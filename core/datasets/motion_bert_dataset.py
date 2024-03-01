@@ -7,7 +7,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
-from core.models.dataclasses import MotionTokenizerParams
+from core.models.param_dataclasses import MotionTokenizerParams
 from core.models.utils import default
 from torch.utils import data
 from tqdm import tqdm

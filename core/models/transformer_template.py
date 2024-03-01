@@ -9,7 +9,7 @@ from typing import Callable, List, Optional, Union
 import torch
 import torch.nn.functional as F
 from core.models.attend import Attend, Attention
-from core.models.dataclasses import (
+from core.models.param_dataclasses import (
     AttentionParams,
     PositionalEmbeddingParams,
     PositionalEmbeddingType,

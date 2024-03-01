@@ -3,7 +3,7 @@ import random
 
 import torch
 import torch.nn as nn
-from core.models.dataclasses import (
+from core import (
     AttentionParams,
     ConformerParams,
     PositionalEmbeddingParams,
@@ -16,7 +16,7 @@ from core.models.resnetVQ.quantizer import QuantizeEMAReset
 from core.models.resnetVQ.residual_vq import ResidualVQ
 from core.models.resnetVQ.resnet import Resnet1D
 from core.models.resnetVQ.vqvae import HumanVQVAE
-from core.models.transformer import TransformerBlock
+from core.models.transformer_template import TransformerBlock
 from core.models.transformer_modules import (
     DecoderConformer,
     DecoderTransfomer,

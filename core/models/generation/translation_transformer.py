@@ -11,10 +11,11 @@ import torch
 import torch.nn.functional as F
 from core.datasets.conditioner import ConditionFuser
 from core.models.attend import Attend, Attention
-from core.models.dataclasses import (
+from core import (
     AttentionParams,
     PositionalEmbeddingParams,
     PositionalEmbeddingType,
+    TranslationTransformerOutput,
     TranslationTransformerParams,
 )
 from core.models.utils import FeedForward, LayerNorm, default, exists, get_obj_from_str
@@ -22,7 +23,6 @@ from einops import rearrange, repeat
 from torch import einsum, nn
 from tqdm.auto import tqdm
 from yacs.config import CfgNode as CN
-from core.models.dataclasses import TranslationTransformerOutput
 
 ConditionType = Tuple[torch.Tensor, torch.Tensor]
 

@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from core.models.attend import Attention
-from core.models.dataclasses import ConformerParams
+from core import ConformerParams
 from core.models.positional_embeddings import (
     PositionalEmbeddingParams,
     RelativePositionBias,

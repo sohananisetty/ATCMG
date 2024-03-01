@@ -254,8 +254,6 @@ class BaseMotionDataset(ABC, data.Dataset):
             motion = self.transform(motion)
             body_params, hand_params, full_params = self.hmldata_process(motion)
             selected_motion = body_params
-            
-            
 
         elif "hand" in motion_rep or motion_rep == "full":
             # motion = (motion - self.mean) / (self.std + 1e-8)

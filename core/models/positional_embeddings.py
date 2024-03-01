@@ -5,7 +5,7 @@ from functools import partial
 
 import torch
 import torch.nn.functional as F
-from core.models.dataclasses import PositionalEmbeddingParams
+from core import PositionalEmbeddingParams
 from core.models.utils import exists, pad_at_dim
 from einops import rearrange, repeat
 from torch import einsum, nn

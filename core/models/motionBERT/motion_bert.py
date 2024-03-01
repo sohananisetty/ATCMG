@@ -6,7 +6,7 @@ from functools import partial, wraps
 import torch
 import torch.nn.functional as F
 from core.models.conformer import ConformerBlock
-from core.models.dataclasses import (
+from core import (
     AttentionParams,
     ConformerParams,
     MotionBERTOutput,

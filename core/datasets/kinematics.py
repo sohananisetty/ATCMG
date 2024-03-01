@@ -1,11 +1,12 @@
 import numpy as np
 import scipy.ndimage.filters as filters
 import torch
+from utils.motion_processing.quaternion import (cont6d_to_matrix,
+                                                cont6d_to_matrix_np,
+                                                qbetween_np, qinv_np, qmul,
+                                                qmul_np, qrot, qrot_np)
 
-from .quaternion import (cont6d_to_matrix, cont6d_to_matrix_np, qbetween_np,
-                         qinv_np, qmul, qmul_np, qrot, qrot_np)
-
-hand_joints_id = [i for i in range(25, 55)]
+hand_joints_id = [i for i in range(22, 52)]
 body_joints_id = [i for i in range(0, 22)]
 l_idx1, l_idx2 = 5, 8
 # Right/Left foot
@@ -16,34 +17,7 @@ r_hip, l_hip = 2, 1
 joints_num = 52
 
 
-t2m_raw_offsets = np.array(
-    [
-        [0, 0, 0],
-        [1, 0, 0],
-        [-1, 0, 0],
-        [0, 1, 0],
-        [0, -1, 0],
-        [0, -1, 0],
-        [0, 1, 0],
-        [0, -1, 0],
-        [0, -1, 0],
-        [0, 1, 0],
-        [0, 0, 1],
-        [0, 0, 1],
-        [0, 1, 0],
-        [1, 0, 0],
-        [-1, 0, 0],
-        [0, 0, 1],
-        [0, -1, 0],
-        [0, -1, 0],
-        [0, -1, 0],
-        [0, -1, 0],
-        [0, -1, 0],
-        [0, -1, 0],
-    ]
-)
-
-t2m_raw_body_offsets = np.array(
+smplx_raw_body_offsets = np.array(
     [
         [0, 0, 0],  # pelvis
         [1, 0, 0],  # left_hip
@@ -70,7 +44,7 @@ t2m_raw_body_offsets = np.array(
     ]
 )
 
-t2m_raw_hand_offsets = np.array(
+smplx_raw_hand_offsets = np.array(
     [
         [0, -1, 0],  # left_index1
         [0, -1, 0],  # left_index2
@@ -106,26 +80,28 @@ t2m_raw_hand_offsets = np.array(
 )
 
 
-t2m_full_raw_offsets = np.concatenate(
-    (t2m_raw_body_offsets, t2m_raw_hand_offsets), axis=0
+smplx_full_raw_offsets = np.concatenate(
+    (smplx_raw_body_offsets, smplx_raw_hand_offsets), axis=0
 )
 
 
-t2m_kinematic_chain = [
+smplx_kinematic_chain = [
     [0, 2, 5, 8, 11],
     [0, 1, 4, 7, 10],
     [0, 3, 6, 9, 12, 15],
     [9, 14, 17, 19, 21],
     [9, 13, 16, 18, 20],
 ]
-t2m_left_hand_chain = [
+
+
+smplx_left_hand_chain = [
     [20, 22, 23, 24],
     [20, 34, 35, 36],
     [20, 25, 26, 27],
     [20, 31, 32, 33],
     [20, 28, 29, 30],
 ]
-t2m_right_hand_chain = [
+smplx_right_hand_chain = [
     [21, 43, 44, 45],
     [21, 46, 47, 48],
     [21, 40, 41, 42],
@@ -133,12 +109,32 @@ t2m_right_hand_chain = [
     [21, 49, 50, 51],
 ]
 
+smplx_only_one_hand_chain = [
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8],
+    [9, 10, 11],
+    [12, 13, 14],
+]
 
-t2m_full_kinematic_chain = (
-    t2m_kinematic_chain + t2m_left_hand_chain + t2m_right_hand_chain
+smplx_only_both_hand_chain = [
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8],
+    [9, 10, 11],
+    [12, 13, 14],
+    [15, 16, 17],
+    [18, 19, 20],
+    [21, 22, 23],
+    [24, 25, 26],
+    [27, 28, 29],
+]
+
+smplx_full_kinematic_chain = (
+    smplx_kinematic_chain + smplx_left_hand_chain + smplx_right_hand_chain
 )
 
-t2m_hand_kinematic_chain = t2m_left_hand_chain + t2m_right_hand_chain
+smplx_hand_kinematic_chain = smplx_left_hand_chain + smplx_right_hand_chain
 
 
 class Skeleton(object):
@@ -365,3 +361,40 @@ class Skeleton(object):
                     torch.matmul(matR, offset_vec).squeeze(-1) + joints[:, chain[i - 1]]
                 )
         return joints
+
+
+def getSkeleton(
+    example_data_path="/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/core/datasets/data/000021_pos.npy",
+    motion_rep="full",
+):
+
+    example_data = torch.Tensor(np.load(example_data_path))
+
+    if motion_rep == "body":
+        example_data = example_data[:, body_joints_id, :]
+        kinematic_chain = smplx_kinematic_chain
+        n_raw_offsets = torch.from_numpy(smplx_raw_body_offsets)
+
+    elif "hand" in motion_rep:
+        if motion_rep == "left_hand":
+            example_data = example_data[:, hand_joints_id[:15], :]
+            kinematic_chain = smplx_only_one_hand_chain
+            n_raw_offsets = torch.from_numpy(smplx_raw_hand_offsets[:15])
+        elif motion_rep == "right_hand":
+            example_data = example_data[:, hand_joints_id[15:], :]
+            kinematic_chain = smplx_only_one_hand_chain
+            n_raw_offsets = torch.from_numpy(smplx_raw_hand_offsets[15:])
+        else:
+            example_data = example_data[:, hand_joints_id, :]
+            kinematic_chain = smplx_only_both_hand_chain
+            n_raw_offsets = torch.from_numpy(smplx_raw_hand_offsets)
+    elif motion_rep == "full":
+        if example_data.shape[1] != 52:
+            example_data = example_data[:, body_joints_id + hand_joints_id, :]
+        kinematic_chain = smplx_full_kinematic_chain
+        n_raw_offsets = torch.from_numpy(smplx_full_raw_offsets)
+
+    tgt_skel = Skeleton(n_raw_offsets, kinematic_chain, "cpu")
+    tgt_offsets = tgt_skel.get_offsets_joints(example_data[0])
+
+    return tgt_skel

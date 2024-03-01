@@ -15,7 +15,7 @@ from core.models.positional_embeddings import (
     PositionalEmbeddingParams,
     PositionalEmbeddingType,
 )
-from core.models.text_encoders import T5, Clip
+from core.models.text_encoders_old import T5, Clip
 from core.models.utils import (
     FeedForward,
     LayerNorm,

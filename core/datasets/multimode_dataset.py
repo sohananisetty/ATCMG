@@ -32,23 +32,23 @@ genre_dict = {
 }
 
 dataset_names_default = [
-    # "animation",
-    # "humanml",
-    # "perform",
-    # "GRAB",
-    # "idea400",
-    # "humman",
-    # "beat",
-    # "game_motion",
-    # "music",
-    # "aist",
-    # "fitness",
+    "animation",
+    "humanml",
+    "perform",
+    "GRAB",
+    "idea400",
+    "humman",
+    "beat",
+    "game_motion",
+    "music",
+    "aist",
+    "fitness",
     "moyo",
     "choreomaster",
-    # "dance",
-    # "kungfu",
-    # "EgoBody",
-    # "HAA500",
+    "dance",
+    "kungfu",
+    "EgoBody",
+    "HAA500",
 ]
 
 
@@ -61,7 +61,6 @@ def load_dataset(
     motion_rep="full",
     split: str = "train",
     weight_scale: Optional[List[int]] = None,
-    # dataset_class=CLAMPDataset,
 ):
     if weight_scale is None:
         weight_scale = [1] * len(dataset_names)
@@ -316,8 +315,6 @@ class MotionAudioTextDataset(BaseMotionDataset):
         if to_ * self.fps - f_ * self.fps > self.min_motion_length:
             motion = motion[f_ * self.fps : to_ * self.fps]
 
-        # selected_motion = motion
-
         processed_motion = self.get_processed_motion(
             motion, motion_rep=MotionRep(self.motion_rep), hml_rep=self.hml_rep
         )
@@ -343,7 +340,7 @@ def simple_collate(
 
     for sample in samples:
         names.append(sample["name"])
-        motions.append(sample["motion"])
+        motions.append(sample["motion"]())
         texts.append(sample["text"])
         audios.append(sample["audio"])
         # print(sample["motion"].shape, sample["audio"].shape)

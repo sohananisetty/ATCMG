@@ -5,7 +5,7 @@ from functools import partial, wraps
 
 import torch
 import torch.nn.functional as F
-from core.models.dataclasses import AttentionParams
+from core import AttentionParams
 from core.models.utils import (
     LayerNorm,
     create_causal_mask,

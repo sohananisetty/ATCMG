@@ -6,7 +6,6 @@ from random import randrange
 
 import torch
 import torch.nn.functional as F
-
 # from vector_quantize_pytorch.vector_quantize_pytorch import VectorQuantize
 from core.models.resnetVQ.quantizer import QuantizeEMAReset
 from einops import pack, rearrange, repeat, unpack

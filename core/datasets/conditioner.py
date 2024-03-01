@@ -10,12 +10,14 @@ import einops
 import numpy as np
 import torch
 import torch.nn.functional as F
-from .text_encoders import BERTConditioner, ClipConditioner, T5Conditioner
 from core.models.utils import TorchAutocast
 from torch import nn
 from transformers import RobertaTokenizer, T5EncoderModel, T5Tokenizer  # type: ignore
 from transformers.feature_extraction_sequence_utils import FeatureExtractionMixin
 from transformers.feature_extraction_utils import BatchFeature
+
+from core.param_dataclasses import MotionRep, TextRep, AudioRep
+from .text_encoders import BERTConditioner, ClipConditioner, T5Conditioner
 
 # from transformers import FeatureExtractionMixin
 
@@ -51,8 +53,8 @@ class ConditionProvider(nn.Module):
     def __init__(
         self,
         text_conditioner_name: str = "t5-base",
-        audio_rep: str = "encodec",
-        text_rep: str = "text_embed",
+        audio_rep: AudioRep = AudioRep.ENCODEC,
+        text_rep: TextRep = TextRep.POOLED_TEXT_EMBED,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
         sampling_rate=16000,
         audio_max_length_s=10,
@@ -60,16 +62,16 @@ class ConditionProvider(nn.Module):
         motion_padding: str = "longest",
         motion_max_length_s: int = 10,
         fps: int = 30,
-        motion_rep: str = "full",
+        motion_rep: MotionRep = MotionRep.FULL,
     ):
         super().__init__()
 
         self.device = device
         self.audio_padding = audio_padding
 
-        if audio_rep == "encodec":
+        if audio_rep == AudioRep.ENCODEC:
             self.sampling_rate = 50
-        elif audio_rep == "librosa":
+        elif audio_rep == AudioRep.LIBROSA:
             self.sampling_rate = 30
         else:
             self.sampling_rate = sampling_rate
@@ -87,7 +89,7 @@ class ConditionProvider(nn.Module):
         self.motion_max_length = motion_max_length_s * fps
         self.use_rotation = True
 
-        self.audio_dim = 128 if audio_rep == "encodec" else 35
+        self.audio_dim = 128 if audio_rep == AudioRep.ENCODEC else 35
 
         if "t5" in text_conditioner_name:
 
@@ -259,7 +261,7 @@ class ConditionProvider(nn.Module):
     def _get_text_features(self, raw_text: List[str]):
         tokenized = self.text_encoder.tokenize(raw_text)
 
-        if self.text_rep == "text_embed":
+        if self.text_rep == TextRep.POOLED_TEXT_EMBED:
             padded_text, text_mask = self.text_encoder.get_text_embedding(tokenized)
         else:
             padded_text, text_mask = self.text_encoder(tokenized)

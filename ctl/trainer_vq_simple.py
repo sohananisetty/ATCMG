@@ -19,7 +19,8 @@ from core.optimizer import get_optimizer
 from torch import nn
 from tqdm import tqdm
 from transformers import AdamW, get_scheduler
-from utils.motion_processing.hml_process import recover_from_ric, recover_root_rot_pos
+from utils.motion_processing.hml_process import (recover_from_ric,
+                                                 recover_root_rot_pos)
 from utils.motion_processing.quaternion import qinv, qrot
 from yacs.config import CfgNode
 

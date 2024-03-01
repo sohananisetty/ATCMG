@@ -3,17 +3,10 @@ import os
 import numpy as np
 import torch
 import utils.rotation_conversions as geometry
-from utils.motion_processing.quaternion import (
-    qbetween_np,
-    qfix,
-    qinv,
-    qinv_np,
-    qmul_np,
-    qrot,
-    qrot_np,
-    quaternion_to_cont6d,
-    quaternion_to_cont6d_np,
-)
+from utils.motion_processing.quaternion import (qbetween_np, qfix, qinv,
+                                                qinv_np, qmul_np, qrot,
+                                                qrot_np, quaternion_to_cont6d,
+                                                quaternion_to_cont6d_np)
 
 from human_body_prior.body_model.body_model import BodyModel
 

@@ -1,5 +1,6 @@
 from configs.config import cfg, get_cfg_defaults
-from ctl.trainer_vq_simple import VQVAEMotionTrainer as VQVAEMotionTrainerSimple
+from ctl.trainer_vq_simple import \
+    VQVAEMotionTrainer as VQVAEMotionTrainerSimple
 
 
 def main(cfg):

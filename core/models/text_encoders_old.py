@@ -3,15 +3,8 @@ from typing import List, Union
 import clip
 import torch
 import torch.nn as nn
-from transformers import (
-    AutoTokenizer,
-    BertConfig,
-    BertForMaskedLM,
-    BertModel,
-    T5Config,
-    T5EncoderModel,
-    T5Tokenizer,
-)
+from transformers import (AutoTokenizer, BertConfig, BertForMaskedLM,
+                          BertModel, T5Config, T5EncoderModel, T5Tokenizer)
 
 DEFAULT_T5_NAME = "google/t5-v1_1-base"
 # "google/t5-v1_1-base"

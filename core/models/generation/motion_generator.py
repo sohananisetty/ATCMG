@@ -8,15 +8,9 @@ from typing import Callable, List, Optional
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
-
-from torch import einsum, nn
-from tqdm.auto import tqdm
-
-import torch
-import torch.nn.functional as F
 from core.datasets.conditioner import ConditionFuser
 from core.models.attend import Attend, Attention
-from core.models.dataclasses import (
+from core import (
     AttentionParams,
     PositionalEmbeddingParams,
     PositionalEmbeddingType,

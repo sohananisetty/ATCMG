@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from core.models.dataclasses import VQVAEOutput
+from core import VQVAEOutput
 from core.models.resnetVQ.encdec import Decoder, Encoder
 from core.models.resnetVQ.quantizer import QuantizeEMAReset
 

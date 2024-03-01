@@ -14,6 +14,25 @@ class PositionalEmbeddingType(Enum):
     SHAW = "core.models.positional_embeddings.ShawRelativePositionalEmbedding"
 
 
+class MotionRep(Enum):
+    FULL = "full"
+    BODY = "body"
+    HAND = "hand"
+    LEFT_HAND = "left_hand"
+    RIGHT_HAND = "right_hand"
+
+
+class TextRep(Enum):
+    POOLED_TEXT_EMBED = "pooled_text_embed"
+    FULL_TEXT_EMBED = "full_text_embed"
+
+
+class AudioRep(Enum):
+    ENCODEC = "encodec"
+    LIBROSA = "librosa"
+    WAV = "wav"
+
+
 @dataclass
 class AttentionParams:
     dim: int = 768

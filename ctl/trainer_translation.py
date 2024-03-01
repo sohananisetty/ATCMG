@@ -21,7 +21,8 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AdamW, get_scheduler
-from utils.motion_processing.hml_process import recover_from_ric, recover_root_rot_pos
+from utils.motion_processing.hml_process import (recover_from_ric,
+                                                 recover_root_rot_pos)
 from yacs.config import CfgNode
 
 

@@ -11,11 +11,8 @@ import transformers
 import utils.vis_utils.plot_3d_global as plot_3d
 import wandb
 from core.datasets.dataset_loading_utils import load_dataset
-from core.datasets.motion_bert_dataset import (
-    DATALoader,
-    MotionBERTDataset,
-    get_mlm_mask,
-)
+from core.datasets.motion_bert_dataset import (DATALoader, MotionBERTDataset,
+                                               get_mlm_mask)
 from core.models.loss import ReConsLoss
 from core.models.resnetVQ.vqvae import HumanVQVAE
 from core.models.utils import instantiate_from_config
