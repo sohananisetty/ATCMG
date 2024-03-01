@@ -12,7 +12,10 @@ import librosa
 import numpy as np
 import torch
 import torchaudio
-from core.datasets.base_dataset_adv import BaseMotionDataset, MotionRep
+from core.datasets.base_dataset_adv import BaseMotionDataset
+
+from core import MotionRep
+
 from core.datasets.conditioner import ConditionProvider
 from torch.utils import data
 from torch.utils.data.dataloader import default_collate
@@ -334,9 +337,6 @@ def simple_collate(
     texts = []
     audios = []
     names = []
-
-    lens_motion = []
-    lens_audio = []
 
     for sample in samples:
         names.append(sample["name"])

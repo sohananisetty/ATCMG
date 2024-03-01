@@ -1,7 +1,9 @@
+from __future__ import annotations
+
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, Dict, List, Optional, Tuple, Union
-
 import numpy as np
 import torch
 
@@ -118,7 +120,7 @@ class Motion:
             else self.contact
         )
 
-    def transform(self, mean, std):
+    def transform(self, mean: Motion, std: Motion):
 
         if isinstance(self.dtype, torch.Tensor):
             mean.tensor().to(self.device)
@@ -140,7 +142,7 @@ class Motion:
             except:
                 continue
 
-    def inv_transform(self, mean, std):
+    def inv_transform(self, mean: Motion, std: Motion):
 
         if isinstance(self.dtype, torch.Tensor):
             mean.tensor().to(self.device)
@@ -191,12 +193,10 @@ class Motion:
         else:
             return torch.cat(params, -1)
 
-    def __add__(self, motion2):
+    def __add__(self, motion2: Motion):
         assert (
             self.motion_rep != MotionRep.FULL and motion2.motion_rep != self.motion_rep
         ), "already full"
-
-        # assert self.motion_rep == MotionRep.BODY, "only body + hand"
 
         assert self.hml_rep.replace("g", "").replace(
             "c", ""
@@ -204,7 +204,31 @@ class Motion:
             "c", ""
         ), f"{self.hml_rep} and {motion2.hml_rep} not compatible"
 
-        combo_motion = Motion(hml_rep=max(self.hml_rep, motion2.hml_rep, key=len))
+        if self.motion_rep in [
+            MotionRep.BODY,
+            MotionRep.HAND,
+        ] and motion2.motion_rep in [
+            MotionRep.BODY,
+            MotionRep.HAND,
+        ]:
+
+            combo_motion = Motion(
+                motion_rep=MotionRep.FULL,
+                hml_rep=max(self.hml_rep, motion2.hml_rep, key=len),
+            )
+
+        elif self.motion_rep in [
+            MotionRep.LEFT_HAND,
+            MotionRep.RIGHT_HAND,
+        ] and motion2.motion_rep in [MotionRep.LEFT_HAND, MotionRep.RIGHT_HAND]:
+
+            combo_motion = Motion(
+                motion_rep=MotionRep.HAND,
+                hml_rep=min(self.hml_rep, motion2.hml_rep, key=len),
+            )
+
+        else:
+            return
 
         if "g" in self.hml_rep:
             assert self.root_params is not None, f"need root for {self.hml_rep} "
@@ -224,12 +248,12 @@ class Motion:
 
         if "r" in self.hml_rep and "r" in motion2.hml_rep:
             concat_func = (
-                np.concatenate if isinstance(self.positions, np.ndarray) else torch.cat
+                np.concatenate if isinstance(self.rotations, np.ndarray) else torch.cat
             )
             assert (
                 self.rotations is not None and motion2.rotations is not None
             ), f"need positions for {self.hml_rep} {motion2.hml_rep}"
-            combo_motion.positions = concat_func(
+            combo_motion.rotations = concat_func(
                 [self.rotations, motion2.rotations], -1
             )
 
@@ -240,13 +264,15 @@ class Motion:
             ), f"need positions for {self.hml_rep} {motion2.hml_rep}"
 
             concat_func = (
-                np.concatenate if isinstance(self.positions, np.ndarray) else torch.cat
+                np.concatenate if isinstance(self.velocity, np.ndarray) else torch.cat
             )
-            combo_motion.positions = concat_func([self.velocity, motion2.velocity], -1)
+            combo_motion.velocity = concat_func([self.velocity, motion2.velocity], -1)
 
         if "c" in self.hml_rep:
             assert self.contact is not None, f"need contact for {self.hml_rep}"
             combo_motion.contact = self.contact
+
+        return combo_motion
 
     def __len__(self) -> int:
         for prm in [
@@ -263,7 +289,7 @@ class Motion:
 
         return 0
 
-    def __getitem__(self, idx: slice) -> "Motion":
+    def __getitem__(self, idx: slice) -> Motion:
         return Motion(
             motion_rep=self.motion_rep,
             hml_rep=self.hml_rep,

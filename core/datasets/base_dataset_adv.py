@@ -16,318 +16,19 @@ from .kinematics import getSkeleton
 from core import MotionRep
 
 from core import Motion
-
-# @dataclass
-# class Motion:
-#     motion_rep: MotionRep = MotionRep.FULL
-#     hml_rep: str = "gprvc"
-#     root_params: Optional[Union[np.ndarray, torch.Tensor]] = None
-#     positions: Optional[Union[np.ndarray, torch.Tensor]] = None
-#     rotations: Optional[Union[np.ndarray, torch.Tensor]] = None
-#     velocity: Optional[Union[np.ndarray, torch.Tensor]] = None
-#     contact: Optional[Union[np.ndarray, torch.Tensor]] = None
-
-#     @property
-#     def device(self):
-#         for prm in [
-#             self.root_params,
-#             self.positions,
-#             self.rotations,
-#             self.velocity,
-#             self.contact,
-#         ]:
-#             try:
-#                 return prm.device
-#             except:
-#                 continue
-
-#         return "cpu"
-
-#     def __len__(self) -> int:
-#         for prm in [
-#             self.root_params,
-#             self.positions,
-#             self.rotations,
-#             self.velocity,
-#             self.contact,
-#         ]:
-#             try:
-#                 return prm.shape[0]
-#             except:
-#                 continue
-
-#         return 0
-
-#     @property
-#     def nb_joints(self):
-#         if self.motion_rep == MotionRep.FULL:
-#             return 52
-#         elif self.motion_rep == MotionRep.BODY:
-#             return 22
-#         elif self.motion_rep == MotionRep.HAND:
-#             return 30
-#         elif self.motion_rep == MotionRep.LEFT_HAND:
-#             return 15
-#         elif self.motion_rep == MotionRep.RIGHT_HAND:
-#             return 15
-
-#     @property
-#     def dtype(self):
-
-#         if any(isinstance(value, np.ndarray) for value in self.__dict__.values()):
-#             return np.ndarray
-#         elif any(isinstance(value, torch.Tensor) for value in self.__dict__.values()):
-#             return torch.Tensor
-
-#     def numpy(self):
-#         """
-#         inplace convert to np array
-
-#         """
-#         self.root_params = (
-#             self.root_params.numpy()
-#             if isinstance(self.root_params, torch.Tensor)
-#             else self.root_params
-#         )
-#         self.positions = (
-#             self.positions.numpy()
-#             if isinstance(self.positions, torch.Tensor)
-#             else self.positions
-#         )
-#         self.rotations = (
-#             self.rotations.numpy()
-#             if isinstance(self.rotations, torch.Tensor)
-#             else self.rotations
-#         )
-#         self.velocity = (
-#             self.velocity.numpy()
-#             if isinstance(self.velocity, torch.Tensor)
-#             else self.velocity
-#         )
-#         self.contact = (
-#             self.contact.numpy()
-#             if isinstance(self.contact, torch.Tensor)
-#             else self.contact
-#         )
-
-#     def tensor(self):
-#         """
-#         inplace convert to torch.Tensor
-
-#         """
-
-#         self.root_params = (
-#             torch.tensor(self.root_params)
-#             if isinstance(self.root_params, np.ndarray)
-#             else self.root_params
-#         )
-#         self.positions = (
-#             torch.tensor(self.positions)
-#             if isinstance(self.positions, np.ndarray)
-#             else self.positions
-#         )
-#         self.rotations = (
-#             torch.tensor(self.rotations)
-#             if isinstance(self.rotations, np.ndarray)
-#             else self.rotations
-#         )
-#         self.velocity = (
-#             torch.tensor(self.velocity)
-#             if isinstance(self.velocity, np.ndarray)
-#             else self.velocity
-#         )
-#         self.contact = (
-#             torch.tensor(self.contact)
-#             if isinstance(self.contact, np.ndarray)
-#             else self.contact
-#         )
-
-#     def __call__(self) -> Union[np.ndarray, torch.Tensor]:
-
-#         params = []
-#         if "g" in self.hml_rep:
-#             assert self.root_params is not None, f"need root for {self.hml_rep}"
-#             params.append(self.root_params)
-
-#         if "p" in self.hml_rep:
-#             assert self.positions is not None, f"need positions for {self.hml_rep}"
-#             params.append(self.positions)
-
-#         if "r" in self.hml_rep:
-#             assert self.rotations is not None, f"need rotation for {self.hml_rep}"
-#             params.append(self.rotations)
-
-#         if "v" in self.hml_rep:
-#             assert self.velocity is not None, f"need velocities for {self.hml_rep}"
-#             params.append(self.velocity)
-
-#         if "c" in self.hml_rep:
-#             assert self.contact is not None, f"need contact for {self.hml_rep}"
-#             params.append(self.contact)
-
-#         if isinstance(params[0], np.ndarray):
-#             return np.concatenate(params, -1)
-#         else:
-#             return torch.cat(params, -1)
-
-#     def __add__(self, motion2):
-#         assert (
-#             self.motion_rep != MotionRep.FULL and motion2.motion_rep != self.motion_rep
-#         ), "already full"
-
-#         # assert self.motion_rep == MotionRep.BODY, "only body + hand"
-
-#         assert self.hml_rep.replace("g", "").replace(
-#             "c", ""
-#         ) == motion2.hml_rep.replace("g", "").replace(
-#             "c", ""
-#         ), f"{self.hml_rep} and {motion2.hml_rep} not compatible"
-
-#         combo_motion = Motion(hml_rep=max(self.hml_rep, motion2.hml_rep, key=len))
-
-#         if "g" in self.hml_rep:
-#             assert self.root_params is not None, f"need root for {self.hml_rep} "
-#             combo_motion.root_params = self.root_params
-
-#         if "p" in self.hml_rep and "p" in motion2.hml_rep:
-#             concat_func = (
-#                 np.concatenate if isinstance(self.positions, np.ndarray) else torch.cat
-#             )
-#             assert (
-#                 self.positions is not None and motion2.positions is not None
-#             ), f"need positions for {self.hml_rep}"
-
-#             combo_motion.positions = concat_func(
-#                 [self.positions, motion2.positions], -1
-#             )
-
-#         if "r" in self.hml_rep and "r" in motion2.hml_rep:
-#             concat_func = (
-#                 np.concatenate if isinstance(self.positions, np.ndarray) else torch.cat
-#             )
-#             assert (
-#                 self.rotations is not None and motion2.rotations is not None
-#             ), f"need positions for {self.hml_rep} {motion2.hml_rep}"
-#             combo_motion.positions = concat_func(
-#                 [self.rotations, motion2.rotations], -1
-#             )
-
-#         if "v" in self.hml_rep and "v" in motion2.hml_rep:
-
-#             assert (
-#                 self.velocity is not None and motion2.velocity is not None
-#             ), f"need positions for {self.hml_rep} {motion2.hml_rep}"
-
-#             concat_func = (
-#                 np.concatenate if isinstance(self.positions, np.ndarray) else torch.cat
-#             )
-#             combo_motion.positions = concat_func([self.velocity, motion2.velocity], -1)
-
-#         if "c" in self.hml_rep:
-#             assert self.contact is not None, f"need contact for {self.hml_rep}"
-#             combo_motion.contact = self.contact
-
-#     def transform(self, mean, std):
-
-#         if isinstance(self.dtype, torch.Tensor):
-#             mean.tensor().to(self.device)
-#             std.tensor().to(self.device)
-
-#         for prm in [
-#             "root_params",
-#             "positions",
-#             "rotations",
-#             "velocity",
-#             "contact",
-#         ]:
-
-#             try:
-#                 trns = (getattr(self, prm) - getattr(mean, prm)) / (
-#                     getattr(std, prm) + 1e-8
-#                 )
-#                 setattr(self, prm, trns)
-#             except:
-#                 continue
-
-#     def inv_transform(self, mean, std):
-
-#         if isinstance(self.dtype, torch.Tensor):
-#             mean.tensor().to(self.device)
-#             std.tensor().to(self.device)
-
-#         for prm in [
-#             "root_params",
-#             "positions",
-#             "rotations",
-#             "velocity",
-#             "contact",
-#         ]:
-
-#             try:
-#                 trns = getattr(self, prm) * (getattr(std, prm) - 1e-8) + getattr(
-#                     mean, prm
-#                 )
-
-#                 setattr(self, prm, trns)
-#             except:
-#                 continue
-
-#     def __getitem__(self, idx: slice) -> "Motion":
-#         return Motion(
-#             root_params=self.root_params[idx] if self.root_params is not None else None,
-#             positions=self.positions[idx] if self.positions is not None else None,
-#             rotations=self.rotations[idx] if self.rotations is not None else None,
-#             velocity=self.velocity[idx] if self.velocity is not None else None,
-#             contact=self.contact[idx] if self.contact is not None else None,
-#         )
-
-#     def __setitem__(
-#         self, idx: Union[slice, int], value: Union[List, np.ndarray, torch.Tensor]
-#     ):
-#         if isinstance(idx, slice):
-#             start, stop, step = idx.start, idx.stop, idx.step
-#             prm_indices = [
-#                 (idx, prm)
-#                 for idx, prm in enumerate(
-#                     [
-#                         self.root_params,
-#                         self.positions,
-#                         self.rotations,
-#                         self.velocity,
-#                         self.contact,
-#                     ]
-#                 )
-#                 if prm is not None
-#             ]
-#             for idx, prm in prm_indices:
-#                 prm[start:stop:step] = value[start:stop:step]
-#         else:
-#             prm_indices = [
-#                 (idx, prm)
-#                 for idx, prm in enumerate(
-#                     [
-#                         self.root_params,
-#                         self.positions,
-#                         self.rotations,
-#                         self.velocity,
-#                         self.contact,
-#                     ]
-#                 )
-#                 if prm is not None
-#             ]
-#             for idx, prm in prm_indices:
-#                 prm[idx] = value[idx]
+import copy
 
 
 class Motion2Positions:
 
-    def __init__(self, data_root, motion_rep) -> None:
+    def __init__(self, data_root: str, motion_rep: MotionRep):
         self.skeleton = getSkeleton(
             os.path.join(data_root, "motion_data/000021_pos.npy"),
             motion_rep=motion_rep.value,
         )
 
-    def recover_root_rot_pos(self, data: Motion):
+    def recover_root_rot_pos(self, data: Motion) -> Tuple[torch.Tensor, torch.Tensor]:
+
         rot_vel = data.root_params[..., 0]
         r_rot_ang = torch.zeros_like(rot_vel).to(data.device)
         """Get Y-axis rotation from rotation velocity"""
@@ -348,9 +49,12 @@ class Motion2Positions:
         r_pos[..., 1] = data.root_params[..., 3]
         return r_rot_quat, r_pos
 
-    def recover_from_rot(self, data: Motion):
+    def recover_from_rot(self, data: Motion) -> torch.Tensor:
 
         data.tensor()
+
+        if data.root_params is None:
+            data.root_params = torch.zeros((data.rotations.shape[:-1] + (4,)))
 
         joints_num = data.nb_joints
         r_rot_quat, r_pos = self.recover_root_rot_pos(data)
@@ -364,8 +68,11 @@ class Motion2Positions:
 
         return positions
 
-    def recover_from_ric(self, data: Motion):
+    def recover_from_ric(self, data: Motion) -> torch.Tensor:
         data.tensor()
+
+        if data.root_params is None:
+            data.root_params = torch.zeros((data.positions.shape[:-1] + (4,)))
 
         joints_num = data.nb_joints
         if joints_num == 22 or joints_num == 52:
@@ -387,12 +94,23 @@ class Motion2Positions:
             positions = torch.cat([r_pos.unsqueeze(-2), positions], dim=-2)
 
         else:
-            positions = data.positions.view(positions.shape[:-1] + (-1, 3)).float()
+            positions = data.positions
+            positions = positions.view(positions.shape[:-1] + (-1, 3)).float()
 
         return positions
 
+    def __call__(self, motion: Motion, hml_rep=None) -> torch.Tensor:
+        hml_rep = motion.hml_rep if hml_rep is None else hml_rep
 
-def splitHands(hand_data: Motion) -> Tuple[Motion, Motion]:
+        if "p" not in hml_rep:
+            xyz = self.recover_from_rot(motion)
+        else:
+            xyz = self.recover_from_ric(motion)
+
+        return xyz
+
+
+def split_hands(hand_data: Motion) -> Tuple[Motion, Motion]:
 
     left_hand = Motion(MotionRep.LEFT_HAND, hml_rep=hand_data.hml_rep)
     right_hand = Motion(MotionRep.RIGHT_HAND, hml_rep=hand_data.hml_rep)
@@ -444,8 +162,8 @@ class BaseMotionDataset(ABC, data.Dataset):
         self.body_mean, self.hand_mean, self.full_mean = self.hmldata_process(self.mean)
         self.body_std, self.hand_std, self.full_std = self.hmldata_process(self.std)
 
-        self.left_hand_mean, self.right_hand_mean = splitHands(self.hand_mean)
-        self.left_hand_std, self.right_hand_std = splitHands(self.hand_std)
+        self.left_hand_mean, self.right_hand_mean = split_hands(self.hand_mean)
+        self.left_hand_std, self.right_hand_std = split_hands(self.hand_std)
 
         self.mot2pos = Motion2Positions(self.data_root, self.motion_rep)
 
@@ -461,36 +179,39 @@ class BaseMotionDataset(ABC, data.Dataset):
         """
         motion_rep = data.motion_rep
 
+        inv_data = copy.deepcopy(data)
+
         if motion_rep == MotionRep.FULL:
-            data.inv_transform(self.mean, self.std)
+            inv_data.inv_transform(self.mean, self.std)
         elif motion_rep == MotionRep.HAND:
-            data.inv_transform(self.hand_mean, self.hand_std)
+            inv_data.inv_transform(self.hand_mean, self.hand_std)
         elif motion_rep == MotionRep.BODY:
-            data.inv_transform(self.body_mean, self.body_std)
+            inv_data.inv_transform(self.body_mean, self.body_std)
 
         elif motion_rep == MotionRep.LEFT_HAND:
-            data.inv_transform(self.left_hand_mean, self.left_hand_std)
+            inv_data.inv_transform(self.left_hand_mean, self.left_hand_std)
         elif motion_rep == MotionRep.RIGHT_HAND:
-            data.inv_transform(self.right_hand_mean, self.right_hand_std)
+            inv_data.inv_transform(self.right_hand_mean, self.right_hand_std)
 
-        return data
+        return inv_data
 
     def transform(self, data: Motion) -> Motion:
         motion_rep = data.motion_rep
+        trn_data = copy.deepcopy(data)
 
         if motion_rep == MotionRep.FULL:
-            data.transform(self.mean, self.std)
+            trn_data.transform(self.mean, self.std)
         elif motion_rep == MotionRep.HAND:
-            data.transform(self.hand_mean, self.hand_std)
+            trn_data.transform(self.hand_mean, self.hand_std)
         elif motion_rep == MotionRep.BODY:
-            data.transform(self.body_mean, self.body_std)
+            trn_data.transform(self.body_mean, self.body_std)
 
         elif motion_rep == MotionRep.LEFT_HAND:
-            data.transform(self.left_hand_mean, self.left_hand_std)
+            trn_data.transform(self.left_hand_mean, self.left_hand_std)
         elif motion_rep == MotionRep.RIGHT_HAND:
-            data.transform(self.right_hand_mean, self.right_hand_std)
+            trn_data.transform(self.right_hand_mean, self.right_hand_std)
 
-        return data
+        return trn_data
 
     def hmldata_process(
         self,
@@ -552,6 +273,7 @@ class BaseMotionDataset(ABC, data.Dataset):
 
         full_motion = Motion(
             motion_rep=MotionRep.FULL,
+            hml_rep=hml_rep,
             root_params=root_params if "g" in hml_rep else None,
             positions=local_pos if "p" in hml_rep else None,
             rotations=local_rots if "r" in hml_rep else None,
@@ -561,11 +283,9 @@ class BaseMotionDataset(ABC, data.Dataset):
 
         return body_motion, hand_motion, full_motion
 
-    def processHand(
+    def process_hand(
         self, body: Motion, hand: Union[Motion, List[Motion]], mode="remove"
     ) -> Motion:
-        l_wrist_pos_param = body.positions[..., 19 * 3 : 20 * 3].reshape(-1, 1, 3)
-        r_wrist_pos_param = body.positions[..., 20 * 3 : 21 * 3].reshape(-1, 1, 3)
 
         def joinHands(hands: List[Motion]) -> Motion:
             l_hand, r_hand = hands[0], hands[1]
@@ -573,18 +293,17 @@ class BaseMotionDataset(ABC, data.Dataset):
             hand.motion_rep = MotionRep.HAND
             hand.hml_rep = body.hml_rep.replace("g", "").replace("c", "")
 
-            # hand = Motion(
-            #     motion_rep=MotionRep.HAND,
-            #     hml_rep=body.hml_rep.replace("g", "").replace("c", ""),
-            #     positions=torch.cat(l_hand.positions, r_hand.positions),
-            #     rotations=torch.cat(l_hand.rotations, r_hand.rotations),
-            #     velocity=torch.cat(l_hand.velocity, r_hand.velocity),
-            # )
-
             return hand
 
         if isinstance(hand, list):
+
             hand = joinHands(hand)
+
+        if "p" not in body.hml_rep or "p" not in hand.hml_rep:
+            return hand
+
+        l_wrist_pos_param = body.positions[..., 19 * 3 : 20 * 3].reshape(-1, 1, 3)
+        r_wrist_pos_param = body.positions[..., 20 * 3 : 21 * 3].reshape(-1, 1, 3)
 
         finger_param = hand.positions.reshape(-1, 30, 3)
         if mode == "remove":
@@ -602,20 +321,24 @@ class BaseMotionDataset(ABC, data.Dataset):
 
         return hand
 
-    def joinBodyHands(self, body: Motion, hand: Union[Motion, List[Motion]]) -> Motion:
+    def join_body_hands(
+        self, body: Motion, hand: Union[Motion, List[Motion]]
+    ) -> Motion:
         if isinstance(hand, list):
-            hand = self.processHand(body, hand, "add")
+            hand = self.process_hand(body, hand, "add")
 
         full_params = body + hand
 
         return full_params
 
-    def toFullJointRepresentation(self, body: Motion, left: Motion, right: Motion):
+    def to_full_joint_representation(self, body: Motion, left: Motion, right: Motion):
         left_inv = self.inv_transform(left)
         right_inv = self.inv_transform(right)
         body_inv = self.inv_transform(body)
-        processed_hand = self.processHand(body_inv, [left_inv, right_inv], "add")
-        joined_motion = self.joinBodyHands(body_inv, processed_hand)
+        processed_hand = self.process_hand(body_inv, [left_inv, right_inv], "add")
+        joined_motion = self.join_body_hands(body_inv, processed_hand)
+        joined_motion = self.transform(joined_motion)
+
         return joined_motion
 
     def get_processed_motion(
@@ -650,57 +373,22 @@ class BaseMotionDataset(ABC, data.Dataset):
             body_params, hand_params, full_params = self.hmldata_process(
                 motion, hml_rep=hml_rep
             )
-            hand_params = self.processHand(body_params, hand_params, "remove")
+
+            if "p" in hml_rep:
+                hand_params = self.process_hand(body_params, hand_params, "remove")
             hand_params = self.transform(hand_params)
 
             if motion_rep == MotionRep.HAND:
                 return hand_params
 
-            left_hand, right_hand = splitHands(hand_params)
+            left_hand, right_hand = split_hands(hand_params)
             if motion_rep == MotionRep.LEFT_HAND:
                 return left_hand
             else:
                 return right_hand
 
-        # elif motion_rep == MotionRep.HAND:
-        #     body_params, hand_params, full_params = self.hmldata_process(
-        #         motion, hml_rep=hml_rep
-        #     )
-        #     hand_params = self.processHand(body_params, hand_params, "remove")
-        #     hand_params = self.transform(hand_params)
-
-        #     selected_motion = hand_params
-
-        # elif motion_rep == MotionRep.LEFT_HAND:
-        #     body_params, hand_params, full_params = self.hmldata_process(
-        #         motion, hml_rep=hml_rep
-        #     )
-        #     hand_params = self.processHand(body_params, hand_params, "remove")
-        #     hand_params = self.transform(hand_params)
-        #     left_hand, right_hand = splitHands(hand_params)
-
-        #     selected_motion = left_hand
-
-        # elif motion_rep == MotionRep.RIGHT_HAND:
-        #     body_params, hand_params, full_params = self.hmldata_process(
-        #         motion, hml_rep=hml_rep
-        #     )
-        #     hand_params = self.processHand(body_params, hand_params, "remove")
-        #     hand_params = self.transform(hand_params)
-        #     left_hand, right_hand = splitHands(hand_params)
-
-        #     selected_motion = right_hand
-        # return selected_motion
-
     def to_xyz(self, motion: Motion, hml_rep=None) -> torch.Tensor:
-        hml_rep = self.hml_rep if hml_rep is None else hml_rep
-
-        if "p" not in hml_rep:
-            xyz = self.mot2pos.recover_from_rot(motion)
-        else:
-            xyz = self.mot2pos.recover_from_ric(motion)
-
-        return xyz
+        return self.mot2pos(motion, hml_rep)
 
     def findAllFile(self, base):
         file_path = []
