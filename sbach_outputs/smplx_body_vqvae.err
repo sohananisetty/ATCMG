@@ -1,0 +1,10 @@
+wandb: Currently logged in as: sohananisetty (ai-choreo). Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.16.2
+wandb: Run data is saved locally in /coc/scratch/sanisetty3/music_motion/ACMG/wandb/run-20240131_152114-hgfi3lod
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run worthy-puddle-6
+wandb:  View project at https://wandb.ai/ai-choreo/smplx_resnet
+wandb:  View run at https://wandb.ai/ai-choreo/smplx_resnet/runs/hgfi3lod
+srun: Job step aborted: Waiting up to 302 seconds for job step to finish.
+slurmstepd: error: *** STEP 751192.0 ON brainiac CANCELLED AT 2024-01-31T15:21:55 ***
+slurmstepd: error: *** JOB 751192 ON brainiac CANCELLED AT 2024-01-31T15:21:55 ***

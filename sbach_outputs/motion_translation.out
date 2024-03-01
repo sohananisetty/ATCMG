@@ -1,0 +1,168 @@
+loading config from: /srv/hays-lab/scratch/sanisetty3/music_motion/ACMG/checkpoints/motion_translation/motion_translation.yaml
+output_dir:  /srv/hays-lab/scratch/sanisetty3/music_motion/ACMG/checkpoints/motion_translation
+Total number of motions animation: 200 and texts 200
+Total number of motions humanml: 55794 and texts 55794
+Total number of motions perform: 371 and texts 371
+Total number of motions GRAB: 1268 and texts 1268
+Total number of motions idea400: 11146 and texts 11146
+Total number of motions humman: 405 and texts 405
+Total number of motions beat: 1458 and texts 1458
+Total number of motions game_motion: 4012 and texts 4012
+Total number of motions music: 3005 and texts 3005
+Total number of motions aist: 1149 and texts 1149
+Total number of motions fitness: 12681 and texts 12681
+Total number of motions moyo: 161 and texts 161
+Total number of motions choreomaster: 34 and texts 34
+Total number of motions dance: 101 and texts 101
+Total number of motions kungfu: 860 and texts 860
+Total number of motions EgoBody: 913 and texts 913
+Total number of motions animation: 9 and texts 9
+Total number of motions humanml: 9888 and texts 9888
+Total number of motions perform: 17 and texts 17
+Total number of motions GRAB: 67 and texts 67
+Total number of motions idea400: 579 and texts 579
+Total number of motions humman: 24 and texts 24
+Total number of motions beat: 162 and texts 162
+Total number of motions game_motion: 203 and texts 203
+Total number of motions music: 153 and texts 153
+Total number of motions aist: 61 and texts 61
+Total number of motions fitness: 656 and texts 656
+Total number of motions moyo: 9 and texts 9
+Total number of motions choreomaster: 2 and texts 2
+Total number of motions dance: 7 and texts 7
+Total number of motions kungfu: 45 and texts 45
+Total number of motions EgoBody: 49 and texts 49
+Total number of motions HAA500: 37 and texts 37
+Total number of motions animation: 2 and texts 2
+Total number of motions humanml: 6 and texts 6
+Total number of motions perform: 2 and texts 2
+Total number of motions GRAB: 2 and texts 2
+Total number of motions idea400: 2 and texts 2
+Total number of motions humman: 1 and texts 1
+Total number of motions beat: 1 and texts 1
+Total number of motions game_motion: 2 and texts 2
+Total number of motions music: 2 and texts 2
+Total number of motions aist: 1 and texts 1
+Total number of motions fitness: 2 and texts 2
+Total number of motions moyo: 2 and texts 2
+Total number of motions choreomaster: 2 and texts 2
+Total number of motions dance: 1 and texts 1
+Total number of motions kungfu: 2 and texts 2
+Total number of motions EgoBody: 2 and texts 2
+Total number of motions HAA500: 0 and texts 0
+training with training 93558 and test dataset of and 11968 samples
+/srv/hays-lab/scratch/sanisetty3/music_motion/ACMG/checkpoints/motion_translation
+0: model total loss: 0.212
+validation start
+val/loss  tensor(0.2491)
+render start
+0.21244235336780548 inf
+0: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ACMG/checkpoints/motion_translation/checkpoints
+200: model total loss: 0.142
+400: model total loss: 0.139
+600: model total loss: 0.136
+800: model total loss: 0.147
+1000: model total loss: 0.138
+1200: model total loss: 0.119
+1400: model total loss: 0.136
+1600: model total loss: 0.146
+1800: model total loss: 0.147
+2000: model total loss: 0.133
+2200: model total loss: 0.138
+2400: model total loss: 0.129
+2600: model total loss: 0.137
+2800: model total loss: 0.125
+3000: model total loss: 0.127
+3200: model total loss: 0.113
+3400: model total loss: 0.125
+3600: model total loss: 0.143
+3800: model total loss: 0.141
+4000: model total loss: 0.131
+4200: model total loss: 0.11
+4400: model total loss: 0.126
+4600: model total loss: 0.124
+4800: model total loss: 0.131
+5000: model total loss: 0.114
+5200: model total loss: 0.112
+5400: model total loss: 0.121
+5600: model total loss: 0.121
+5800: model total loss: 0.116
+6000: model total loss: 0.116
+6200: model total loss: 0.116
+6400: model total loss: 0.121
+6600: model total loss: 0.12
+6800: model total loss: 0.109
+7000: model total loss: 0.135
+7200: model total loss: 0.123
+7400: model total loss: 0.118
+7600: model total loss: 0.0965
+7800: model total loss: 0.117
+8000: model total loss: 0.12
+8200: model total loss: 0.116
+8400: model total loss: 0.118
+8600: model total loss: 0.125
+8800: model total loss: 0.107
+9000: model total loss: 0.119
+9200: model total loss: 0.11
+9400: model total loss: 0.122
+9600: model total loss: 0.102
+9800: model total loss: 0.106
+10000: model total loss: 0.118
+validation start
+val/loss  tensor(0.1253)
+render start
+0.11845939606428146 tensor(0.2124)
+10000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ACMG/checkpoints/motion_translation/checkpoints
+10200: model total loss: 0.118
+10400: model total loss: 0.112
+10600: model total loss: 0.0925
+10800: model total loss: 0.124
+11000: model total loss: 0.113
+11200: model total loss: 0.113
+11400: model total loss: 0.106
+11600: model total loss: 0.108
+11800: model total loss: 0.114
+12000: model total loss: 0.09
+12200: model total loss: 0.114
+12400: model total loss: 0.125
+12600: model total loss: 0.124
+12800: model total loss: 0.0987
+13000: model total loss: 0.125
+13200: model total loss: 0.116
+13400: model total loss: 0.117
+13600: model total loss: 0.0992
+13800: model total loss: 0.109
+14000: model total loss: 0.121
+14200: model total loss: 0.117
+14400: model total loss: 0.0891
+14600: model total loss: 0.115
+14800: model total loss: 0.112
+15000: model total loss: 0.108
+15200: model total loss: 0.0981
+15400: model total loss: 0.101
+15600: model total loss: 0.111
+15800: model total loss: 0.12
+16000: model total loss: 0.12
+16200: model total loss: 0.101
+16400: model total loss: 0.105
+16600: model total loss: 0.102
+16800: model total loss: 0.108
+17000: model total loss: 0.106
+17200: model total loss: 0.109
+17400: model total loss: 0.0963
+17600: model total loss: 0.0929
+17800: model total loss: 0.0946
+18000: model total loss: 0.114
+18200: model total loss: 0.0926
+18400: model total loss: 0.109
+18600: model total loss: 0.0958
+18800: model total loss: 0.0955
+19000: model total loss: 0.11
+19200: model total loss: 0.107
+19400: model total loss: 0.0786
+19600: model total loss: 0.0968
+19800: model total loss: 0.0923
+20000: model total loss: 0.105
+validation start
+val/loss  tensor(0.1301)
+render start
