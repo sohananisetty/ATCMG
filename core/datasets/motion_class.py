@@ -9,15 +9,24 @@ import torch
 from core import MotionRep
 
 
-@dataclass
 class Motion:
-    motion_rep: MotionRep = MotionRep.FULL
-    hml_rep: str = "gprvc"
-    root_params: Optional[Union[np.ndarray, torch.Tensor]] = None
-    positions: Optional[Union[np.ndarray, torch.Tensor]] = None
-    rotations: Optional[Union[np.ndarray, torch.Tensor]] = None
-    velocity: Optional[Union[np.ndarray, torch.Tensor]] = None
-    contact: Optional[Union[np.ndarray, torch.Tensor]] = None
+    def __init__(
+        self,
+        motion_rep: MotionRep = MotionRep.FULL,
+        hml_rep: str = "gprvc",
+        root_params: Optional[Union[np.ndarray, torch.Tensor]] = None,
+        positions: Optional[Union[np.ndarray, torch.Tensor]] = None,
+        rotations: Optional[Union[np.ndarray, torch.Tensor]] = None,
+        velocity: Optional[Union[np.ndarray, torch.Tensor]] = None,
+        contact: Optional[Union[np.ndarray, torch.Tensor]] = None,
+    ):
+        self.motion_rep = motion_rep
+        self.hml_rep = hml_rep
+        self.root_params = root_params
+        self.positions = positions
+        self.rotations = rotations
+        self.velocity = velocity
+        self.contact = contact
 
     @property
     def device(self):
@@ -55,6 +64,29 @@ class Motion:
             return np.ndarray
         elif any(isinstance(value, torch.Tensor) for value in self.__dict__.values()):
             return torch.Tensor
+
+    def to(self, dtype=None, device=None):
+        assert isinstance(self.dtype(), torch.Tensor), "motion is np.ndarray"
+
+        for prm in [
+            self.root_params,
+            self.positions,
+            self.rotations,
+            self.velocity,
+            self.contact,
+        ]:
+            if prm is not None:
+                prm = prm.to(dtype=dtype, device=device)
+
+    def cuda(self):
+        assert isinstance(self.dtype(), torch.Tensor), "motion is np.ndarray"
+
+        self.to(device="cuda")
+
+    def cpu(self):
+        assert isinstance(self.dtype(), torch.Tensor), "motion is np.ndarray"
+
+        self.to(device="cpu")
 
     def numpy(self):
         """

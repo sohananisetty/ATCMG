@@ -13,6 +13,7 @@ from core.models.utils import default
 from torch.utils import data
 from tqdm import tqdm
 from utils.motion_processing.quaternion import qinv, qrot, quaternion_to_cont6d
+import utils.vis_utils.plot_3d_global as plot_3d
 
 from .kinematics import getSkeleton
 
@@ -56,6 +57,7 @@ class Motion2Positions:
 
         joints_num = data.nb_joints
         r_rot_quat, r_pos = self.recover_root_rot_pos(data)
+
         r_rot_cont6d = quaternion_to_cont6d(r_rot_quat)
 
         cont6d_params = data.rotations
@@ -97,10 +99,12 @@ class Motion2Positions:
 
         return positions
 
-    def __call__(self, motion: Motion, hml_rep=None) -> torch.Tensor:
+    def __call__(
+        self, motion: Motion, hml_rep=None, from_rotation=False
+    ) -> torch.Tensor:
         hml_rep = motion.hml_rep if hml_rep is None else hml_rep
 
-        if "p" not in hml_rep:
+        if "p" not in hml_rep or from_rotation is True:
             xyz = self.recover_from_rot(motion)
         else:
             xyz = self.recover_from_ric(motion)
@@ -212,6 +216,8 @@ class BaseMotionDataset(ABC, data.Dataset):
         return trn_data
 
     def toMotion(self, motion, motion_rep=None, hml_rep=None):
+
+        assert len(motion.shape) == 2, "remove batch dimension"
         if hml_rep is None:
             hml_rep = self.hml_rep
         if motion_rep is None:
@@ -434,8 +440,30 @@ class BaseMotionDataset(ABC, data.Dataset):
             else:
                 return right_hand
 
-    def to_xyz(self, motion: Motion, hml_rep=None) -> torch.Tensor:
-        return self.mot2pos(motion, hml_rep)
+    def to_xyz(self, motion: Motion, hml_rep=None, from_rotation=False) -> torch.Tensor:
+        return self.mot2pos(motion, hml_rep, from_rotation)
+
+    def render_hml(
+        self,
+        motion: Union[np.ndarray, torch.Tensor, Motion],
+        save_path: str = "motion",
+        from_rotation=False,
+    ):
+
+        if not isinstance(motion, Motion):
+            motion = self.toMotion(motion)
+
+        motion = self.inv_transform(motion)
+        motion.tensor()
+        xyz = self.to_xyz(motion, from_rotation=from_rotation).cpu()
+
+        if len(xyz.shape) > 3:
+            xyz = xyz[0]
+
+        plot_3d.render(
+            np.array(xyz),
+            save_path,
+        )
 
     def findAllFile(self, base):
         file_path = []

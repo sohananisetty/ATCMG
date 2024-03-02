@@ -20,9 +20,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AdamW, get_scheduler
-from utils.motion_processing.hml_process import (recover_from_ric,
-                                                 recover_root_rot_pos)
-from utils.motion_processing.quaternion import qinv, qrot
+
 from yacs.config import CfgNode
 
 
@@ -415,49 +413,6 @@ class VQVAEMotionTrainer(nn.Module):
 
         self.vqvae_model.train()
 
-    def sample_render(self, save_path):
-        save_file = os.path.join(save_path, f"{int(self.steps.item())}")
-        os.makedirs(save_file, exist_ok=True)
-
-        # assert self.render_dl.batch_size == 1 , "Batch size for rendering should be 1!"
-        dataset_lens = self.render_ds.cumulative_sizes
-        self.vqvae_model.eval()
-        print(f"render start")
-        with torch.no_grad():
-            for idx, batch in tqdm(
-                enumerate(self.render_dl),
-            ):
-
-                gt_motion = batch["motion"][0].to(self.device)
-
-                name = str(batch["names"][0])
-
-                curr_dataset_idx = np.searchsorted(dataset_lens, idx + 1)
-                dset = self.render_ds.datasets[curr_dataset_idx]
-
-                vqvae_output = self.vqvae_model(gt_motion)
-
-                vqvae_output_motion = dset.toMotion(vqvae_output.detach().cpu())
-                gt_motion_motion = dset.toMotion(gt_motion.detach().cpu())
-
-                vqvae_output_motion = dset.inv_transform(vqvae_output_motion)
-                gt_motion_motion = dset.inv_transform(gt_motion_motion)
-
-                self.renderer.render(
-                    motion_vec=gt_motion,
-                    outdir=save_path,
-                    step=int(self.steps.item()),
-                    name=f"{name}_gt",
-                )
-                self.renderer.render(
-                    motion_vec=pred_motion,
-                    outdir=save_path,
-                    step=int(self.steps.item()),
-                    name=f"{name}_pred",
-                )
-
-        self.vqvae_model.train()
-
     def sample_render_hmlvec(self, save_path):
         save_file = os.path.join(save_path, f"{int(self.steps.item())}")
         os.makedirs(save_file, exist_ok=True)
@@ -481,25 +436,17 @@ class VQVAEMotionTrainer(nn.Module):
 
                 vqvae_output = self.vqvae_model(gt_motion)
 
-                vqvae_output_motion = dset.toMotion(vqvae_output.detach().cpu())
-                gt_motion_motion = dset.toMotion(gt_motion.detach().cpu())
-
-                vqvae_output_motion = dset.inv_transform(vqvae_output_motion)
-                gt_motion_motion = dset.inv_transform(gt_motion_motion)
-
-                gt_motion_xyz = np.array(dset.to_xyz(gt_motion_motion))
-                pred_motion_xyz = np.array(dset.to_xyz(vqvae_output_motion))
-
-                plot_3d.render(
-                    gt_motion_xyz.numpy().squeeze(),
+                dset.render_hml(
+                    gt_motion.squeeze().cpu(),
                     os.path.join(
                         save_file, os.path.basename(name).split(".")[0] + "_gt.gif"
                     ),
                 )
-                plot_3d.render(
-                    pred_motion_xyz.numpy().squeeze(),
+
+                dset.render_hml(
+                    vqvae_output.decoded_motion.squeeze().cpu(),
                     os.path.join(
-                        save_file, os.path.basename(name).split(".")[0] + "_pred.gif"
+                        save_file, os.path.basename(name).split(".")[0] + "_gt.gif"
                     ),
                 )
 
