@@ -12,10 +12,8 @@ import librosa
 import numpy as np
 import torch
 import torchaudio
-from core.datasets.base_dataset_adv import BaseMotionDataset
-
 from core import MotionRep
-
+from core.datasets.base_dataset import BaseMotionDataset
 from core.datasets.conditioner import ConditionProvider
 from torch.utils import data
 from torch.utils.data.dataloader import default_collate
@@ -138,14 +136,13 @@ class MotionAudioTextDataset(BaseMotionDataset):
         sampling_rate: int = 16000,
         fps: int = 30,
         split: str = "train",
+        **kwargs,
     ):
         super().__init__(dataset_root, MotionRep(motion_rep), hml_rep)
         self.dataset_name = dataset_name
         self.split = split
         self.fps = fps
         self.audio_rep = audio_rep
-        self.motion_rep = motion_rep
-        self.hml_rep = hml_rep
 
         self.window_size = window_size
 
@@ -319,7 +316,7 @@ class MotionAudioTextDataset(BaseMotionDataset):
             motion = motion[f_ * self.fps : to_ * self.fps]
 
         processed_motion = self.get_processed_motion(
-            motion, motion_rep=MotionRep(self.motion_rep), hml_rep=self.hml_rep
+            motion, motion_rep=self.motion_rep, hml_rep=self.hml_rep
         )
 
         return {

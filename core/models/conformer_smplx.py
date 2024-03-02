@@ -4,14 +4,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from core import (AttentionParams, ConformerParams, TransformerParams,
+                  VQVAEOutput)
 from core.models.attend import Attend, Attention
 from core.models.conformer import ConformerBlock
-from core import (
-    AttentionParams,
-    ConformerParams,
-    TransformerParams,
-    VQVAEOutput,
-)
 from core.models.transformer_template import TransformerBlock
 from core.models.utils import exists, pad_to_multiple
 from core.quantization.vector_quantize import VectorQuantize

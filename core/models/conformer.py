@@ -1,11 +1,9 @@
 import torch
 import torch.nn.functional as F
-from core.models.attend import Attention
 from core import ConformerParams
-from core.models.positional_embeddings import (
-    PositionalEmbeddingParams,
-    RelativePositionBias,
-)
+from core.models.attend import Attention
+from core.models.positional_embeddings import (PositionalEmbeddingParams,
+                                               RelativePositionBias)
 from core.models.utils import calc_same_padding, default, exists
 from einops import rearrange
 from einops.layers.torch import Rearrange

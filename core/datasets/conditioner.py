@@ -5,12 +5,11 @@ import einops
 import numpy as np
 import torch
 import torch.nn.functional as F
+from core.param_dataclasses import AudioRep, MotionRep, TextRep
 from torch import nn
 from transformers.feature_extraction_utils import BatchFeature
 
-from core.param_dataclasses import MotionRep, TextRep, AudioRep
 from .text_encoders import BERTConditioner, ClipConditioner, T5Conditioner
-
 
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
 
@@ -192,7 +191,7 @@ class ConditionProvider(nn.Module):
         down_sampling_factor=4,
         padding="longest",
         subset_index_list=None,
-    ):
+    ) -> tp.Tuple[np.ndarray, np.ndarray]:
         motions = []
         masks = []
 
@@ -206,7 +205,7 @@ class ConditionProvider(nn.Module):
 
             seq_len = motion.shape[0]
 
-            if seq_len > max_length:
+            if seq_len >= max_length:
 
                 overflow = seq_len - max_length
                 start_idx = (
@@ -216,8 +215,8 @@ class ConditionProvider(nn.Module):
                 )
                 motion = motion[start_idx : start_idx + max_length]
                 mask = np.array([1] * max_length)
-                motions.append(motion[None, ...])
-                masks.append(mask[None, ...])
+                motions.append(motion)
+                masks.append(mask)
 
             else:
 
@@ -239,11 +238,11 @@ class ConditionProvider(nn.Module):
                     [1] * motion.shape[0] + [0] * (max_length - motion.shape[0])
                 )
 
-                motions.append(pad_motion[None, ...])
-                masks.append(mask[None, ...])
+                motions.append(pad_motion)
+                masks.append(mask)
 
-        padded_motion = np.concatenate(motions, 0)
-        attention_mask = np.concatenate(masks, 0)
+        padded_motion = np.stack(motions, axis=0)
+        attention_mask = np.stack(masks, axis=0)
 
         return padded_motion, attention_mask
 

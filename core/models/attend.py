@@ -6,15 +6,8 @@ from functools import partial, wraps
 import torch
 import torch.nn.functional as F
 from core import AttentionParams
-from core.models.utils import (
-    LayerNorm,
-    create_causal_mask,
-    default,
-    dropout_seq,
-    exists,
-    l2norm,
-    print_once,
-)
+from core.models.utils import (LayerNorm, create_causal_mask, default,
+                               dropout_seq, exists, l2norm, print_once)
 from einops import rearrange, repeat
 from packaging import version
 from torch import einsum, nn

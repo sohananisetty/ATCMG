@@ -5,15 +5,10 @@ from functools import partial, wraps
 
 import torch
 import torch.nn.functional as F
+from core import (AttentionParams, ConformerParams, MotionBERTOutput,
+                  MotionTokenizerParams, PositionalEmbeddingParams,
+                  PositionalEmbeddingType)
 from core.models.conformer import ConformerBlock
-from core import (
-    AttentionParams,
-    ConformerParams,
-    MotionBERTOutput,
-    MotionTokenizerParams,
-    PositionalEmbeddingParams,
-    PositionalEmbeddingType,
-)
 from core.models.utils import get_obj_from_str
 from einops import rearrange, repeat
 from packaging import version

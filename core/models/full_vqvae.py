@@ -3,26 +3,18 @@ import random
 
 import torch
 import torch.nn as nn
-from core import (
-    AttentionParams,
-    ConformerParams,
-    PositionalEmbeddingParams,
-    PositionalEmbeddingType,
-    TransformerParams,
-    VQVAEOutput,
-)
+from core import (AttentionParams, ConformerParams, PositionalEmbeddingParams,
+                  PositionalEmbeddingType, TransformerParams, VQVAEOutput)
 from core.models.resnetVQ.encdec import Decoder, Encoder
 from core.models.resnetVQ.quantizer import QuantizeEMAReset
 from core.models.resnetVQ.residual_vq import ResidualVQ
 from core.models.resnetVQ.resnet import Resnet1D
 from core.models.resnetVQ.vqvae import HumanVQVAE
+from core.models.transformer_modules import (DecoderConformer,
+                                             DecoderTransfomer,
+                                             EncoderConformer,
+                                             EncoderTransfomer)
 from core.models.transformer_template import TransformerBlock
-from core.models.transformer_modules import (
-    DecoderConformer,
-    DecoderTransfomer,
-    EncoderConformer,
-    EncoderTransfomer,
-)
 
 
 class VQVAE(nn.Module):

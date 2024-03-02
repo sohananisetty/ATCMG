@@ -11,21 +11,12 @@ import torch.nn.functional as F
 import torchvision.transforms as T
 from core.models.attend import Attend, Attention, AttentionParams
 from core.models.conv_vqvae import ConvVQMotionModel
-from core.models.positional_embeddings import (
-    PositionalEmbeddingParams,
-    PositionalEmbeddingType,
-)
+from core.models.positional_embeddings import (PositionalEmbeddingParams,
+                                               PositionalEmbeddingType)
 from core.models.text_encoders_old import T5, Clip
-from core.models.utils import (
-    FeedForward,
-    LayerNorm,
-    default,
-    dropout_seq,
-    eval_decorator,
-    exists,
-    get_mask_subset_prob,
-    l2norm,
-)
+from core.models.utils import (FeedForward, LayerNorm, default, dropout_seq,
+                               eval_decorator, exists, get_mask_subset_prob,
+                               l2norm)
 from einops import rearrange, repeat
 from torch import einsum, nn
 from tqdm.auto import tqdm

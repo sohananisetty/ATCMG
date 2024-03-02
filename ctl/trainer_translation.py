@@ -14,7 +14,7 @@ import utils.vis_utils.plot_3d_global as plot_3d
 import wandb
 from configs.config_t2m import cfg, get_cfg_defaults
 from core.datasets.conditioner import ConditionProvider
-from core.datasets.multimode_dataset import load_dataset, simple_collate
+from core.datasets.multimodal_dataset import load_dataset, simple_collate
 from core.models.utils import instantiate_from_config
 from core.optimizer import get_optimizer
 from torch import nn

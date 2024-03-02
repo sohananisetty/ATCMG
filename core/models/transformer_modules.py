@@ -4,11 +4,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from core import ConformerParams, TransformerParams
 from core.models.conformer import ConformerBlock
-from core import (
-    ConformerParams,
-    TransformerParams,
-)
 from core.models.transformer_template import TransformerBlock
 from core.models.utils import exists, pad_to_multiple
 from einops import rearrange

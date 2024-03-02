@@ -2,6 +2,7 @@ import itertools
 import os
 import random
 from collections import Counter
+from functools import partial
 from math import sqrt
 from pathlib import Path
 
@@ -10,13 +11,13 @@ import torch
 import transformers
 import utils.vis_utils.plot_3d_global as plot_3d
 import wandb
-from core.datasets.dataset_loading_utils import load_dataset
-from core.datasets.vq_dataset import DATALoader, MotionCollator
-from core.models.conformer_smplx import ConformerVQMotionModel
+from core.datasets.conditioner import ConditionProvider
+from core.datasets.vq_dataset import load_dataset, simple_collate
 from core.models.loss import ReConsLoss
 from core.models.utils import instantiate_from_config
 from core.optimizer import get_optimizer
 from torch import nn
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AdamW, get_scheduler
 from utils.motion_processing.hml_process import (recover_from_ric,
@@ -123,20 +124,40 @@ class VQVAEMotionTrainer(nn.Module):
 
         self.max_grad_norm = self.training_args.max_grad_norm
 
+        dataset_names = {
+            "animation": 0.8,
+            "humanml": 3.5,
+            "perform": 0.6,
+            "GRAB": 1.0,
+            "idea400": 1.5,
+            "humman": 0.5,
+            "beat": 2.0,
+            "game_motion": 0.8,
+            "music": 0.5,
+            "aist": 1.5,
+            "fitness": 1.0,
+            "moyo": 1.0,
+            "choreomaster": 2.0,
+            "dance": 1.0,
+            "kungfu": 1.0,
+            "EgoBody": 0.5,
+            # "HAA500": 1.0,
+        }
+
         train_ds, sampler_train, weights_train = load_dataset(
+            dataset_names=list(dataset_names.keys()),
             dataset_args=self.dataset_args,
-            model_args=self.vqvae_args,
             split="train",
             # weight_scale=[1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2, 1, 1, 1],
         )
         test_ds, _, _ = load_dataset(
+            dataset_names=list(dataset_names.keys()),
             dataset_args=self.dataset_args,
-            model_args=self.vqvae_args,
             split="test",
         )
         self.render_ds, _, _ = load_dataset(
+            dataset_names=list(dataset_names.keys()),
             dataset_args=self.dataset_args,
-            model_args=self.vqvae_args,
             split="render",
         )
 
@@ -146,29 +167,34 @@ class VQVAEMotionTrainer(nn.Module):
         )
 
         # dataloader
-        collate_fn = MotionCollator() if self.enable_var_len else None
 
-        self.dl = DATALoader(
+        condition_provider = ConditionProvider(
+            motion_rep=self.dataset_args.motion_rep,
+            motion_padding=self.dataset_args.motion_padding,
+            motion_max_length_s=self.dataset_args.motion_max_length_s,
+        )
+
+        self.dl = DataLoader(
             train_ds,
             batch_size=self.training_args.train_bs,
             sampler=sampler_train,
             shuffle=False if sampler_train else True,
-            collate_fn=collate_fn,
+            collate_fn=partial(simple_collate, conditioner=condition_provider),
         )
-        self.valid_dl = DATALoader(
+        self.valid_dl = DataLoader(
             test_ds,
             batch_size=self.training_args.eval_bs,
             shuffle=False,
-            collate_fn=collate_fn,
+            collate_fn=partial(simple_collate, conditioner=condition_provider),
         )
-        self.render_dl = DATALoader(
-            self.render_ds, batch_size=1, shuffle=False, collate_fn=None
+        self.render_dl = DataLoader(
+            self.render_ds,
+            batch_size=1,
+            shuffle=False,
+            collate_fn=partial(simple_collate, conditioner=condition_provider),
         )
 
         self.dl_iter = cycle(self.dl)
-        # self.valid_dl_iter = cycle(self.valid_dl)
-
-        # self.renderer = Renderer(self.device)
 
         self.save_model_every = self.training_args.save_steps
         self.log_losses_every = self.training_args.logging_steps
@@ -176,14 +202,6 @@ class VQVAEMotionTrainer(nn.Module):
         self.calc_metrics_every = self.training_args.evaluate_every
         self.wandb_every = self.training_args.wandb_every
 
-        self.best_fid = float("inf")
-        self.best_div = float("-inf")
-        self.best_top1 = float("-inf")
-        self.best_top2 = float("-inf")
-        self.best_top3 = float("-inf")
-        self.best_matching = float("inf")
-
-        # if self.is_main:
         wandb.login()
         wandb.init(project=self.model_name)
 
@@ -234,8 +252,6 @@ class VQVAEMotionTrainer(nn.Module):
     def train_step(self):
         steps = int(self.steps.item())
 
-        log_losses = self.log_losses_every > 0 and not (steps % self.log_losses_every)
-
         self.vqvae_model = self.vqvae_model.train()
 
         # logs
@@ -245,21 +261,22 @@ class VQVAEMotionTrainer(nn.Module):
         for _ in range(self.grad_accum_every):
             batch = next(self.dl_iter)
 
-            gt_motion = batch[f"motion_{self.train_mode}"].to(self.device)
+            gt_motion = batch["motion"][0].to(self.device)
+            # mask = batch["motion"][1].to(self.device)
 
             if self.dataset_args.enable_masking:
                 gt_motion = self.mask_augment(gt_motion, perc_n=0.2, perc_d=0.1)
-
-            mask = batch.get("motion_mask", None)
 
             vqvae_output = self.vqvae_model(
                 motion=gt_motion,
                 # mask=mask,
             )
 
-            loss_motion = self.loss_fnc(vqvae_output.decoded_motion, gt_motion, mask)
+            loss_motion = self.loss_fnc(
+                vqvae_output.decoded_motion, gt_motion, mask=None
+            )
             loss_vel = self.loss_fnc.forward_vel(
-                vqvae_output.decoded_motion, gt_motion, mask
+                vqvae_output.decoded_motion, gt_motion, mask=None
             )
 
             loss = (
@@ -341,12 +358,10 @@ class VQVAEMotionTrainer(nn.Module):
                 leave=True,
                 # disable=not self.accelerator.is_main_process,
             ):
-                gt_motion = batch[f"motion_{self.train_mode}"].to(self.device)
-
+                gt_motion = batch["motion"][0].to(self.device)
+                # mask = batch["motion"][1].to(self.device)
                 if self.dataset_args.enable_masking:
                     gt_motion = self.mask_augment(gt_motion, perc_n=0.2, perc_d=0.1)
-
-                mask = batch.get("motion_mask", None)
 
                 vqvae_output = self.vqvae_model(
                     motion=gt_motion,
@@ -354,10 +369,10 @@ class VQVAEMotionTrainer(nn.Module):
                 )
 
                 loss_motion = self.loss_fnc(
-                    vqvae_output.decoded_motion, gt_motion, mask
+                    vqvae_output.decoded_motion, gt_motion, mask=None
                 )
                 loss_vel = self.loss_fnc.forward_vel(
-                    vqvae_output.decoded_motion, gt_motion, mask
+                    vqvae_output.decoded_motion, gt_motion, mask=None
                 )
 
                 loss = (
@@ -412,32 +427,21 @@ class VQVAEMotionTrainer(nn.Module):
             for idx, batch in tqdm(
                 enumerate(self.render_dl),
             ):
-                gt_motion = batch[f"motion_{self.train_mode}"][
-                    :, :, : self.vqvae_args.motion_dim
-                ].to(self.device)
-                mask = batch.get("motion_mask", None)
+
+                gt_motion = batch["motion"][0].to(self.device)
+
                 name = str(batch["names"][0])
 
                 curr_dataset_idx = np.searchsorted(dataset_lens, idx + 1)
-
-                motion_len = int(batch.get("motion_lengths", [gt_motion.shape[1]])[0])
-
-                gt_motion = gt_motion[:, :motion_len, :]
+                dset = self.render_ds.datasets[curr_dataset_idx]
 
                 vqvae_output = self.vqvae_model(gt_motion)
 
-                gt_motion = (
-                    self.render_ds.datasets[curr_dataset_idx]
-                    .inv_transform(gt_motion.cpu())
-                    .squeeze()
-                    .float()
-                )
-                pred_motion = (
-                    self.render_ds.datasets[curr_dataset_idx]
-                    .inv_transform(vqvae_output.decoded_motion.cpu())
-                    .squeeze()
-                    .float()
-                )
+                vqvae_output_motion = dset.toMotion(vqvae_output.detach().cpu())
+                gt_motion_motion = dset.toMotion(gt_motion.detach().cpu())
+
+                vqvae_output_motion = dset.inv_transform(vqvae_output_motion)
+                gt_motion_motion = dset.inv_transform(gt_motion_motion)
 
                 self.renderer.render(
                     motion_vec=gt_motion,
@@ -467,33 +471,24 @@ class VQVAEMotionTrainer(nn.Module):
             for idx, batch in tqdm(
                 enumerate(self.render_dl),
             ):
+
+                gt_motion = batch["motion"][0].to(self.device)
+
                 name = str(batch["names"][0])
+
                 curr_dataset_idx = np.searchsorted(dataset_lens, idx + 1)
+                dset = self.render_ds.datasets[curr_dataset_idx]
 
-                gt_motion = batch[f"motion_{self.train_mode}"].to(self.device)
-                mask = batch.get("motion_mask", None)
+                vqvae_output = self.vqvae_model(gt_motion)
 
-                vqvae_output = self.vqvae_model(
-                    motion=gt_motion,
-                )
+                vqvae_output_motion = dset.toMotion(vqvae_output.detach().cpu())
+                gt_motion_motion = dset.toMotion(gt_motion.detach().cpu())
 
-                gt_motion = (
-                    self.render_ds.datasets[curr_dataset_idx]
-                    .inv_transform(gt_motion.cpu())
-                    .squeeze()
-                    .float()
-                )
-                pred_motion = (
-                    self.render_ds.datasets[curr_dataset_idx]
-                    .inv_transform(vqvae_output.decoded_motion.cpu())
-                    .squeeze()
-                    .float()
-                )
+                vqvae_output_motion = dset.inv_transform(vqvae_output_motion)
+                gt_motion_motion = dset.inv_transform(gt_motion_motion)
 
-                gt_motion_xyz = recover_from_ric(gt_motion, self.vqvae_args.nb_joints)
-                pred_motion_xyz = recover_from_ric(
-                    pred_motion, self.vqvae_args.nb_joints
-                )
+                gt_motion_xyz = np.array(dset.to_xyz(gt_motion_motion))
+                pred_motion_xyz = np.array(dset.to_xyz(vqvae_output_motion))
 
                 plot_3d.render(
                     gt_motion_xyz.numpy().squeeze(),
