@@ -22,11 +22,9 @@ cfg.output_dir = os.path.join(cfg.abs_dir, "checkpoints/")
 
 cfg.dataset = CN()
 cfg.dataset.dataset_name = "mix"
-cfg.dataset.use_rotation = True
 cfg.dataset.dataset_root = "/srv/hays-lab/scratch/sanisetty3/music_motion"
 cfg.dataset.music_folder = "music"
 cfg.dataset.fps = 30
-cfg.dataset.enable_masking = False
 cfg.dataset.text_rep = "pooled_text_embed"
 cfg.dataset.motion_rep = "full"
 cfg.dataset.hml_rep = "gprvc"  ## global pos rot6d vel contact

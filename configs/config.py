@@ -16,30 +16,23 @@ cfg.device = "cuda"
 cfg.model_name = "vqvae"
 
 cfg.pretrained_modelpath = os.path.join(
-    cfg.abs_dir, f"checkpoints/{cfg.vqvae_model_name}/vqvae_motion.pt"
+    cfg.abs_dir, f"checkpoints/{cfg.model_name}/vqvae_motion.pt"
 )
 cfg.output_dir = os.path.join(cfg.abs_dir, "checkpoints/")
 
 
 cfg.dataset = CN()
 cfg.dataset.dataset_name = "mix"
-cfg.dataset.use_rotation = True
 cfg.dataset.dataset_root = "/srv/hays-lab/scratch/sanisetty3/music_motion"
-cfg.dataset.music_folder = "music"
 cfg.dataset.fps = 30
-cfg.dataset.enable_masking = False
-cfg.dataset.text_rep = "pooled_text_embed"
 cfg.dataset.motion_rep = "full"
 cfg.dataset.hml_rep = "gprvc"  ## global pos rot6d vel contact
-cfg.dataset.audio_rep = "encodec"
 cfg.dataset.motion_min_length_s = 2
 cfg.dataset.motion_max_length_s = 10
-cfg.dataset.audio_max_length_s = 10
 cfg.dataset.window_size = None
 cfg.dataset.sampling_rate = 16000
-cfg.dataset.text_conditioner_name = "t5-base"
-cfg.dataset.audio_padding = "longest"
 cfg.dataset.motion_padding = "longest"
+cfg.dataset.use_motion_augmentation = False
 
 
 cfg.train = CN()
@@ -69,8 +62,8 @@ cfg.vqvae = CN()
 cfg.vqvae.target = "core.models"
 
 cfg.vqvae.nb_joints = 52
-cfg.vqvae.nb_joints_hands = 30
-cfg.vqvae.nb_joints_body = 22
+# cfg.vqvae.nb_joints_hands = 30
+# cfg.vqvae.nb_joints_body = 22
 cfg.vqvae.motion_dim = 623
 cfg.vqvae.dim = 512
 cfg.vqvae.depth = 3
@@ -93,7 +86,7 @@ cfg.vqvae.commit = 1.0  # "hyper-parameter for the commitment loss"
 cfg.vqvae.loss_vel = 1.0
 cfg.vqvae.loss_motion = 1.0
 cfg.vqvae.recons_loss = "l1_smooth"  # l1_smooth , l1 , l2
-
+cfg.vqvae.use_geodesic_loss = False
 
 # cfg.vqvae.motion_dim_body = 263  #'Input motion dimension dimension'
 # cfg.vqvae.motion_dim_hand = 360  #'Input motion dimension dimension'

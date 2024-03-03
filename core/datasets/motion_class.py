@@ -29,6 +29,29 @@ class Motion:
         self.contact = contact
 
     @property
+    def dim(self):
+        dim = 0
+
+        if "g" in self.hml_rep:
+            dim += 4
+        if "p" in self.hml_rep:
+            if self.motion_rep == MotionRep.BODY or self.motion_rep == MotionRep.FULL:
+                dim += (self.nb_joints - 1) * 3
+            else:
+                dim += (self.nb_joints) * 3
+        if "r" in self.hml_rep:
+            if self.motion_rep == MotionRep.BODY or self.motion_rep == MotionRep.FULL:
+                dim += (self.nb_joints - 1) * 6
+            else:
+                dim += (self.nb_joints) * 6
+        if "v" in self.hml_rep:
+            dim += self.nb_joints * 3
+        if "c" in self.hml_rep:
+            dim += 4
+
+        return
+
+    @property
     def device(self):
         for prm in [
             self.root_params,

@@ -1,12 +1,21 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import utils.rotation_conversions as geomtry
+import utils.rotation_conversions as geometry
 from core.models.smpl.body_model import BodyModel
+from core import MotionRep
+import numpy as np
 
 
 class ReConsLoss(nn.Module):
-    def __init__(self, recons_loss, nb_joints=52, use_rotation=True, mode="full"):
+    def __init__(
+        self,
+        recons_loss: str = "l1_smooth",
+        use_geodesic_loss: bool = False,
+        nb_joints: int = 52,
+        hml_rep: str = "gprvc",
+        motion_rep: MotionRep = MotionRep.FULL,
+    ):
         super(ReConsLoss, self).__init__()
 
         if recons_loss == "l1":
@@ -16,139 +25,119 @@ class ReConsLoss(nn.Module):
         elif recons_loss == "l1_smooth":
             self.Loss = torch.nn.SmoothL1Loss()
 
+        self.use_geodesic_loss = use_geodesic_loss
+
+        self.geodesic_loss = GeodesicLoss()
+
         # 4 global motion associated to root
         # 12 motion ( 3 positions ,6 rot6d, 3 vel xyz, )
         # 4 foot contact
         self.nb_joints = nb_joints
-        self.use_rotation = use_rotation
-        self.mode = mode
+        self.hml_rep = hml_rep
+        self.motion_rep = motion_rep
+
+        split_seq = []
+
+        if "g" in hml_rep:
+            split_seq.append(4)
+        if "p" in hml_rep:
+            if motion_rep == MotionRep.BODY or motion_rep == MotionRep.FULL:
+                split_seq.append((self.nb_joints - 1) * 3)
+            else:
+                split_seq.append((self.nb_joints) * 3)
+        if "r" in hml_rep:
+            if motion_rep == MotionRep.BODY or motion_rep == MotionRep.FULL:
+                split_seq.append((self.nb_joints - 1) * 6)
+            else:
+                split_seq.append((self.nb_joints) * 6)
+        if "v" in hml_rep:
+            split_seq.append(self.nb_joints * 3)
+        if "c" in hml_rep:
+            split_seq.append(4)
+
+        self.split_seq = split_seq
 
     def forward(self, motion_pred, motion_gt, mask=None):
-        ## pred: b n d, gt: b n d, mask: b n
-        if mask is None:
-            loss = self.Loss(motion_pred, motion_gt)
-        else:
-            # F.mse_loss(batch["motion"] * batch["motion_mask"][...,None] , pred_motion*batch["motion"] * batch["motion_mask"][...,None], reduction = "sum")
-            norm = motion_pred.numel() / (mask.sum() * motion_pred.shape[-1])
-            loss = (
-                self.Loss(
-                    motion_pred * mask[..., None],
-                    motion_gt * mask[..., None],
-                )
-                * norm
-            )
+        hml_rep = self.hml_rep
 
-        return loss
+        loss = 0
+        params_pred = torch.split(motion_pred, self.split_seq, -1)[0]
+        params_gt = torch.split(motion_gt, self.split_seq, -1)[0]
 
-    def forward_vel(
-        self,
-        motion_pred,
-        motion_gt,
-        mask=None,
-    ):
-        if self.use_rotation:
-            if "hand" in self.mode:
-                strt = (self.nb_joints) * 9
+        if mask is not None:
+            mask_split = torch.split(mask, self.split_seq, -1)[0]
+
+        for indx, rep in enumerate(list(hml_rep)):
+
+            mp = params_pred[indx]
+            mg = params_gt[indx]
+
+            if mask is not None:
+                msk = mask_split[indx]
+                mp = mp * msk[..., None]
+                mg = mg * msk[..., None]
+
+            if rep == "r":
+                if self.use_geodesic_loss:
+
+                    if (
+                        self.motion_rep == MotionRep.BODY
+                        or self.motion_rep == MotionRep.FULL
+                    ):
+                        nb_joints = self.nb_joints - 1
+                    else:
+                        nb_joints = self.nb_joints
+
+                    mp = geometry.rotation_6d_to_matrix(
+                        mp.view(-1, nb_joints, 6).contiguous()
+                    ).view(-1, 3, 3)
+                    mg = geometry.rotation_6d_to_matrix(
+                        mg.view(-1, nb_joints, 6).contiguous()
+                    ).view(-1, 3, 3)
+
+                    loss += self.geodesic_loss(mp, mg)
+
+                else:
+
+                    loss += self.Loss(mp, mg)
+
             else:
-                strt = 4 + (self.nb_joints - 1) * 9
-        else:
-            if "hand" in self.mode:
-                strt = (self.nb_joints) * 3
-            else:
-                strt = 4 + (self.nb_joints - 1) * 3
-        # 4 + (self.nb_joints - 1) * 9
-        end = strt + self.nb_joints * 3
-        # 4 + (self.nb_joints - 1) * 12
-        if mask is None:
-            loss = self.Loss(motion_pred[..., strt:end], motion_gt[..., strt:end])
 
-        else:
-            norm = motion_pred[..., strt:end].numel() / (
-                mask.sum() * motion_pred.shape[-1]
-            )
-            loss = (
-                self.Loss(
-                    motion_pred[..., strt:end] * mask[..., None],
-                    motion_gt[..., strt:end] * mask[..., None],
-                )
-                * norm
-            )
+                loss += self.Loss(mp, mg)
 
         return loss
 
 
-class ReConsLossSMPLX(nn.Module):
-    def __init__(self, recons_loss, nb_joints, motion_dim_hand, motion_dim_body):
-        super(ReConsLossSMPLX, self).__init__()
+class GeodesicLoss(nn.Module):
+    def __init__(self):
+        super(GeodesicLoss, self).__init__()
 
-        if recons_loss == "l1":
-            self.Loss = torch.nn.L1Loss()
-        elif recons_loss == "l2":
-            self.Loss = torch.nn.MSELoss()
-        elif recons_loss == "l1_smooth":
-            self.Loss = torch.nn.SmoothL1Loss()
+    def compute_geodesic_distance(self, m1, m2, epsilon=1e-7):
+        """Compute the geodesic distance between two rotation matrices.
+        Args:
+            m1, m2: Two rotation matrices with the shape (batch x 3 x 3).
+        Returns:
+            The minimal angular difference between two rotation matrices in radian form [0, pi].
+        """
+        batch = m1.shape[0]
+        m = torch.bmm(m1, m2.permute(0, 2, 1))  # batch*3*3
 
-        # self.bm = BodyModel(
-        #     "/srv/hays-lab/scratch/sanisetty3/music_motion/motion-diffusion-model/body_models/smplh/neutral/model.npz"
-        # )
+        cos = (m[:, 0, 0] + m[:, 1, 1] + m[:, 2, 2] - 1) / 2
+        # cos = (m.diagonal(dim1=-2, dim2=-1).sum(-1) -1) /2
+        # cos = torch.min(cos, torch.autograd.Variable(torch.ones(batch).cuda()))
+        # cos = torch.max(cos, torch.autograd.Variable(torch.ones(batch).cuda()) * -1)
+        cos = torch.clamp(cos, -1 + epsilon, 1 - epsilon)
+        theta = torch.acos(cos)
 
-        # 3 global motion associated to root
-        # 12 motion (6 rot6d, 3 positions, 3 vel xyz, )
-        # 4 foot contact
-        self.nb_joints = nb_joints
-        self.motion_dim_hand = motion_dim_hand
-        self.motion_dim_body = motion_dim_body
+        return theta
 
-    def forward(self, motion_pred, motion_gt, mask=None):
-        ## pred: b n d, gt: b n d, mask: b n
-        if mask is None:
-            loss = self.Loss(
-                motion_pred[..., : self.motion_dim], motion_gt[..., : self.motion_dim]
-            )
-        else:
-            # F.mse_loss(batch["motion"] * batch["motion_mask"][...,None] , pred_motion*batch["motion"] * batch["motion_mask"][...,None], reduction = "sum")
-            norm = motion_pred.numel() / (mask.sum() * motion_pred.shape[-1])
-            loss = (
-                self.Loss(
-                    motion_pred[..., : self.motion_dim] * mask[..., None],
-                    motion_gt[..., : self.motion_dim] * mask[..., None],
-                )
-                * norm
-            )
+    def __call__(self, m1, m2, reduction="mean"):
+        loss = self.compute_geodesic_distance(m1, m2)
 
-        return loss
-
-    def forward_vel(self, motion_pred, motion_gt, mask=None):
-        if motion_pred.shape[-1] == 135 and motion_gt.shape[-1] == 135:
-            loss = self.Loss(
-                (motion_pred[:, 1:, 3:] - motion_pred[:, :-1, 3:]),
-                (motion_gt[:, 1:, 3:] - motion_gt[:, :-1, 3:]),
-            )
-
+        if reduction == "mean":
+            return loss.mean()
+        elif reduction == "none":
             return loss
-        if mask is None:
-            loss = self.Loss(
-                motion_pred[..., (3 + self.nb_joints * 9) : (3 + self.nb_joints * 12)],
-                motion_gt[..., (3 + self.nb_joints * 9) : (3 + self.nb_joints * 12)],
-            )
-
-        else:
-            norm = motion_pred[
-                ..., (3 + self.nb_joints * 9) : (3 + self.nb_joints * 12)
-            ].numel() / (mask.sum() * motion_pred.shape[-1])
-            loss = (
-                self.Loss(
-                    motion_pred[
-                        ..., (3 + self.nb_joints * 6) : (3 + self.nb_joints * 9)
-                    ]
-                    * mask[..., None],
-                    motion_gt[..., (3 + self.nb_joints * 6) : (3 + self.nb_joints * 9)]
-                    * mask[..., None],
-                )
-                * norm
-            )
-
-        return loss
 
 
 class InfoNceLoss(nn.Module):

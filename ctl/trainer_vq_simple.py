@@ -22,6 +22,7 @@ from tqdm import tqdm
 from transformers import AdamW, get_scheduler
 
 from yacs.config import CfgNode
+from core import MotionRep
 
 
 def exists(val):
@@ -75,7 +76,7 @@ class VQVAEMotionTrainer(nn.Module):
         args: CfgNode,
     ):
         super().__init__()
-        self.model_name = args.vqvae_model_name
+        self.model_name = args.model_name
 
         transformers.set_seed(42)
 
@@ -84,13 +85,12 @@ class VQVAEMotionTrainer(nn.Module):
         self.training_args = args.train
         self.dataset_args = args.dataset
         self.dataset_name = args.dataset.dataset_name
-        self.enable_var_len = self.dataset_args.var_len
         self.num_train_steps = self.training_args.num_train_iters
-        self.num_stages = self.training_args.num_stages
         self.output_dir = Path(self.args.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.register_buffer("steps", torch.Tensor([0]))
-        self.train_mode = self.dataset_args.train_mode
+        self.motion_rep = MotionRep(self.dataset_args.motion_rep)
+        self.hml_rep = self.dataset_args.hml_rep
         print(self.vqvae_args)
 
         self.vqvae_model = instantiate_from_config(self.vqvae_args).to(self.device)
@@ -101,10 +101,11 @@ class VQVAEMotionTrainer(nn.Module):
         self.grad_accum_every = self.training_args.gradient_accumulation_steps
 
         self.loss_fnc = ReConsLoss(
-            self.vqvae_args.recons_loss,
-            self.vqvae_args.nb_joints,
-            self.dataset_args.use_rotation,
-            self.train_mode,
+            recons_loss=self.vqvae_args.recons_loss,
+            use_geodesic_loss=self.vqvae_args.use_geodesic_loss,
+            nb_joints=self.vqvae_args.nb_joints,
+            hml_rep=self.hml_rep,
+            motion_rep=self.motion_rep,
         )
 
         self.optim = get_optimizer(
@@ -124,18 +125,18 @@ class VQVAEMotionTrainer(nn.Module):
 
         dataset_names = {
             "animation": 0.8,
-            "humanml": 3.5,
+            "humanml": 2.5,
             "perform": 0.6,
             "GRAB": 1.0,
             "idea400": 1.5,
             "humman": 0.5,
-            "beat": 2.0,
+            "beat": 1.5,
             "game_motion": 0.8,
             "music": 0.5,
             "aist": 1.5,
             "fitness": 1.0,
-            "moyo": 1.0,
-            "choreomaster": 2.0,
+            "moyo": 1.5,
+            "choreomaster": 1.5,
             "dance": 1.0,
             "kungfu": 1.0,
             "EgoBody": 0.5,
@@ -146,7 +147,7 @@ class VQVAEMotionTrainer(nn.Module):
             dataset_names=list(dataset_names.keys()),
             dataset_args=self.dataset_args,
             split="train",
-            # weight_scale=[1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2, 1, 1, 1],
+            # weight_scale=list(dataset_names.values()),
         )
         test_ds, _, _ = load_dataset(
             dataset_names=list(dataset_names.keys()),
@@ -262,7 +263,7 @@ class VQVAEMotionTrainer(nn.Module):
             gt_motion = batch["motion"][0].to(self.device)
             # mask = batch["motion"][1].to(self.device)
 
-            if self.dataset_args.enable_masking:
+            if self.dataset_args.use_motion_augmentation:
                 gt_motion = self.mask_augment(gt_motion, perc_n=0.2, perc_d=0.1)
 
             vqvae_output = self.vqvae_model(
@@ -273,14 +274,10 @@ class VQVAEMotionTrainer(nn.Module):
             loss_motion = self.loss_fnc(
                 vqvae_output.decoded_motion, gt_motion, mask=None
             )
-            loss_vel = self.loss_fnc.forward_vel(
-                vqvae_output.decoded_motion, gt_motion, mask=None
-            )
 
             loss = (
                 self.vqvae_args.loss_motion * loss_motion
                 + self.vqvae_args.commit * vqvae_output.commit_loss
-                + self.vqvae_args.loss_vel * loss_vel
             ) / self.grad_accum_every
 
             used_indices = vqvae_output.indices.flatten().tolist()
@@ -295,7 +292,6 @@ class VQVAEMotionTrainer(nn.Module):
                 dict(
                     loss=loss.detach().cpu(),
                     loss_motion=loss_motion.detach().cpu() / self.grad_accum_every,
-                    loss_vel=loss_vel.detach().cpu() / self.grad_accum_every,
                     commit_loss=vqvae_output.commit_loss.detach().cpu()
                     / self.grad_accum_every,
                     usage=usage / self.grad_accum_every,
@@ -308,7 +304,7 @@ class VQVAEMotionTrainer(nn.Module):
 
         # build pretty printed losses
 
-        losses_str = f"{steps}: vqvae model total loss: {logs['loss'].float():.3} reconstruction loss: {logs['loss_motion'].float():.3} loss_vel: {logs['loss_vel'].float():.3}  commit_loss: {logs['commit_loss'].float():.3} codebook usage: {logs['usage']}"
+        losses_str = f"{steps}: vqvae model total loss: {logs['loss'].float():.3} reconstruction loss: {logs['loss_motion'].float():.3} commit_loss: {logs['commit_loss'].float():.3} codebook usage: {logs['usage']}"
 
         # log
         if steps % self.wandb_every == 0:
@@ -316,10 +312,6 @@ class VQVAEMotionTrainer(nn.Module):
                 wandb.log({f"train_loss/{key}": value})
 
             self.print(losses_str)
-
-        if steps % self.evaluate_every == 0:
-            self.validation_step()
-            self.sample_render_hmlvec(os.path.join(self.output_dir, "samples"))
 
         # if self.is_main and not (steps % self.save_model_every) and steps > 0:
         if not (steps % self.save_model_every):
@@ -339,13 +331,16 @@ class VQVAEMotionTrainer(nn.Module):
                 f'{steps}: saving model to {str(os.path.join(self.output_dir , "checkpoints") )}'
             )
 
+        if steps % self.evaluate_every == 0:
+            self.validation_step()
+            self.sample_render_hmlvec(os.path.join(self.output_dir, "samples"))
+
         self.steps += 1
         return logs
 
     def validation_step(self):
         self.vqvae_model.eval()
         val_loss_ae = {}
-        all_loss = 0.0
 
         self.print(f"validation start")
 
@@ -358,8 +353,6 @@ class VQVAEMotionTrainer(nn.Module):
             ):
                 gt_motion = batch["motion"][0].to(self.device)
                 # mask = batch["motion"][1].to(self.device)
-                if self.dataset_args.enable_masking:
-                    gt_motion = self.mask_augment(gt_motion, perc_n=0.2, perc_d=0.1)
 
                 vqvae_output = self.vqvae_model(
                     motion=gt_motion,
@@ -369,14 +362,10 @@ class VQVAEMotionTrainer(nn.Module):
                 loss_motion = self.loss_fnc(
                     vqvae_output.decoded_motion, gt_motion, mask=None
                 )
-                loss_vel = self.loss_fnc.forward_vel(
-                    vqvae_output.decoded_motion, gt_motion, mask=None
-                )
 
                 loss = (
                     self.vqvae_args.loss_motion * loss_motion
                     + self.vqvae_args.commit * vqvae_output.commit_loss
-                    + self.vqvae_args.loss_vel * loss_vel
                 ) / self.grad_accum_every
 
                 used_indices = vqvae_output.indices.flatten().tolist()
@@ -385,7 +374,6 @@ class VQVAEMotionTrainer(nn.Module):
                 loss_dict = {
                     "total_loss": loss.detach().cpu(),
                     "loss_motion": loss_motion.detach().cpu(),
-                    "loss_vel": loss_vel.detach().cpu(),
                     "commit_loss": vqvae_output.commit_loss.detach().cpu(),
                     "usage": usage,
                 }
@@ -417,7 +405,7 @@ class VQVAEMotionTrainer(nn.Module):
         save_file = os.path.join(save_path, f"{int(self.steps.item())}")
         os.makedirs(save_file, exist_ok=True)
 
-        # assert self.render_dl.batch_size == 1 , "Batch size for rendering should be 1!"
+        assert self.render_dl.batch_size == 1, "Batch size for rendering should be 1!"
 
         dataset_lens = self.render_ds.cumulative_sizes
         self.vqvae_model.eval()
@@ -446,7 +434,7 @@ class VQVAEMotionTrainer(nn.Module):
                 dset.render_hml(
                     vqvae_output.decoded_motion.squeeze().cpu(),
                     os.path.join(
-                        save_file, os.path.basename(name).split(".")[0] + "_gt.gif"
+                        save_file, os.path.basename(name).split(".")[0] + "_pred.gif"
                     ),
                 )
 

@@ -169,6 +169,42 @@ class BaseMotionDataset(ABC, data.Dataset):
 
         self.mot2pos = Motion2Positions(self.data_root, self.motion_rep)
 
+    @property
+    def nb_joints(self):
+        if self.motion_rep == MotionRep.FULL:
+            return 52
+        elif self.motion_rep == MotionRep.BODY:
+            return 22
+        elif self.motion_rep == MotionRep.HAND:
+            return 30
+        elif self.motion_rep == MotionRep.LEFT_HAND:
+            return 15
+        elif self.motion_rep == MotionRep.RIGHT_HAND:
+            return 15
+
+    @property
+    def motion_dim(self):
+        dim = 0
+
+        if "g" in self.hml_rep:
+            dim += 4
+        if "p" in self.hml_rep:
+            if self.motion_rep == MotionRep.BODY or self.motion_rep == MotionRep.FULL:
+                dim += (self.nb_joints - 1) * 3
+            else:
+                dim += (self.nb_joints) * 3
+        if "r" in self.hml_rep:
+            if self.motion_rep == MotionRep.BODY or self.motion_rep == MotionRep.FULL:
+                dim += (self.nb_joints - 1) * 6
+            else:
+                dim += (self.nb_joints) * 6
+        if "v" in self.hml_rep:
+            dim += self.nb_joints * 3
+        if "c" in self.hml_rep:
+            dim += 4
+
+        return dim
+
     def inv_transform(self, data: Motion) -> Motion:
         """Inverse transforms the data.
 

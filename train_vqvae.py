@@ -1,10 +1,47 @@
 from configs.config import cfg, get_cfg_defaults
-from ctl.trainer_vq_simple import \
-    VQVAEMotionTrainer as VQVAEMotionTrainerSimple
+from ctl.trainer_vq_simple import VQVAEMotionTrainer
+from core import MotionRep
+
+
+def nb_joints(motion_rep):
+    if motion_rep == MotionRep.FULL:
+        return 52
+    elif motion_rep == MotionRep.BODY:
+        return 22
+    elif motion_rep == MotionRep.HAND:
+        return 30
+    elif motion_rep == MotionRep.LEFT_HAND:
+        return 15
+    elif motion_rep == MotionRep.RIGHT_HAND:
+        return 15
+
+
+def motion_dim(hml_rep, motion_rep):
+    dim = 0
+    joints = nb_joints(motion_rep)
+
+    if "g" in hml_rep:
+        dim += 4
+    if "p" in hml_rep:
+        if motion_rep == MotionRep.BODY or motion_rep == MotionRep.FULL:
+            dim += (joints - 1) * 3
+        else:
+            dim += (joints) * 3
+    if "r" in hml_rep:
+        if motion_rep == MotionRep.BODY or motion_rep == MotionRep.FULL:
+            dim += (joints - 1) * 6
+        else:
+            dim += (joints) * 6
+    if "v" in hml_rep:
+        dim += joints * 3
+    if "c" in hml_rep:
+        dim += 4
+
+    return dim
 
 
 def main(cfg):
-    trainer = VQVAEMotionTrainerSimple(
+    trainer = VQVAEMotionTrainer(
         args=cfg,
     ).cuda()
 
@@ -12,11 +49,17 @@ def main(cfg):
 
 
 if __name__ == "__main__":
-    nme = "smplx_resnet"
-    path = f"/srv/hays-lab/scratch/sanisetty3/music_motion/ACMG/checkpoints/{nme}/{nme}.yaml"
+    nme = "vqvae_body"
+    path = f"/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/{nme}/{nme}.yaml"
     cfg = get_cfg_defaults()
     print("loading config from:", path)
     cfg.merge_from_file(path)
+
+    cfg.vqvae.nb_joints = nb_joints(MotionRep(cfg.dataset.motion_rep))
+    cfg.vqvae.motion_dim = motion_dim(
+        cfg.dataset.hml_rep, MotionRep(cfg.dataset.motion_rep)
+    )
+
     cfg.freeze()
     print("output_dir: ", cfg.output_dir)
 
