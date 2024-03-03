@@ -61,8 +61,14 @@ class ReConsLoss(nn.Module):
         hml_rep = self.hml_rep
 
         loss = 0
+
+        if self.use_geodesic_loss is False:
+            return self.Loss(motion_pred, motion_gt)
+
         params_pred = torch.split(motion_pred, self.split_seq, -1)[0]
         params_gt = torch.split(motion_gt, self.split_seq, -1)[0]
+
+        loss = self.Loss(motion_pred, motion_gt)
 
         if mask is not None:
             mask_split = torch.split(mask, self.split_seq, -1)[0]

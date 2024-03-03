@@ -106,8 +106,8 @@ class VQVAE(nn.Module):
 
     # x_out, loss, perplexity, code_idx
 
-    def forward_decoder(self, x):
-        x_d = self.quantizer.dequantize(x)
+    def forward_decoder(self, indices):
+        x_d = self.quantizer.dequantize(indices)
         x_d = x_d.view(1, -1, self.code_dim).permute(0, 2, 1).contiguous()
 
         # decoder
@@ -142,6 +142,7 @@ class HumanVQVAE(nn.Module):
         self.load_state_dict(pkg["model"])
 
     def freeze(self):
+        # self.eval()
         for param in self.parameters():
             param.requires_grad = False
 
@@ -153,6 +154,6 @@ class HumanVQVAE(nn.Module):
     def forward(self, motion, mask=None):
         return self.vqvae(motion, mask)
 
-    def forward_decoder(self, x):
-        x_out = self.vqvae.forward_decoder(x)
+    def decode(self, indices):
+        x_out = self.vqvae.forward_decoder(indices)
         return x_out

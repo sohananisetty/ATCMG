@@ -51,6 +51,7 @@ class ConditionProvider(nn.Module):
         motion_max_length_s: int = 10,
         fps: int = 30,
         motion_rep: MotionRep = MotionRep.FULL,
+        pad_id: int = 0,
     ):
         super().__init__()
 
@@ -75,7 +76,7 @@ class ConditionProvider(nn.Module):
         self.motion_padding = motion_padding
         self.motion_max_length_s = motion_max_length_s
         self.motion_max_length = motion_max_length_s * fps
-        self.use_rotation = True
+        self.pad_id = pad_id
 
         self.audio_dim = 128 if audio_rep == AudioRep.ENCODEC else 35
 
@@ -232,7 +233,11 @@ class ConditionProvider(nn.Module):
                     motion = np.stack(np.tile(motion, n_repeat))
 
                 pad_motion = np.concatenate(
-                    [motion, np.zeros((max_length - motion.shape[0], motion.shape[-1]))]
+                    [
+                        motion,
+                        self.pad_id
+                        * np.ones((max_length - motion.shape[0], motion.shape[-1])),
+                    ]
                 )
                 mask = np.array(
                     [1] * motion.shape[0] + [0] * (max_length - motion.shape[0])

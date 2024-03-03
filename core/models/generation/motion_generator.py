@@ -3,22 +3,29 @@ import pathlib
 from functools import partial
 from pathlib import Path
 from random import random
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Dict, Tuple
 
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
-from core import (AttentionParams, PositionalEmbeddingParams,
-                  PositionalEmbeddingType, TranslationTransformerParams)
+from core import (
+    AttentionParams,
+    PositionalEmbeddingParams,
+    PositionalEmbeddingType,
+    TranslationTransformerParams,
+)
 from core.datasets.conditioner import ConditionFuser
 from core.models.attend import Attend, Attention
-from core.models.utils import (FeedForward, LayerNorm, default, exists,
-                               get_obj_from_str)
+from core.models.utils import FeedForward, LayerNorm, default, exists, get_obj_from_str
 from einops import rearrange, repeat
 from torch import einsum, nn
 from tqdm.auto import tqdm
 from yacs.config import CfgNode as CN
+from copy import deepcopy
+from core import MotionTokenizerParams
+from core.models.resnetVQ.vqvae import HumanVQVAE
 
+ConditionType = Tuple[torch.Tensor, torch.Tensor]
 # helpers
 
 
@@ -98,101 +105,53 @@ def FeedForward(dim, mult=4):
     )
 
 
-# class Attention(nn.Module):
-#     def __init__(
-#         self,
-#         dim,
-#         dim_head=64,
-#         heads=8,
-#         cross_attend=False,
-#         scale=8,
-#         flash=True,
-#         dropout=0.0,
-#     ):
-#         super().__init__()
-#         self.scale = scale
-#         self.heads = heads
-#         inner_dim = dim_head * heads
-
-#         self.cross_attend = cross_attend
-#         self.norm = LayerNorm(dim)
-
-#         self.attend = Attend(flash=flash, dropout=dropout, scale=scale)
-
-#         self.null_kv = nn.Parameter(torch.randn(2, heads, 1, dim_head))
-
-#         self.to_q = nn.Linear(dim, inner_dim, bias=False)
-#         self.to_kv = nn.Linear(dim, inner_dim * 2, bias=False)
-
-#         self.q_scale = nn.Parameter(torch.ones(dim_head))
-#         self.k_scale = nn.Parameter(torch.ones(dim_head))
-
-#         self.to_out = nn.Linear(inner_dim, dim, bias=False)
-
-#     def forward(self, x, context=None, context_mask=None):
-#         assert not (exists(context) ^ self.cross_attend)
-
-#         n = x.shape[-2]
-#         h, is_cross_attn = self.heads, exists(context)
-
-#         x = self.norm(x)
-
-#         kv_input = context if self.cross_attend else x
-
-#         q, k, v = (self.to_q(x), *self.to_kv(kv_input).chunk(2, dim=-1))
-
-#         q, k, v = map(lambda t: rearrange(t, "b n (h d) -> b h n d", h=h), (q, k, v))
-
-#         nk, nv = self.null_kv
-#         nk, nv = map(lambda t: repeat(t, "h 1 d -> b h 1 d", b=x.shape[0]), (nk, nv))
-
-#         k = torch.cat((nk, k), dim=-2)
-#         v = torch.cat((nv, v), dim=-2)
-
-#         q, k = map(l2norm, (q, k))
-#         q = q * self.q_scale
-#         k = k * self.k_scale
-
-#         if exists(context_mask):
-#             context_mask = repeat(context_mask, "b j -> b h i j", h=h, i=n)
-#             context_mask = F.pad(context_mask, (1, 0), value=True)
-
-#         out = self.attend(q, k, v, mask=context_mask)
-
-#         out = rearrange(out, "b h n d -> b n (h d)")
-#         return self.to_out(out)
-
-
-class TransformerBlock(nn.Module):
+class TransformerBlockMuse(nn.Module):
     def __init__(
         self,
-        self_attention_params: AttentionParams,
-        cross_attention_params: AttentionParams = None,
+        dim: int = 768,
+        heads: int = 8,
+        dropout: float = 0.0,
+        cross_attn_tokens_dropout: float = 0.0,
+        flash: bool = False,
+        causal: bool = True,
         depth: int = 1,
         ff_mult: int = 4,
     ):
         super().__init__()
         self.layers = nn.ModuleList([])
-        self.do_cross = cross_attention_params is not None
-
-        assert cross_attention_params.dim == self_attention_params.dim, "need same dim"
+        self.do_cross = causal
 
         for _ in range(depth):
             self.layers.append(
                 nn.ModuleList(
                     [
-                        Attention(self_attention_params),
+                        Attention(
+                            dim=dim,
+                            heads=heads,
+                            dropout=dropout,
+                            cross_attn_tokens_dropout=cross_attn_tokens_dropout,
+                            add_null_kv=True,
+                            flash=flash,
+                        ),
                         (
-                            Attention(cross_attention_params)
+                            Attention(
+                                dim=dim,
+                                heads=heads,
+                                dropout=dropout,
+                                cross_attn_tokens_dropout=cross_attn_tokens_dropout,
+                                add_null_kv=True,
+                                flash=flash,
+                                causal=True,
+                            )
                             if self.do_cross
                             else nn.Identity()
                         ),
-                        FeedForward(dim=self_attention_params.dim, mult=ff_mult),
+                        FeedForward(dim=dim, mult=ff_mult),
                     ]
                 )
             )
 
-        self.norm = LayerNorm(self_attention_params.dim)
+        self.norm = LayerNorm(dim)
 
     def forward(self, x, mask=None, context=None, context_mask=None, rel_pos=None):
         for attn, cross_attn, ff1 in self.layers:
@@ -213,50 +172,125 @@ class TransformerBlock(nn.Module):
 # transformer - it's all we need
 
 
+class ClassifierFreeGuidanceDropout(nn.Module):
+    """Classifier Free Guidance dropout.
+    All attributes are dropped with the same probability.
+
+    Args:
+        p (float): Probability to apply condition dropout during training.
+        seed (int): Random seed.
+    """
+
+    def __init__(self, p: float = 0.0, seed: int = 42):
+        super().__init__()
+        self.rng = torch.Generator()
+        self.rng.manual_seed(seed)
+        self.p = p
+
+    def prob_mask_like(self, shape, prob, device=None):
+        if prob == 1:
+            return torch.ones(shape, device=device, dtype=torch.bool)
+        elif prob == 0:
+            return torch.zeros(shape, device=device, dtype=torch.bool)
+        else:
+            return torch.zeros(shape, device=device).float().uniform_(0, 1) < prob
+
+    def forward(
+        self, conditions: Dict[str, ConditionType], drop_prob: float = None
+    ) -> Dict[str, ConditionType]:
+        """
+        Args:
+            samples (list[ConditioningAttributes]): List of conditions.
+        Returns:
+            list[ConditioningAttributes]: List of conditions after all attributes were set to None.
+        """
+
+        drop_prob = drop_prob if drop_prob is not None else self.p
+
+        conditions_ = deepcopy(conditions)
+
+        for condition_modality, (embedding, mask) in conditions.items():
+            b, n = mask.shape
+
+            if mask.dtype != torch.bool:
+                mask = mask.to(torch.bool)
+
+            if drop_prob > 0.0 and (condition_modality != "audio" or not self.training):
+                drop_mask = self.prob_mask_like((b, 1), 1.0 - drop_prob, mask.device)
+                new_mask = mask & drop_mask
+                new_embedding = embedding * new_mask.unsqueeze(-1)
+                conditions_[condition_modality] = (new_embedding, new_mask)
+
+        return conditions_
+
+    def __repr__(self):
+        return f"ClassifierFreeGuidanceDropout(p={self.p})"
+
+
 class Transformer(nn.Module):
     def __init__(
         self,
         *,
         num_tokens,
         dim,
-        seq_len,
-        dim_out=None,
-        t5_name=DEFAULT_T5_NAME,
-        self_cond=False,
-        add_mask_id=False,
-        **kwargs
+        positional_embedding_type="SINE",
+        emb_dropout=0.0,
+        dim_out: None,
+        audio_input_dim: int = 128,
+        text_input_dim: int = 768,
+        fuse_method: Dict[str, List[str]] = {"cross": ["audio"], "prepend": ["text"]},
+        **kwargs,
     ):
         super().__init__()
         self.dim = dim
-        self.mask_id = num_tokens if add_mask_id else None
+        self.audio_input_dim = audio_input_dim
+        self.text_input_dim = text_input_dim
 
-        self.num_tokens = num_tokens
-        self.token_emb = nn.Embedding(num_tokens + int(add_mask_id), dim)
-        self.pos_emb = nn.Embedding(seq_len, dim)
-        self.seq_len = seq_len
+        motion_tokenizer_params = MotionTokenizerParams(num_tokens)
 
-        self.transformer_blocks = TransformerBlocks(dim=dim, **kwargs)
+        self.num_tokens = motion_tokenizer_params.num_tokens
+        self.mask_token_id = motion_tokenizer_params.mask_token_id
+        self.pad_token_id = motion_tokenizer_params.pad_token_id
+        self.token_emb = nn.Embedding(motion_tokenizer_params.vocab_size, dim)
+        self.dim_out = default(dim_out, num_tokens)
+
+        positional_embedding_params = PositionalEmbeddingParams(dim=self.dim)
+
+        self.pos_emb = get_obj_from_str(
+            PositionalEmbeddingType[positional_embedding_type].value
+        )(positional_embedding_params)
+
+        self.transformer_blocks = TransformerBlockMuse(dim=dim, **kwargs)
         self.norm = LayerNorm(dim)
+
+        self.condition_fuser = ConditionFuser(fuse_method)
+
+        self.cfg_dropout = ClassifierFreeGuidanceDropout()
+        self.emb_dropout = nn.Dropout(emb_dropout)
+
+        self.project_audio = (
+            nn.Linear(self.audio_input_dim, self.dim, bias=False)
+            if self.audio_input_dim != self.dim
+            else nn.Identity()
+        )
+        self.project_text = (
+            nn.Linear(self.text_input_dim, self.dim, bias=False)
+            if self.text_input_dim != self.dim
+            else nn.Identity()
+        )
 
         self.dim_out = default(dim_out, num_tokens)
         self.to_logits = nn.Linear(dim, self.dim_out, bias=False)
 
-        # text conditioning
+    def _prepare_inputs(self, input, conditions):
+        audio_embed = self.project_audio(conditions["audio"][0])
+        text_embed = self.project_text(conditions["text"][0])
+        conditions["audio"] = (audio_embed, conditions["audio"][1])
+        conditions["text"] = (text_embed, conditions["text"][1])
 
-        self.encode_text = partial(t5_encode_text, name=t5_name)
+        inputs_, cross_inputs = self.condition_fuser(input, conditions)
 
-        text_embed_dim = get_encoded_dim(t5_name)
-
-        self.text_embed_proj = (
-            nn.Linear(text_embed_dim, dim, bias=False)
-            if text_embed_dim != dim
-            else nn.Identity()
-        )
-
-        # optional self conditioning
-
-        self.self_cond = self_cond
-        self.self_cond_to_init_embed = FeedForward(dim)
+        return inputs_, cross_inputs
 
     def forward_with_cond_scale(
         self, *args, cond_scale=3.0, return_embed=False, **kwargs
@@ -281,11 +315,12 @@ class Transformer(nn.Module):
 
     def forward_with_neg_prompt(
         self,
+        *args,
         text_embed: torch.Tensor,
         neg_text_embed: torch.Tensor,
         cond_scale=3.0,
         return_embed=False,
-        **kwargs
+        **kwargs,
     ):
         neg_logits = self.forward(
             *args, neg_text_embed=neg_text_embed, cond_drop_prob=0.0, **kwargs
@@ -295,10 +330,10 @@ class Transformer(nn.Module):
             return_embed=True,
             text_embed=text_embed,
             cond_drop_prob=0.0,
-            **kwargs
+            **kwargs,
         )
 
-        logits = neg_logits + (pos_logits - neg_logits) * cond_scale
+        scaled_logits = neg_logits + (pos_logits - neg_logits) * cond_scale
 
         if return_embed:
             return scaled_logits, embed
@@ -307,61 +342,41 @@ class Transformer(nn.Module):
 
     def forward(
         self,
-        x,
-        return_embed=False,
-        return_logits=False,
-        labels=None,
-        ignore_index=0,
-        self_cond_embed=None,
-        cond_drop_prob=0.0,
-        conditioning_token_ids: Optional[torch.Tensor] = None,
-        texts: Optional[List[str]] = None,
-        text_embeds: Optional[torch.Tensor] = None,
+        inputs: Dict[str, ConditionType],
+        conditions: Dict[str, ConditionType],
+        return_embed: bool = False,
+        return_logits: bool = False,
+        labels: Optional[torch.IntTensor] = None,
+        cond_drop_prob: float = 0.0,
+        ignore_index: int = -100,
     ):
-        device, b, n = x.device, *x.shape
-        assert n <= self.seq_len
 
-        # prepare texts
+        assert len(inputs[0].shape) == 2, "input motion not b n"
+        device, b, n = inputs[0].device, *inputs[0]
 
-        assert exists(texts) ^ exists(text_embeds)
-
-        if exists(texts):
-            text_embeds = self.encode_text(texts)
-
-        context = self.text_embed_proj(text_embeds)
-
-        context_mask = (text_embeds != 0).any(dim=-1)
-
-        # classifier free guidance
-
-        if cond_drop_prob > 0.0:
-            mask = prob_mask_like((b, 1), 1.0 - cond_drop_prob, device)
-            context_mask = context_mask & mask
-
-        # concat conditioning image token ids if needed
-
-        if exists(conditioning_token_ids):
-            conditioning_token_ids = rearrange(
-                conditioning_token_ids, "b ... -> b (...)"
-            )
-            cond_token_emb = self.token_emb(conditioning_token_ids)
-            context = torch.cat((context, cond_token_emb), dim=-2)
-            context_mask = F.pad(
-                context_mask, (0, conditioning_token_ids.shape[-1]), value=True
-            )
-
-        # embed tokens
-
+        x = inputs[0]
         x = self.token_emb(x)
         x = x + self.pos_emb(torch.arange(n, device=device))
+        # x = self.post_emb_norm(x)
+        x = self.emb_dropout(x)
 
-        if self.self_cond:
-            if not exists(self_cond_embed):
-                self_cond_embed = torch.zeros_like(x)
-            x = x + self.self_cond_to_init_embed(self_cond_embed)
+        # classifier free guidance
+        if self.training and cond_drop_prob > 0.0:
+            conditions = self.cfg_dropout(conditions, cond_drop_prob)
+        # fuse conditions
+        inputs_, cross_inputs_ = self._prepare_inputs((x, inputs[1]), conditions)
 
-        embed = self.transformer_blocks(x, context=context, context_mask=context_mask)
+        x_ = inputs_[0]
+        x_padding_mask = inputs_[1]
+        context = cross_inputs_[0]
+        context_padding_mask = cross_inputs_[1]
 
+        embed = self.transformer_blocks(
+            x=x_,
+            mask=x_padding_mask,
+            context=context,
+            context_mask=context_padding_mask,
+        )
         logits = self.to_logits(embed)
 
         if return_embed:
@@ -370,82 +385,14 @@ class Transformer(nn.Module):
         if not exists(labels):
             return logits
 
-        if self.dim_out == 1:
-            loss = F.binary_cross_entropy_with_logits(
-                rearrange(logits, "... 1 -> ..."), labels
-            )
-        else:
-            loss = F.cross_entropy(
-                rearrange(logits, "b n c -> b c n"), labels, ignore_index=ignore_index
-            )
+        loss = F.cross_entropy(
+            rearrange(logits, "b n c -> b c n"), labels, ignore_index=ignore_index
+        )
 
         if not return_logits:
             return loss
 
         return loss, logits
-
-
-# self critic wrapper
-
-
-class SelfCritic(nn.Module):
-    def __init__(self, net):
-        super().__init__()
-        self.net = net
-        self.to_pred = nn.Linear(net.dim, 1)
-
-    def forward_with_cond_scale(self, x, *args, **kwargs):
-        _, embeds = self.net.forward_with_cond_scale(
-            x, *args, return_embed=True, **kwargs
-        )
-        return self.to_pred(embeds)
-
-    def forward_with_neg_prompt(self, x, *args, **kwargs):
-        _, embeds = self.net.forward_with_neg_prompt(
-            x, *args, return_embed=True, **kwargs
-        )
-        return self.to_pred(embeds)
-
-    def forward(self, x, *args, labels=None, **kwargs):
-        _, embeds = self.net(x, *args, return_embed=True, **kwargs)
-        logits = self.to_pred(embeds)
-
-        if not exists(labels):
-            return logits
-
-        logits = rearrange(logits, "... 1 -> ...")
-        return F.binary_cross_entropy_with_logits(logits, labels)
-
-
-# specialized transformers
-
-
-class MaskGitTransformer(Transformer):
-    def __init__(self, *args, **kwargs):
-        assert "add_mask_id" not in kwargs
-        super().__init__(*args, add_mask_id=True, **kwargs)
-
-
-class TokenCritic(Transformer):
-    def __init__(self, *args, **kwargs):
-        assert "dim_out" not in kwargs
-        super().__init__(*args, dim_out=1, **kwargs)
-
-
-# classifier free guidance functions
-
-
-def uniform(shape, min=0, max=1, device=None):
-    return torch.zeros(shape, device=device).float().uniform_(0, 1)
-
-
-def prob_mask_like(shape, prob, device=None):
-    if prob == 1:
-        return torch.ones(shape, device=device, dtype=torch.bool)
-    elif prob == 0:
-        return torch.zeros(shape, device=device, dtype=torch.bool)
-    else:
-        return uniform(shape, device=device) < prob
 
 
 # sampling helpers
@@ -472,6 +419,10 @@ def top_k(logits, thres=0.9):
     return probs
 
 
+def uniform(shape, min=0, max=1, device=None):
+    return torch.zeros(shape, device=device).float().uniform_(0, 1)
+
+
 # noise schedules
 
 
@@ -482,62 +433,25 @@ def cosine_schedule(t):
 # main maskgit classes
 
 
-@beartype
 class MaskGit(nn.Module):
     def __init__(
         self,
-        image_size,
-        transformer: MaskGitTransformer,
+        # image_size,
+        transformer: Transformer,
         noise_schedule: Callable = cosine_schedule,
-        token_critic: Optional[TokenCritic] = None,
-        self_token_critic=False,
-        vae: Optional[VQGanVAE] = None,
-        cond_vae: Optional[VQGanVAE] = None,
-        cond_image_size=None,
+        vqvae: Optional[HumanVQVAE] = None,
         cond_drop_prob=0.5,
-        self_cond_prob=0.9,
         no_mask_token_prob=0.0,
-        critic_loss_weight=1.0,
     ):
         super().__init__()
-        self.vae = vae.copy_for_eval() if exists(vae) else None
-
-        if exists(cond_vae):
-            self.cond_vae = cond_vae.eval()
-        else:
-            self.cond_vae = self.vae
-
-        assert not (
-            exists(cond_vae) and not exists(cond_image_size)
-        ), "cond_image_size must be specified if conditioning"
-
-        self.image_size = image_size
-        self.cond_image_size = cond_image_size
-        self.resize_image_for_cond_image = exists(cond_image_size)
+        self.vqvae = vqvae.eval().freeze() if exists(vqvae) else None
 
         self.cond_drop_prob = cond_drop_prob
 
         self.transformer = transformer
-        self.self_cond = transformer.self_cond
-        assert (
-            self.vae.codebook_size
-            == self.cond_vae.codebook_size
-            == transformer.num_tokens
-        ), "transformer num_tokens must be set to be equal to the vae codebook size"
 
-        self.mask_id = transformer.mask_id
+        self.mask_token_id = transformer.mask_token_id
         self.noise_schedule = noise_schedule
-
-        assert not (self_token_critic and exists(token_critic))
-        self.token_critic = token_critic
-
-        if self_token_critic:
-            self.token_critic = SelfCritic(transformer)
-
-        self.critic_loss_weight = critic_loss_weight
-
-        # self conditioning
-        self.self_cond_prob = self_cond_prob
 
         # percentage of tokens to be [mask]ed to remain the same token, so that transformer produces better embeddings across all tokens as done in original BERT paper
         # may be needed for self conditioning
@@ -552,51 +466,146 @@ class MaskGit(nn.Module):
         state_dict = torch.load(str(path))
         self.load_state_dict(state_dict)
 
+    def muse_mask(self, code_ids: torch.Tensor, ignore_index: int = -100):
+        batch, seq_len, device = (
+            *code_ids.shape,
+            code_ids.device,
+        )
+
+        rand_time = uniform((batch,), device=device)
+        rand_mask_probs = self.noise_schedule(rand_time)
+        num_token_masked = (seq_len * rand_mask_probs).round().clamp(min=1)
+
+        # mask_id = self.mask_token_id
+        batch_randperm = torch.rand((batch, seq_len), device=device).argsort(dim=-1)
+        mask = batch_randperm < rearrange(num_token_masked, "b -> b 1")
+        mask[code_ids == self.transformer.pad_token_id] = False
+
+        # mask_id = self.transformer.mask_token_id
+        labels = torch.where(mask, code_ids, ignore_index)
+
+        if self.no_mask_token_prob > 0.0:
+            no_mask_mask = get_mask_subset_prob(mask, self.no_mask_token_prob)
+            mask &= ~no_mask_mask
+
+        x = torch.where(mask, self.mask_token_id, code_ids)
+
+        return x, labels
+
+    def bert_muse_mask(self, code_ids: torch.Tensor, ignore_index: int = -100):
+        batch, seq_len, device = (
+            *code_ids.shape,
+            code_ids.device,
+        )
+
+        rand_time = uniform((batch,), device=device)
+        rand_mask_probs = self.noise_schedule(rand_time)
+
+        # probability_matrix = torch.full(code_ids.shape, self.mlm_probability)
+
+        rand_time = uniform((batch,), device=device)
+        rand_mask_probs = self.noise_schedule(rand_time)
+        num_token_masked = (seq_len * rand_mask_probs).round().clamp(min=1)
+
+        # mask_id = self.mask_token_id
+        batch_randperm = torch.rand((batch, seq_len), device=device)
+        batch_randperm[code_ids == self.transformer.pad_token_id] = 10.0
+        batch_randperm = batch_randperm.argsort(dim=-1)
+
+        mask = batch_randperm < rearrange(num_token_masked, "b -> b 1")
+        mask[code_ids == self.transformer.pad_token_id] = False
+
+        # mask_id = self.transformer.mask_token_id
+        labels = torch.where(mask, code_ids, ignore_index)
+
+        # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
+        indices_replaced = (
+            torch.bernoulli(torch.full(code_ids.shape, 0.8)).bool() & mask
+        )
+        code_ids[indices_replaced] = self.transformer.mask_token_id
+
+        # 10% of the time, we replace masked input tokens with random word
+        indices_random = (
+            torch.bernoulli(torch.full(code_ids.shape, 0.5)).bool()
+            & mask
+            & ~indices_replaced
+        )
+        random_words = torch.randint(
+            self.transformer.num_tokens, code_ids.shape, dtype=torch.long
+        ).to(device)
+        code_ids[indices_random] = random_words[indices_random]
+
+        return code_ids, labels
+
     @torch.no_grad()
     @eval_decorator
     def generate(
         self,
-        texts: List[str],
-        negative_texts: Optional[List[str]] = None,
-        cond_images: Optional[torch.Tensor] = None,
-        fmap_size=None,
+        # texts: List[str],
+        # negative_texts: Optional[List[str]] = None,
+        conditions: Dict[str, ConditionType],
+        neg_conditions: Dict[str, ConditionType],
+        duration: int = 300,
+        # cond_images: Optional[torch.Tensor] = None,
+        # fmap_size=None,
         temperature=1.0,
         topk_filter_thres=0.9,
         can_remask_prev_masked=False,
-        force_not_use_token_critic=False,
+        # force_not_use_token_critic=False,
         timesteps=18,  # ideal number of steps is 18 in maskgit paper
         cond_scale=3,
-        critic_noise_scale=1,
+        # critic_noise_scale=1,
     ):
-        fmap_size = default(fmap_size, self.vae.get_encoded_fmap_size(self.image_size))
+        # fmap_size = default(fmap_size, self.vae.get_encoded_fmap_size(self.image_size))
 
         # begin with all image token ids masked
 
         device = next(self.parameters()).device
 
-        seq_len = fmap_size**2
+        # assert (
+        #     neg_conditions.keys() == conditions.keys()
+        # ), "need same number of negetive conditions and positive conditions"
 
-        batch_size = len(texts)
+        seq_len = duration
+        try:
+            if conditions.get("text", None) is not None:
+
+                batch_size = conditions["text"].shape[0]
+                if neg_conditions.get("text", None) is not None:
+                    assert (
+                        neg_conditions["text"].shape[0] == batch_size
+                    ), "negetive text conditions should have same number as positive "
+
+            else:
+                batch_size = len(conditions["audio"].shape[0])
+                if neg_conditions.get("audio", None) is not None:
+                    assert (
+                        neg_conditions["audio"].shape[0] == batch_size
+                    ), "negetive audio conditions should have same number as positive "
+
+        except:
+            print("need atleast one condition")
+            return
 
         shape = (batch_size, seq_len)
 
-        ids = torch.full(shape, self.mask_id, dtype=torch.long, device=device)
+        ids = torch.full(shape, self.mask_token_id, dtype=torch.long, device=device)
         scores = torch.zeros(shape, dtype=torch.float32, device=device)
 
         starting_temperature = temperature
 
         cond_ids = None
 
-        text_embeds = self.transformer.encode_text(texts)
+        # text_embeds = self.transformer.encode_text(texts)
 
         demask_fn = self.transformer.forward_with_cond_scale
 
         # whether to use token critic for scores
 
-        use_token_critic = exists(self.token_critic) and not force_not_use_token_critic
+        # use_token_critic = exists(self.token_critic) and not force_not_use_token_critic
 
-        if use_token_critic:
-            token_critic_fn = self.token_critic.forward_with_cond_scale
+        # if use_token_critic:
+        #     token_critic_fn = self.token_critic.forward_with_cond_scale
 
         # negative prompting, as in paper
 
@@ -702,144 +711,40 @@ class MaskGit(nn.Module):
 
     def forward(
         self,
-        images_or_ids: torch.Tensor,
-        ignore_index=-1,
-        cond_images: Optional[torch.Tensor] = None,
-        cond_token_ids: Optional[torch.Tensor] = None,
-        texts: Optional[List[str]] = None,
-        text_embeds: Optional[torch.Tensor] = None,
+        inputs: Dict[str, ConditionType],
+        conditions: Dict[str, ConditionType],
+        ignore_index: int = -100,
         cond_drop_prob=None,
-        train_only_generator=False,
-        sample_temperature=None,
     ):
         # tokenize if needed
 
-        if images_or_ids.dtype == torch.float:
+        motions_or_ids = inputs[0]
+        input_mask = inputs[1]
+
+        if motions_or_ids.dtype == torch.float and len(motions_or_ids.shape) == 3:
             assert exists(
-                self.vae
-            ), "vqgan vae must be passed in if training from raw images"
-            assert all(
-                [
-                    height_or_width == self.image_size
-                    for height_or_width in images_or_ids.shape[-2:]
-                ]
-            ), "the image you passed in is not of the correct dimensions"
+                self.vqvae
+            ), "human vqvae must be passed in if training from raw motions"
 
             with torch.no_grad():
-                _, ids, _ = self.vae.encode(images_or_ids)
+                code_ids = self.vqvae.encode(motions_or_ids)
         else:
-            assert (
-                not self.resize_image_for_cond_image
-            ), "you cannot pass in raw image token ids if you want the framework to autoresize image for conditioning super res transformer"
-            ids = images_or_ids
+            assert motions_or_ids.dtype == torch.long, "code ids should be type long"
+            code_ids = motions_or_ids
 
-        # take care of conditioning image if specified
+        code_ids = rearrange(code_ids, "b ... -> b (...)")
 
-        if self.resize_image_for_cond_image:
-            cond_images_or_ids = F.interpolate(
-                images_or_ids, self.cond_image_size, mode="nearest"
-            )
-
-        # get some basic variables
-
-        ids = rearrange(ids, "b ... -> b (...)")
-
-        batch, seq_len, device, cond_drop_prob = (
-            *ids.shape,
-            ids.device,
-            default(cond_drop_prob, self.cond_drop_prob),
-        )
-
-        # tokenize conditional images if needed
-
-        assert not (
-            exists(cond_images) and exists(cond_token_ids)
-        ), "if conditioning on low resolution, cannot pass in both images and token ids"
-
-        if exists(cond_images):
-            assert exists(self.cond_vae), "cond vqgan vae must be passed in"
-            assert all(
-                [
-                    height_or_width == self.cond_image_size
-                    for height_or_width in cond_images.shape[-2:]
-                ]
-            )
-
-            with torch.no_grad():
-                _, cond_token_ids, _ = self.cond_vae.encode(cond_images)
-
-        # prepare mask
-
-        rand_time = uniform((batch,), device=device)
-        rand_mask_probs = self.noise_schedule(rand_time)
-        num_token_masked = (seq_len * rand_mask_probs).round().clamp(min=1)
-
-        mask_id = self.mask_id
-        batch_randperm = torch.rand((batch, seq_len), device=device).argsort(dim=-1)
-        mask = batch_randperm < rearrange(num_token_masked, "b -> b 1")
-
-        mask_id = self.transformer.mask_id
-        labels = torch.where(mask, ids, ignore_index)
-
-        if self.no_mask_token_prob > 0.0:
-            no_mask_mask = get_mask_subset_prob(mask, self.no_mask_token_prob)
-            mask &= ~no_mask_mask
-
-        x = torch.where(mask, mask_id, ids)
-
-        # get text embeddings
-
-        if exists(texts):
-            text_embeds = self.transformer.encode_text(texts)
-            texts = None
-
-        # self conditioning
-
-        self_cond_embed = None
-
-        if self.transformer.self_cond and random() < self.self_cond_prob:
-            with torch.no_grad():
-                _, self_cond_embed = self.transformer(
-                    x,
-                    text_embeds=text_embeds,
-                    conditioning_token_ids=cond_token_ids,
-                    cond_drop_prob=0.0,
-                    return_embed=True,
-                )
-
-                self_cond_embed.detach_()
+        x, labels = self.muse_mask(code_ids, ignore_index)
 
         # get loss
 
         ce_loss, logits = self.transformer(
-            x,
-            text_embeds=text_embeds,
-            self_cond_embed=self_cond_embed,
-            conditioning_token_ids=cond_token_ids,
+            inputs=(x, input_mask),
+            conditions=conditions,
             labels=labels,
             cond_drop_prob=cond_drop_prob,
             ignore_index=ignore_index,
             return_logits=True,
         )
 
-        if not exists(self.token_critic) or train_only_generator:
-            return ce_loss
-
-        # token critic loss
-
-        sampled_ids = gumbel_sample(
-            logits, temperature=default(sample_temperature, random())
-        )
-
-        critic_input = torch.where(mask, sampled_ids, x)
-        critic_labels = (ids != critic_input).float()
-
-        bce_loss = self.token_critic(
-            critic_input,
-            text_embeds=text_embeds,
-            conditioning_token_ids=cond_token_ids,
-            labels=critic_labels,
-            cond_drop_prob=cond_drop_prob,
-        )
-
-        return ce_loss + self.critic_loss_weight * bce_loss
+        return ce_loss

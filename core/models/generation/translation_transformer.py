@@ -9,13 +9,16 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.nn.functional as F
-from core import (AttentionParams, PositionalEmbeddingParams,
-                  PositionalEmbeddingType, TranslationTransformerOutput,
-                  TranslationTransformerParams)
+from core import (
+    AttentionParams,
+    PositionalEmbeddingParams,
+    PositionalEmbeddingType,
+    TranslationTransformerOutput,
+    TranslationTransformerParams,
+)
 from core.datasets.conditioner import ConditionFuser
 from core.models.attend import Attend, Attention
-from core.models.utils import (FeedForward, LayerNorm, default, exists,
-                               get_obj_from_str)
+from core.models.utils import FeedForward, LayerNorm, default, exists, get_obj_from_str
 from einops import rearrange, repeat
 from torch import einsum, nn
 from tqdm.auto import tqdm
@@ -296,54 +299,6 @@ class TranslationTransformer(nn.Module):
         inputs_, cross_inputs = self.condition_fuser(input, conditions)
 
         return inputs_, cross_inputs
-
-    # def forward_with_cond_scale(
-    #     self, *args, cond_scale=3.0, return_embed=False, **kwargs
-    # ):
-    #     if cond_scale == 1:
-    #         return self.forward(
-    #             *args, return_embed=return_embed, cond_drop_prob=0.0, **kwargs
-    #         )
-
-    #     logits, embed = self.forward(
-    #         *args, return_embed=True, cond_drop_prob=0.0, **kwargs
-    #     )
-
-    #     null_logits = self.forward(*args, cond_drop_prob=1.0, **kwargs)
-
-    #     scaled_logits = null_logits + (logits - null_logits) * cond_scale
-
-    #     if return_embed:
-    #         return scaled_logits, embed
-
-    #     return scaled_logits
-
-    # def forward_with_neg_prompt(
-    #     self,
-    #     *args,
-    #     text_embed: torch.Tensor,
-    #     neg_text_embed: torch.Tensor,
-    #     cond_scale=3.0,
-    #     return_embed=False,
-    #     **kwargs,
-    # ):
-    #     neg_logits = self.forward(
-    #         *args, neg_text_embed=neg_text_embed, cond_drop_prob=0.0, **kwargs
-    #     )
-    #     pos_logits, embed = self.forward(
-    #         *args,
-    #         return_embed=True,
-    #         text_embed=text_embed,
-    #         cond_drop_prob=0.0,
-    #         **kwargs,
-    #     )
-
-    #     logits = neg_logits + (pos_logits - neg_logits) * cond_scale
-
-    #     if return_embed:
-    #         return logits, embed
-
-    #     return logits
 
     def forward(
         self,

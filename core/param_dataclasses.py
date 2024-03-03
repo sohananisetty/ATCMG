@@ -131,7 +131,16 @@ class TranslationTransformerParams(TransformerParams):
 
 @dataclass
 class MotionTokenizerParams:
-    vocab_size: int = 1027
-    pad_token_id: int = 1024
-    cls_token_id: int = 1025
-    mask_token_id: int = 1026
+    num_tokens: int = 1024
+
+    @property
+    def pad_token_id(self):
+        return self.num_tokens
+
+    @property
+    def mask_token_id(self):
+        return self.num_tokens + 1
+
+    @property
+    def vocab_size(self):
+        return self.mask_token_id + 1
