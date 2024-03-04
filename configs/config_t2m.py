@@ -87,6 +87,29 @@ cfg.translation_transformer.positional_embedding_type = "SINE"
 
 # cfg.translation_transformer.nb_joints = 52
 
+cfg.motion_generator = CN()
+cfg.motion_generator.target = "core.models.generation.motion_generator.MotionMuse"
+
+cfg.motion_generator.dim = 256
+cfg.motion_generator.depth = 8
+cfg.motion_generator.heads = 8
+cfg.motion_generator.attn_dropout = 0.1
+cfg.motion_generator.causal = True
+cfg.motion_generator.flash = False
+cfg.motion_generator.num_tokens = 1024
+cfg.motion_generator.ff_mult = 4
+cfg.motion_generator.emb_dropout = 0.1
+cfg.motion_generator.post_emb_norm = False
+cfg.motion_generator.positional_embedding_type = "SINE"
+
+## Conditional
+cfg.motion_generator.fuse_method = [{"cross": ["audio"], "prepend": ["text"]}]
+cfg.motion_generator.audio_input_dim = 128
+cfg.motion_generator.text_input_dim = 768
+
+cfg.motion_generator.no_mask_token_prob = 0.1
+cfg.motion_generator.cond_dropout = 0.4
+
 
 def get_cfg_defaults():
     """Get a yacs CfgNode object with default values for my_project."""

@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=vqvae_body
-#SBATCH --output=/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/sbach_outputs/vqvae_body.out
-#SBATCH --error=/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/sbach_outputs/vqvae_body.err
+#SBATCH --job-name=vqvae_body_gprvc
+#SBATCH --output=/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/sbach_outputs/vqvae_body_gprvc.out
+#SBATCH --error=/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/sbach_outputs/vqvae_body_gprvc.err
 #SBATCH --ntasks=1
 #SBATCH -G a40:1
 #SBATCH -p overcap

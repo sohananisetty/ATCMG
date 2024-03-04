@@ -88,23 +88,6 @@ cfg.vqvae.loss_motion = 1.0
 cfg.vqvae.recons_loss = "l1_smooth"  # l1_smooth , l1 , l2
 cfg.vqvae.use_geodesic_loss = False
 
-# cfg.vqvae.motion_dim_body = 263  #'Input motion dimension dimension'
-# cfg.vqvae.motion_dim_hand = 360  #'Input motion dimension dimension'
-
-# cfg.vqvae.dim_hands = 512
-# cfg.vqvae.dim_body = 512
-
-# cfg.vqvae.depth_hand = 3
-# cfg.vqvae.depth_body = 3
-
-# cfg.vqvae.codebook_dim_hands = 768
-# cfg.vqvae.codebook_size_hands = 1024
-# cfg.vqvae.codebook_dim_body = 768
-# cfg.vqvae.codebook_size_body = 1024
-
-
-# cfg.vqvae.freeze_model = False
-
 
 def get_cfg_defaults():
     """Get a yacs CfgNode object with default values for my_project."""

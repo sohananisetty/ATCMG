@@ -327,6 +327,198 @@ class MotionAudioTextDataset(BaseMotionDataset):
         }
 
 
+class MotionIndicesAudioTextDataset(data.Dataset):
+    def __init__(
+        self,
+        dataset_name: str,
+        dataset_root: str,
+        audio_rep: str = "encodec",
+        motion_rep: str = "full",
+        # hml_rep: str = "gprvc",
+        motion_min_length_s=2,
+        motion_max_length_s=10,
+        window_size=None,
+        sampling_rate: int = 16000,
+        downsample_ratio=4,
+        fps: int = 30,
+        split: str = "train",
+        **kwargs,
+    ):
+        super().__init__()
+        self.dataset_name = dataset_name
+        self.split = split
+        self.fps = fps
+        self.audio_rep = audio_rep
+        self.downsample_ratio = downsample_ratio
+
+        self.window_size = window_size
+
+        self.min_motion_length = motion_min_length_s * fps
+        self.max_motion_length = motion_max_length_s * fps
+
+        data_root = dataset_root
+
+        self.text_dir = os.path.join(data_root, "texts/semantic_labels")
+        self.motion_dir = os.path.join(data_root, f"indices/{motion_rep}")
+        self.audio_dir = os.path.join(data_root, "audio")
+
+        if self.audio_rep == "encodec":
+            self.sampling_rate = 50
+        elif self.audio_rep == "librosa":
+            self.sampling_rate = 30
+        else:
+            self.sampling_rate = sampling_rate
+
+        split_file = os.path.join(data_root, f"motion_data/{split}.txt")
+
+        self.id_list = []
+        self.text_list = []
+        with open(split_file, "r") as f:
+            for line in f.readlines():
+                if dataset_name + "/" in line:
+                    try:
+                        motion = np.load(
+                            os.path.join(self.motion_dir, line.strip())
+                        ).squeeze()
+                        if motion.shape[0] * self.downsample_ratio < default(
+                            self.window_size, self.min_motion_length
+                        ):
+                            continue
+
+                        if self.dataset_name == "humanml":
+                            name_list, txt_list = self.load_humanml(line.strip())
+
+                        else:
+                            name_list, txt_list = self.load_txt(line.strip())
+
+                        self.id_list.extend(name_list)
+                        self.text_list.extend(txt_list)
+
+                    except:
+                        continue
+
+        print(
+            f"Total number of motions {dataset_name}: {len(self.id_list)} and texts {len(self.text_list)}"
+        )
+
+    def __len__(self) -> int:
+        return len(self.id_list)
+
+    def load_txt(self, name):
+        name = name[:-4]
+        new_name = f"{name}_0_0_0"
+        name_list = []
+        txt_list = []
+
+        with open(os.path.join(self.text_dir, name + ".txt"), "r") as f:
+            for line in f.readlines():
+                name_list.append(new_name)
+                txt_list.append(line.strip())
+
+        return name_list, txt_list
+
+    def load_humanml(self, name):
+        name = name[:-4]
+        # data_dict = {}
+        name_list = []
+        txt_list = []
+        with open(os.path.join(self.text_dir, name + ".txt"), "r") as f:
+            for index, line in enumerate(f.readlines()):
+                line_split = line.strip().split("#")
+                caption = line_split[0]
+                tokens = line_split[1].split(" ")
+                f_tag = float(line_split[2])
+                to_tag = float(line_split[3])
+                f_tag = 0.0 if np.isnan(f_tag) else f_tag
+                to_tag = 0.0 if np.isnan(to_tag) else to_tag
+                new_name = (
+                    f"{name}_{index}_{int(f_tag * self.fps)}_{int(to_tag * self.fps)}"
+                )
+
+                name_list.append(new_name)
+                txt_list.append(caption)
+
+        return name_list, txt_list
+
+    def load_beat(self, name):
+        name = name[:-4]
+        id, person_name, recording_type, start, end = name.split("_")
+        if id in (list(np.arange(6, 11)) + list(np.arange(21, 31))):
+            gender = "woman"
+        else:
+            gender = "man"
+
+        new_name = f"{name}_0_0"
+        name_list = []
+        txt_list = []
+        with open(
+            os.path.join(
+                self.text_dir.replace("semantic_labels", "body_texts"), name + ".json"
+            ),
+            "r",
+        ) as outfile:
+            frame_texts = json.load(outfile)
+
+        emotion = frame_texts.pop("emotion")
+        if emotion == "neutral":
+            emotion = "a neutral tone"
+
+        prefix = (
+            f"a {gender} is giving a speech with {emotion} on "
+            if recording_type == 0
+            else f"a {gender} is having a conversation with {emotion} on "
+        )
+
+        items = list(frame_texts.values())
+
+        items.insert(0, prefix)
+        # sentence = (" ".join(list(dict.fromkeys(items)))).strip()
+        name_list.append(new_name)
+        txt_list.append(" ".join(items))
+
+        return name_list, txt_list
+
+    def __getitem__(self, item: int) -> Tuple[torch.Tensor, str]:
+        # print(self.id_list[item])
+
+        name, ind, f_, to_ = self.id_list[item].rsplit("_", 3)
+        f_, to_ = int(f_), int(to_)
+        motion = np.load(os.path.join(self.motion_dir, name + ".npy")).squeeze()
+        text = self.text_list[item]
+        try:
+
+            if self.audio_rep == "wav":
+
+                wav, sr = torchaudio.load(
+                    os.path.join(self.audio_dir, self.audio_rep, name + ".wav")
+                )
+                audio_data = np.array(convert_audio(wav, sr, self.sampling_rate, 1))
+            elif self.audio_rep == "encodec" or self.audio_rep == "librosa":
+                audio_data = np.load(
+                    os.path.join(self.audio_dir, self.audio_rep, name + ".npy")
+                )
+
+            motion_s = (motion.shape[0]) // self.fps
+            audio_s = audio_data.shape[0] // self.sampling_rate
+
+            common_len_seconds = min(motion_s, audio_s)
+            motion = motion[: int((common_len_seconds * self.fps))]
+            audio_data = audio_data[: int(common_len_seconds * self.sampling_rate)]
+
+        except:
+            audio_data = None
+
+        if to_ * self.fps - f_ * self.fps > self.min_motion_length:
+            motion = motion[(f_ * self.fps) : (to_ * self.fps)]
+
+        return {
+            "name": name,
+            "motion": motion.reshape(-1, 1),
+            "text": text,
+            "audio": audio_data,
+        }
+
+
 def simple_collate(
     samples: List[Tuple[torch.Tensor, str]], conditioner: ConditionProvider
 ) -> Dict[str, torch.Tensor]:
@@ -337,10 +529,9 @@ def simple_collate(
 
     for sample in samples:
         names.append(sample["name"])
-        motions.append(sample["motion"]())
+        motions.append(sample["motion"])
         texts.append(sample["text"])
         audios.append(sample["audio"])
-        # print(sample["motion"].shape, sample["audio"].shape)
 
     inputs, conditions = conditioner(
         raw_audio=audios,

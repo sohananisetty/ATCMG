@@ -200,7 +200,7 @@ class ConditionProvider(nn.Module):
             max_length_ = (
                 max([motion.shape[0] for motion in motion_list]) // down_sampling_factor
             ) * down_sampling_factor
-            max_length = min(max_length_, self.motion_max_length)
+            max_length = int(min(max_length_, self.motion_max_length))
 
         for idx, motion in enumerate(motion_list):
 
@@ -214,6 +214,7 @@ class ConditionProvider(nn.Module):
                     if subset_index_list is not None
                     else np.random.randint(0, overflow + 1)
                 )
+                print(start_idx, max_length)
                 motion = motion[start_idx : start_idx + max_length]
                 mask = np.array([1] * max_length)
                 motions.append(motion)

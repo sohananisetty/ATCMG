@@ -15,7 +15,7 @@ from core import (
     TranslationTransformerParams,
 )
 from core.datasets.conditioner import ConditionFuser
-from core.models.attend import Attend, Attention
+from core.models.attend2 import Attend, Attention
 from core.models.utils import FeedForward, LayerNorm, default, exists, get_obj_from_str
 from einops import rearrange, repeat
 from torch import einsum, nn
@@ -110,7 +110,7 @@ class TransformerBlockMuse(nn.Module):
         self,
         dim: int = 768,
         heads: int = 8,
-        dropout: float = 0.0,
+        attn_dropout: float = 0.0,
         cross_attn_tokens_dropout: float = 0.0,
         flash: bool = False,
         causal: bool = True,
@@ -128,7 +128,7 @@ class TransformerBlockMuse(nn.Module):
                         Attention(
                             dim=dim,
                             heads=heads,
-                            dropout=dropout,
+                            dropout=attn_dropout,
                             cross_attn_tokens_dropout=cross_attn_tokens_dropout,
                             add_null_kv=True,
                             flash=flash,
@@ -137,7 +137,7 @@ class TransformerBlockMuse(nn.Module):
                             Attention(
                                 dim=dim,
                                 heads=heads,
-                                dropout=dropout,
+                                dropout=attn_dropout,
                                 cross_attn_tokens_dropout=cross_attn_tokens_dropout,
                                 add_null_kv=True,
                                 flash=flash,
@@ -230,12 +230,12 @@ class ClassifierFreeGuidanceDropout(nn.Module):
 class Transformer(nn.Module):
     def __init__(
         self,
-        *,
         num_tokens,
         dim,
         positional_embedding_type="SINE",
         emb_dropout=0.0,
-        dim_out: None,
+        cond_dropout=0.0,
+        post_emb_norm: bool = False,
         audio_input_dim: int = 128,
         text_input_dim: int = 768,
         fuse_method: Dict[str, List[str]] = {"cross": ["audio"], "prepend": ["text"]},
@@ -252,7 +252,8 @@ class Transformer(nn.Module):
         self.mask_token_id = motion_tokenizer_params.mask_token_id
         self.pad_token_id = motion_tokenizer_params.pad_token_id
         self.token_emb = nn.Embedding(motion_tokenizer_params.vocab_size, dim)
-        self.dim_out = default(dim_out, num_tokens)
+        self.dim_out = num_tokens
+        # default(dim_out, num_tokens)
 
         positional_embedding_params = PositionalEmbeddingParams(dim=self.dim)
 
@@ -262,10 +263,14 @@ class Transformer(nn.Module):
 
         self.transformer_blocks = TransformerBlockMuse(dim=dim, **kwargs)
         self.norm = LayerNorm(dim)
+        self.post_emb_norm = LayerNorm(dim) if post_emb_norm else nn.Identity()
+
+        if isinstance(fuse_method, list):
+            fuse_method = fuse_method[0]
 
         self.condition_fuser = ConditionFuser(fuse_method)
 
-        self.cfg_dropout = ClassifierFreeGuidanceDropout()
+        self.cfg_dropout = ClassifierFreeGuidanceDropout(p=cond_dropout)
         self.emb_dropout = nn.Dropout(emb_dropout)
 
         self.project_audio = (
@@ -279,7 +284,8 @@ class Transformer(nn.Module):
             else nn.Identity()
         )
 
-        self.dim_out = default(dim_out, num_tokens)
+        self.dim_out = num_tokens
+        # default(dim_out, num_tokens)
         self.to_logits = nn.Linear(dim, self.dim_out, bias=False)
 
     def _prepare_inputs(self, input, conditions):
@@ -293,18 +299,27 @@ class Transformer(nn.Module):
         return inputs_, cross_inputs
 
     def forward_with_cond_scale(
-        self, *args, cond_scale=3.0, return_embed=False, **kwargs
+        self,
+        inputs: Dict[str, ConditionType],
+        conditions: Dict[str, ConditionType],
+        cond_scale=3.0,
+        return_embed=False,
+        **kwargs,
     ):
         if cond_scale == 1:
             return self.forward(
-                *args, return_embed=return_embed, cond_drop_prob=0.0, **kwargs
+                inputs,
+                conditions,
+                return_embed=return_embed,
+                cond_drop_prob=0.0,
+                **kwargs,
             )
 
         logits, embed = self.forward(
-            *args, return_embed=True, cond_drop_prob=0.0, **kwargs
+            inputs, conditions, return_embed=True, cond_drop_prob=0.0, **kwargs
         )
 
-        null_logits = self.forward(*args, cond_drop_prob=1.0, **kwargs)
+        null_logits = self.forward(inputs, conditions, cond_drop_prob=1.0, **kwargs)
 
         scaled_logits = null_logits + (logits - null_logits) * cond_scale
 
@@ -315,20 +330,23 @@ class Transformer(nn.Module):
 
     def forward_with_neg_prompt(
         self,
-        *args,
-        text_embed: torch.Tensor,
-        neg_text_embed: torch.Tensor,
+        inputs: Dict[str, ConditionType],
+        conditions: Dict[str, ConditionType],
+        neg_conditions: Dict[str, ConditionType],
         cond_scale=3.0,
         return_embed=False,
         **kwargs,
     ):
         neg_logits = self.forward(
-            *args, neg_text_embed=neg_text_embed, cond_drop_prob=0.0, **kwargs
+            inputs,
+            neg_conditions,
+            cond_drop_prob=0.0,
+            **kwargs,
         )
         pos_logits, embed = self.forward(
-            *args,
+            inputs,
+            conditions,
             return_embed=True,
-            text_embed=text_embed,
             cond_drop_prob=0.0,
             **kwargs,
         )
@@ -357,7 +375,7 @@ class Transformer(nn.Module):
         x = inputs[0]
         x = self.token_emb(x)
         x = x + self.pos_emb(torch.arange(n, device=device))
-        # x = self.post_emb_norm(x)
+        x = self.post_emb_norm(x)
         x = self.emb_dropout(x)
 
         # classifier free guidance
@@ -433,10 +451,9 @@ def cosine_schedule(t):
 # main maskgit classes
 
 
-class MaskGit(nn.Module):
+class MotionMuse(nn.Module):
     def __init__(
         self,
-        # image_size,
         transformer: Transformer,
         noise_schedule: Callable = cosine_schedule,
         vqvae: Optional[HumanVQVAE] = None,
@@ -541,22 +558,15 @@ class MaskGit(nn.Module):
     @eval_decorator
     def generate(
         self,
-        # texts: List[str],
-        # negative_texts: Optional[List[str]] = None,
         conditions: Dict[str, ConditionType],
-        neg_conditions: Dict[str, ConditionType],
+        neg_conditions: Optional[Dict[str, ConditionType]] = None,
         duration: int = 300,
-        # cond_images: Optional[torch.Tensor] = None,
-        # fmap_size=None,
         temperature=1.0,
         topk_filter_thres=0.9,
         can_remask_prev_masked=False,
-        # force_not_use_token_critic=False,
         timesteps=18,  # ideal number of steps is 18 in maskgit paper
         cond_scale=3,
-        # critic_noise_scale=1,
     ):
-        # fmap_size = default(fmap_size, self.vae.get_encoded_fmap_size(self.image_size))
 
         # begin with all image token ids masked
 
@@ -594,45 +604,16 @@ class MaskGit(nn.Module):
 
         starting_temperature = temperature
 
-        cond_ids = None
-
-        # text_embeds = self.transformer.encode_text(texts)
-
         demask_fn = self.transformer.forward_with_cond_scale
-
-        # whether to use token critic for scores
-
-        # use_token_critic = exists(self.token_critic) and not force_not_use_token_critic
-
-        # if use_token_critic:
-        #     token_critic_fn = self.token_critic.forward_with_cond_scale
 
         # negative prompting, as in paper
 
-        neg_text_embeds = None
-        if exists(negative_texts):
-            assert len(texts) == len(negative_texts)
+        if exists(neg_conditions):
 
-            neg_text_embeds = self.transformer.encode_text(negative_texts)
             demask_fn = partial(
                 self.transformer.forward_with_neg_prompt,
-                neg_text_embeds=neg_text_embeds,
+                neg_conditions=neg_conditions,
             )
-
-            if use_token_critic:
-                token_critic_fn = partial(
-                    self.token_critic.forward_with_neg_prompt,
-                    neg_text_embeds=neg_text_embeds,
-                )
-
-        if self.resize_image_for_cond_image:
-            assert exists(
-                cond_images
-            ), "conditioning image must be passed in to generate for super res maskgit"
-            with torch.no_grad():
-                _, cond_ids, _ = self.cond_vae.encode(cond_images)
-
-        self_cond_embed = None
 
         for timestep, steps_until_x0 in tqdm(
             zip(
@@ -647,18 +628,16 @@ class MaskGit(nn.Module):
 
             masked_indices = scores.topk(num_token_masked, dim=-1).indices
 
-            ids = ids.scatter(1, masked_indices, self.mask_id)
+            ids = ids.scatter(1, masked_indices, self.mask_token_id)
 
             logits, embed = demask_fn(
-                ids,
-                text_embeds=text_embeds,
-                self_cond_embed=self_cond_embed,
-                conditioning_token_ids=cond_ids,
+                inputs=ids,
+                conditions=conditions,
                 cond_scale=cond_scale,
                 return_embed=True,
             )
 
-            self_cond_embed = embed if self.self_cond else None
+            # self_cond_embed = embed if self.self_cond else None
 
             filtered_logits = top_k(logits, topk_filter_thres)
 
@@ -668,45 +647,28 @@ class MaskGit(nn.Module):
 
             pred_ids = gumbel_sample(filtered_logits, temperature=temperature, dim=-1)
 
-            is_mask = ids == self.mask_id
+            is_mask = ids == self.mask_token_id
 
             ids = torch.where(is_mask, pred_ids, ids)
 
-            if use_token_critic:
-                scores = token_critic_fn(
-                    ids,
-                    text_embeds=text_embeds,
-                    conditioning_token_ids=cond_ids,
-                    cond_scale=cond_scale,
-                )
+            probs_without_temperature = logits.softmax(dim=-1)
 
-                scores = rearrange(scores, "... 1 -> ...")
+            scores = 1 - probs_without_temperature.gather(2, pred_ids[..., None])
+            scores = rearrange(scores, "... 1 -> ...")
 
-                scores = scores + (
-                    uniform(scores.shape, device=device) - 0.5
-                ) * critic_noise_scale * (steps_until_x0 / timesteps)
-
+            if not can_remask_prev_masked:
+                scores = scores.masked_fill(~is_mask, -1e5)
             else:
-                probs_without_temperature = logits.softmax(dim=-1)
-
-                scores = 1 - probs_without_temperature.gather(2, pred_ids[..., None])
-                scores = rearrange(scores, "... 1 -> ...")
-
-                if not can_remask_prev_masked:
-                    scores = scores.masked_fill(~is_mask, -1e5)
-                else:
-                    assert (
-                        self.no_mask_token_prob > 0.0
-                    ), "without training with some of the non-masked tokens forced to predict, not sure if the logits will be meaningful for these token"
+                assert (
+                    self.no_mask_token_prob > 0.0
+                ), "without training with some of the non-masked tokens forced to predict, not sure if the logits will be meaningful for these token"
 
         # get ids
 
-        ids = rearrange(ids, "b (i j) -> b i j", i=fmap_size, j=fmap_size)
-
-        if not exists(self.vae):
+        if not exists(self.vqvae):
             return ids
 
-        images = self.vae.decode_from_ids(ids)
+        images = self.vqvae.decode(ids)
         return images
 
     def forward(

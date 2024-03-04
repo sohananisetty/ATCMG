@@ -1,0 +1,201 @@
+loading config from: /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gprvc/vqvae_body_gprvc.yaml
+output_dir:  /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gprvc
+codebook_dim: 512
+codebook_size: 1024
+commit: 0.25
+conv_kernel_size: 5
+depth: 6
+dim: 768
+down_sampling_ratio: 4
+dropout: 0.1
+heads: 8
+loss_motion: 2.0
+loss_vel: 1.0
+motion_dim: 263
+nb_joints: 22
+num_quantizers: 2
+quantize_dropout_prob: 0.2
+rearrange_output: False
+recons_loss: l1_smooth
+sample_codebook_temp: 0.4
+shared_codebook: False
+target: core.models.resnetVQ.vqvae.HumanVQVAE
+use_geodesic_loss: False
+Total training params: 70.26M
+Total number of motions animation: 120
+Total number of motions humanml: 16730
+Total number of motions perform: 346
+Total number of motions GRAB: 1268
+Total number of motions idea400: 10946
+Total number of motions humman: 314
+Total number of motions beat: 1458
+Total number of motions game_motion: 2780
+Total number of motions music: 2865
+Total number of motions aist: 1141
+Total number of motions fitness: 10902
+Total number of motions moyo: 161
+Total number of motions choreomaster: 34
+Total number of motions dance: 97
+Total number of motions kungfu: 827
+Total number of motions EgoBody: 916
+Total number of motions animation: 2
+Total number of motions humanml: 2944
+Total number of motions perform: 16
+Total number of motions GRAB: 67
+Total number of motions idea400: 577
+Total number of motions humman: 19
+Total number of motions beat: 162
+Total number of motions game_motion: 130
+Total number of motions music: 148
+Total number of motions aist: 61
+Total number of motions fitness: 572
+Total number of motions moyo: 9
+Total number of motions choreomaster: 2
+Total number of motions dance: 7
+Total number of motions kungfu: 42
+Total number of motions EgoBody: 49
+Total number of motions animation: 1
+Total number of motions humanml: 1
+Total number of motions perform: 2
+Total number of motions GRAB: 2
+Total number of motions idea400: 2
+Total number of motions humman: 1
+Total number of motions beat: 1
+Total number of motions game_motion: 2
+Total number of motions music: 1
+Total number of motions aist: 1
+Total number of motions fitness: 2
+Total number of motions moyo: 2
+Total number of motions choreomaster: 2
+Total number of motions dance: 1
+Total number of motions kungfu: 2
+Total number of motions EgoBody: 2
+training with training 50905 and test dataset of  and  4807 samples and render of  25
+/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gprvc
+0: vqvae model total loss: 0.687 reconstruction loss: 0.343 commit_loss: 0.00356 codebook usage: 1.0
+0.6869314908981323 inf
+0: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gprvc/checkpoints
+validation start
+val/rec_loss tensor(0.2087)
+val/total_loss  tensor(0.4177)
+render start
+200: vqvae model total loss: 0.433 reconstruction loss: 0.214 commit_loss: 0.0179 codebook usage: 0.3525390625
+400: vqvae model total loss: 0.351 reconstruction loss: 0.172 commit_loss: 0.0289 codebook usage: 0.58984375
+600: vqvae model total loss: 0.324 reconstruction loss: 0.158 commit_loss: 0.0353 codebook usage: 0.7646484375
+800: vqvae model total loss: 0.311 reconstruction loss: 0.149 commit_loss: 0.0506 codebook usage: 0.865234375
+1000: vqvae model total loss: 0.295 reconstruction loss: 0.14 commit_loss: 0.0604 codebook usage: 0.9091796875
+1200: vqvae model total loss: 0.318 reconstruction loss: 0.147 commit_loss: 0.0993 codebook usage: 0.9296875
+1400: vqvae model total loss: 0.297 reconstruction loss: 0.131 commit_loss: 0.14 codebook usage: 0.9365234375
+1600: vqvae model total loss: 0.275 reconstruction loss: 0.12 commit_loss: 0.142 codebook usage: 0.9375
+1800: vqvae model total loss: 0.257 reconstruction loss: 0.108 commit_loss: 0.166 codebook usage: 0.9306640625
+2000: vqvae model total loss: 0.277 reconstruction loss: 0.111 commit_loss: 0.221 codebook usage: 0.9228515625
+2200: vqvae model total loss: 0.272 reconstruction loss: 0.105 commit_loss: 0.254 codebook usage: 0.9111328125
+2400: vqvae model total loss: 0.255 reconstruction loss: 0.0962 commit_loss: 0.251 codebook usage: 0.8935546875
+2600: vqvae model total loss: 0.264 reconstruction loss: 0.0975 commit_loss: 0.278 codebook usage: 0.8876953125
+2800: vqvae model total loss: 0.277 reconstruction loss: 0.101 commit_loss: 0.304 codebook usage: 0.8876953125
+3000: vqvae model total loss: 0.279 reconstruction loss: 0.0992 commit_loss: 0.32 codebook usage: 0.8955078125
+3200: vqvae model total loss: 0.273 reconstruction loss: 0.0959 commit_loss: 0.323 codebook usage: 0.88671875
+3400: vqvae model total loss: 0.253 reconstruction loss: 0.0866 commit_loss: 0.321 codebook usage: 0.87890625
+3600: vqvae model total loss: 0.26 reconstruction loss: 0.0885 commit_loss: 0.334 codebook usage: 0.8720703125
+3800: vqvae model total loss: 0.272 reconstruction loss: 0.0923 commit_loss: 0.351 codebook usage: 0.8955078125
+4000: vqvae model total loss: 0.25 reconstruction loss: 0.0835 commit_loss: 0.331 codebook usage: 0.87109375
+4200: vqvae model total loss: 0.253 reconstruction loss: 0.0827 commit_loss: 0.349 codebook usage: 0.8935546875
+4400: vqvae model total loss: 0.259 reconstruction loss: 0.0851 commit_loss: 0.354 codebook usage: 0.904296875
+4600: vqvae model total loss: 0.258 reconstruction loss: 0.0833 commit_loss: 0.365 codebook usage: 0.8916015625
+4800: vqvae model total loss: 0.249 reconstruction loss: 0.0815 commit_loss: 0.342 codebook usage: 0.857421875
+5000: vqvae model total loss: 0.277 reconstruction loss: 0.0904 commit_loss: 0.384 codebook usage: 0.89453125
+validation start
+val/rec_loss tensor(0.0447)
+val/total_loss  tensor(0.1556)
+render start
+5200: vqvae model total loss: 0.234 reconstruction loss: 0.075 commit_loss: 0.335 codebook usage: 0.8701171875
+5400: vqvae model total loss: 0.241 reconstruction loss: 0.0775 commit_loss: 0.345 codebook usage: 0.8876953125
+5600: vqvae model total loss: 0.25 reconstruction loss: 0.0803 commit_loss: 0.357 codebook usage: 0.8984375
+5800: vqvae model total loss: 0.259 reconstruction loss: 0.083 commit_loss: 0.373 codebook usage: 0.884765625
+6000: vqvae model total loss: 0.237 reconstruction loss: 0.0732 commit_loss: 0.361 codebook usage: 0.87890625
+6200: vqvae model total loss: 0.23 reconstruction loss: 0.0722 commit_loss: 0.341 codebook usage: 0.8837890625
+6400: vqvae model total loss: 0.237 reconstruction loss: 0.0743 commit_loss: 0.356 codebook usage: 0.8974609375
+6600: vqvae model total loss: 0.236 reconstruction loss: 0.0737 commit_loss: 0.356 codebook usage: 0.8857421875
+6800: vqvae model total loss: 0.238 reconstruction loss: 0.0753 commit_loss: 0.348 codebook usage: 0.8974609375
+7000: vqvae model total loss: 0.223 reconstruction loss: 0.0708 commit_loss: 0.327 codebook usage: 0.8935546875
+7200: vqvae model total loss: 0.225 reconstruction loss: 0.0705 commit_loss: 0.337 codebook usage: 0.9140625
+7400: vqvae model total loss: 0.24 reconstruction loss: 0.0752 commit_loss: 0.36 codebook usage: 0.9052734375
+7600: vqvae model total loss: 0.215 reconstruction loss: 0.067 commit_loss: 0.325 codebook usage: 0.8994140625
+7800: vqvae model total loss: 0.21 reconstruction loss: 0.0657 commit_loss: 0.316 codebook usage: 0.8994140625
+8000: vqvae model total loss: 0.21 reconstruction loss: 0.0653 commit_loss: 0.318 codebook usage: 0.900390625
+8200: vqvae model total loss: 0.196 reconstruction loss: 0.0598 commit_loss: 0.306 codebook usage: 0.90234375
+8400: vqvae model total loss: 0.202 reconstruction loss: 0.0619 commit_loss: 0.315 codebook usage: 0.8935546875
+8600: vqvae model total loss: 0.214 reconstruction loss: 0.0644 commit_loss: 0.342 codebook usage: 0.9111328125
+8800: vqvae model total loss: 0.201 reconstruction loss: 0.0622 commit_loss: 0.304 codebook usage: 0.908203125
+9000: vqvae model total loss: 0.19 reconstruction loss: 0.058 commit_loss: 0.296 codebook usage: 0.8828125
+9200: vqvae model total loss: 0.198 reconstruction loss: 0.061 commit_loss: 0.304 codebook usage: 0.923828125
+9400: vqvae model total loss: 0.202 reconstruction loss: 0.0624 commit_loss: 0.307 codebook usage: 0.92578125
+9600: vqvae model total loss: 0.197 reconstruction loss: 0.0593 commit_loss: 0.315 codebook usage: 0.9228515625
+9800: vqvae model total loss: 0.196 reconstruction loss: 0.0595 commit_loss: 0.308 codebook usage: 0.9091796875
+10000: vqvae model total loss: 0.201 reconstruction loss: 0.0602 commit_loss: 0.321 codebook usage: 0.9287109375
+0.20059512555599213 tensor(0.6869)
+10000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gprvc/checkpoints
+validation start
+val/rec_loss tensor(0.0294)
+val/total_loss  tensor(0.1078)
+render start
+10200: vqvae model total loss: 0.188 reconstruction loss: 0.0563 commit_loss: 0.3 codebook usage: 0.927734375
+10400: vqvae model total loss: 0.178 reconstruction loss: 0.0553 commit_loss: 0.271 codebook usage: 0.9072265625
+10600: vqvae model total loss: 0.171 reconstruction loss: 0.0525 commit_loss: 0.264 codebook usage: 0.921875
+10800: vqvae model total loss: 0.176 reconstruction loss: 0.0531 commit_loss: 0.28 codebook usage: 0.9072265625
+11000: vqvae model total loss: 0.184 reconstruction loss: 0.0563 commit_loss: 0.284 codebook usage: 0.9150390625
+11200: vqvae model total loss: 0.163 reconstruction loss: 0.0493 commit_loss: 0.256 codebook usage: 0.9189453125
+11400: vqvae model total loss: 0.179 reconstruction loss: 0.0544 commit_loss: 0.281 codebook usage: 0.916015625
+11600: vqvae model total loss: 0.154 reconstruction loss: 0.0469 commit_loss: 0.241 codebook usage: 0.919921875
+11800: vqvae model total loss: 0.181 reconstruction loss: 0.0563 commit_loss: 0.273 codebook usage: 0.935546875
+12000: vqvae model total loss: 0.177 reconstruction loss: 0.0533 commit_loss: 0.282 codebook usage: 0.94921875
+12200: vqvae model total loss: 0.162 reconstruction loss: 0.0492 commit_loss: 0.255 codebook usage: 0.9375
+12400: vqvae model total loss: 0.158 reconstruction loss: 0.0472 commit_loss: 0.254 codebook usage: 0.9228515625
+12600: vqvae model total loss: 0.17 reconstruction loss: 0.0498 commit_loss: 0.28 codebook usage: 0.9326171875
+12800: vqvae model total loss: 0.159 reconstruction loss: 0.0489 commit_loss: 0.243 codebook usage: 0.9306640625
+13000: vqvae model total loss: 0.158 reconstruction loss: 0.0459 commit_loss: 0.265 codebook usage: 0.916015625
+13200: vqvae model total loss: 0.161 reconstruction loss: 0.0503 commit_loss: 0.242 codebook usage: 0.935546875
+13400: vqvae model total loss: 0.169 reconstruction loss: 0.0509 commit_loss: 0.268 codebook usage: 0.9365234375
+13600: vqvae model total loss: 0.171 reconstruction loss: 0.051 commit_loss: 0.278 codebook usage: 0.9443359375
+13800: vqvae model total loss: 0.154 reconstruction loss: 0.0462 commit_loss: 0.247 codebook usage: 0.9169921875
+14000: vqvae model total loss: 0.148 reconstruction loss: 0.0448 commit_loss: 0.232 codebook usage: 0.9306640625
+14200: vqvae model total loss: 0.141 reconstruction loss: 0.0432 commit_loss: 0.218 codebook usage: 0.9208984375
+14400: vqvae model total loss: 0.146 reconstruction loss: 0.0442 commit_loss: 0.23 codebook usage: 0.9345703125
+14600: vqvae model total loss: 0.153 reconstruction loss: 0.0471 commit_loss: 0.234 codebook usage: 0.923828125
+14800: vqvae model total loss: 0.147 reconstruction loss: 0.0454 commit_loss: 0.224 codebook usage: 0.93359375
+15000: vqvae model total loss: 0.15 reconstruction loss: 0.0453 commit_loss: 0.236 codebook usage: 0.9306640625
+validation start
+val/rec_loss tensor(0.0383)
+val/total_loss  tensor(0.1260)
+render start
+15200: vqvae model total loss: 0.142 reconstruction loss: 0.044 commit_loss: 0.217 codebook usage: 0.9326171875
+15400: vqvae model total loss: 0.148 reconstruction loss: 0.0438 commit_loss: 0.241 codebook usage: 0.92578125
+15600: vqvae model total loss: 0.133 reconstruction loss: 0.0396 commit_loss: 0.215 codebook usage: 0.91796875
+15800: vqvae model total loss: 0.143 reconstruction loss: 0.0424 commit_loss: 0.234 codebook usage: 0.927734375
+16000: vqvae model total loss: 0.136 reconstruction loss: 0.0422 commit_loss: 0.207 codebook usage: 0.923828125
+16200: vqvae model total loss: 0.153 reconstruction loss: 0.0455 commit_loss: 0.247 codebook usage: 0.94140625
+16400: vqvae model total loss: 0.132 reconstruction loss: 0.0409 commit_loss: 0.201 codebook usage: 0.92578125
+16600: vqvae model total loss: 0.145 reconstruction loss: 0.0446 commit_loss: 0.223 codebook usage: 0.931640625
+16800: vqvae model total loss: 0.134 reconstruction loss: 0.0391 commit_loss: 0.224 codebook usage: 0.9248046875
+17000: vqvae model total loss: 0.141 reconstruction loss: 0.0425 commit_loss: 0.223 codebook usage: 0.9326171875
+17200: vqvae model total loss: 0.124 reconstruction loss: 0.0381 commit_loss: 0.19 codebook usage: 0.9208984375
+17400: vqvae model total loss: 0.131 reconstruction loss: 0.0396 commit_loss: 0.207 codebook usage: 0.9208984375
+17600: vqvae model total loss: 0.139 reconstruction loss: 0.0412 commit_loss: 0.225 codebook usage: 0.9375
+17800: vqvae model total loss: 0.146 reconstruction loss: 0.0435 commit_loss: 0.235 codebook usage: 0.9482421875
+18000: vqvae model total loss: 0.145 reconstruction loss: 0.0441 commit_loss: 0.226 codebook usage: 0.931640625
+18200: vqvae model total loss: 0.136 reconstruction loss: 0.041 commit_loss: 0.216 codebook usage: 0.9384765625
+18400: vqvae model total loss: 0.131 reconstruction loss: 0.0393 commit_loss: 0.211 codebook usage: 0.9423828125
+18600: vqvae model total loss: 0.133 reconstruction loss: 0.0399 commit_loss: 0.212 codebook usage: 0.9287109375
+18800: vqvae model total loss: 0.132 reconstruction loss: 0.0403 commit_loss: 0.204 codebook usage: 0.9443359375
+19000: vqvae model total loss: 0.131 reconstruction loss: 0.0405 commit_loss: 0.199 codebook usage: 0.9345703125
+19200: vqvae model total loss: 0.128 reconstruction loss: 0.0385 commit_loss: 0.204 codebook usage: 0.9375
+19400: vqvae model total loss: 0.122 reconstruction loss: 0.0365 commit_loss: 0.197 codebook usage: 0.92578125
+19600: vqvae model total loss: 0.122 reconstruction loss: 0.0376 commit_loss: 0.189 codebook usage: 0.9306640625
+19800: vqvae model total loss: 0.118 reconstruction loss: 0.0357 commit_loss: 0.186 codebook usage: 0.931640625
+20000: vqvae model total loss: 0.136 reconstruction loss: 0.0412 commit_loss: 0.212 codebook usage: 0.943359375
+0.13550487160682678 tensor(0.2006)
+20000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gprvc/checkpoints
+validation start
+val/rec_loss tensor(0.0289)
+val/total_loss  tensor(0.0931)
+render start
