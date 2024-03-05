@@ -6,7 +6,7 @@ import random
 from glob import glob
 from os.path import join as pjoin
 from typing import Dict, List, Optional, Tuple
-
+import math
 import clip
 import librosa
 import numpy as np
@@ -79,7 +79,7 @@ def load_dataset(
                 motion_max_length_s=dataset_args.motion_max_length_s,
                 audio_rep=dataset_args.audio_rep,
                 motion_rep=dataset_args.motion_rep,
-                hml_rep = dataset_args.hml_rep
+                hml_rep=dataset_args.hml_rep,
             )
         )
 
@@ -124,7 +124,7 @@ def load_dataset_gen(
                 audio_rep=dataset_args.audio_rep,
                 motion_rep=dataset_args.motion_rep,
                 fps=dataset_args.fps / dataset_args.down_sampling_ratio,
-                hml_rep = dataset_args.hml_rep
+                hml_rep=dataset_args.hml_rep,
             )
         )
 
@@ -427,7 +427,7 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
                         motion = np.load(
                             os.path.join(self.motion_dir, line.strip())
                         ).squeeze()
-                        if motion.shape[0] * self.downsample_ratio < default(
+                        if motion.shape[0] < default(
                             self.window_size, self.min_motion_length
                         ):
                             continue
@@ -556,7 +556,7 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
             audio_data = None
 
         if to_ * self.fps - f_ * self.fps > self.min_motion_length:
-            motion = motion[(f_ * self.fps) : (to_ * self.fps)]
+            motion = motion[int(f_ * self.fps) : math.ceil(to_ * self.fps)]
 
         return {
             "name": name,

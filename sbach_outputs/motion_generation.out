@@ -1,0 +1,58 @@
+loading config from: /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_generation/motion_generation.yaml
+output_dir:  /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_generation
+Total number of motions animation: 194 and texts 194
+Total number of motions humanml: 55446 and texts 55446
+Total number of motions perform: 369 and texts 369
+Total number of motions GRAB: 1268 and texts 1268
+Total number of motions idea400: 11142 and texts 11142
+Total number of motions humman: 399 and texts 399
+Total number of motions beat: 1458 and texts 1458
+Total number of motions game_motion: 4012 and texts 4012
+Total number of motions music: 2997 and texts 2997
+Total number of motions aist: 1149 and texts 1149
+Total number of motions fitness: 12552 and texts 12552
+Total number of motions moyo: 161 and texts 161
+Total number of motions choreomaster: 34 and texts 34
+Total number of motions dance: 101 and texts 101
+Total number of motions kungfu: 855 and texts 855
+Total number of motions EgoBody: 913 and texts 913
+Total number of motions animation: 8 and texts 8
+Total number of motions humanml: 9852 and texts 9852
+Total number of motions perform: 17 and texts 17
+Total number of motions GRAB: 67 and texts 67
+Total number of motions idea400: 579 and texts 579
+Total number of motions humman: 23 and texts 23
+Total number of motions beat: 162 and texts 162
+Total number of motions game_motion: 203 and texts 203
+Total number of motions music: 153 and texts 153
+Total number of motions aist: 61 and texts 61
+Total number of motions fitness: 651 and texts 651
+Total number of motions moyo: 9 and texts 9
+Total number of motions choreomaster: 2 and texts 2
+Total number of motions dance: 7 and texts 7
+Total number of motions kungfu: 45 and texts 45
+Total number of motions EgoBody: 49 and texts 49
+Total number of motions animation: 2 and texts 2
+Total number of motions humanml: 6 and texts 6
+Total number of motions perform: 2 and texts 2
+Total number of motions GRAB: 2 and texts 2
+Total number of motions idea400: 2 and texts 2
+Total number of motions humman: 1 and texts 1
+Total number of motions beat: 1 and texts 1
+Total number of motions game_motion: 2 and texts 2
+Total number of motions music: 2 and texts 2
+Total number of motions aist: 1 and texts 1
+Total number of motions fitness: 2 and texts 2
+Total number of motions moyo: 2 and texts 2
+Total number of motions choreomaster: 2 and texts 2
+Total number of motions dance: 1 and texts 1
+Total number of motions kungfu: 2 and texts 2
+Total number of motions EgoBody: 2 and texts 2
+training with training 93050 and test dataset of 11888 and render 32 samples
+/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_generation
+0: model cross entropy loss: 7.06 
+7.062910556793213 inf
+0: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_generation/checkpoints
+validation start
+val/ce_loss tensor(7.0281)
+render start
