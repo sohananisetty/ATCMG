@@ -229,17 +229,19 @@ def get_obj_from_str(string, reload=False):
     return getattr(importlib.import_module(module, package=None), cls)
 
 
-def instantiate_from_config(config, parameters=None):
+def instantiate_from_config(config=None, target=None, parameters=None):
     """
     Instantiate object from config
     """
-    if not "target" in config:
+    if target is None and (config is not None and not "target" in config):
         raise KeyError("Expected key `target` to instantiate.")
 
+    target = target if target is not None else config["target"]
+
     if parameters is None:
-        return get_obj_from_str(config["target"])(config)
+        return get_obj_from_str(target)(config)
     else:
-        return get_obj_from_str(config["target"])(parameters)
+        return get_obj_from_str(target)(**parameters)
 
 
 class TorchAutocast:

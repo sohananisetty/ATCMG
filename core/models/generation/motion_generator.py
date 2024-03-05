@@ -232,11 +232,6 @@ class ClassifierFreeGuidanceDropout(nn.Module):
                 new_mask = mask & drop_mask
 
                 new_embedding = embedding * new_mask.unsqueeze(-1)
-                # if condition_modality == "audio":
-                # new_embedding = new_embedding[:, :1, :]
-                # new_mask = new_mask[:, :1]
-
-                # print(new_embedding.shape, new_mask.shape, "new")
 
                 conditions_[condition_modality] = (new_embedding, new_mask)
 
@@ -501,22 +496,24 @@ def cosine_schedule(t):
 class MotionMuse(nn.Module):
     def __init__(
         self,
-        transformer: Transformer,
+        config,
         noise_schedule: Callable = cosine_schedule,
         vqvae: Optional[HumanVQVAE] = None,
-        no_mask_token_prob=0.2,
+        # no_mask_token_prob=0.2,
     ):
         super().__init__()
         self.vqvae = vqvae.eval().freeze() if exists(vqvae) else None
+        self.no_mask_token_prob = config.pop("no_mask_token_prob")
+        self.transformer = Transformer(**config)
 
-        self.transformer = transformer
+        # self.transformer = transformer
 
-        self.mask_token_id = transformer.mask_token_id
+        self.mask_token_id = self.transformer.mask_token_id
         self.noise_schedule = noise_schedule
 
         # percentage of tokens to be [mask]ed to remain the same token, so that transformer produces better embeddings across all tokens as done in original BERT paper
         # may be needed for self conditioning
-        self.no_mask_token_prob = no_mask_token_prob
+        # self.no_mask_token_prob = no_mask_token_prob
 
     def save(self, path):
         torch.save(self.state_dict(), path)
@@ -604,7 +601,7 @@ class MotionMuse(nn.Module):
         self,
         conditions: Dict[str, ConditionType],
         neg_conditions: Optional[Dict[str, ConditionType]] = None,
-        duration: int = 300,
+        duration: int = 75,
         temperature=1.0,
         topk_filter_thres=0.9,
         can_remask_prev_masked=False,
@@ -722,6 +719,7 @@ class MotionMuse(nn.Module):
         conditions: Dict[str, ConditionType],
         ignore_index: int = -100,
         cond_drop_prob=None,
+        return_logits=False,
     ):
         # tokenize if needed
 
@@ -754,4 +752,7 @@ class MotionMuse(nn.Module):
             return_logits=True,
         )
 
-        return ce_loss
+        if not return_logits:
+            return ce_loss
+
+        return ce_loss, logits

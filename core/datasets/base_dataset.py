@@ -217,7 +217,8 @@ class BaseMotionDataset(ABC, data.Dataset):
         """
         motion_rep = data.motion_rep
 
-        inv_data = copy.deepcopy(data)
+        inv_data = data
+        # copy.deepcopy(data)
 
         if motion_rep == MotionRep.FULL:
             inv_data.inv_transform(self.mean, self.std)

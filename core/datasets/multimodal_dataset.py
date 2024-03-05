@@ -54,12 +54,13 @@ dataset_names_default = [
 
 
 def load_dataset(
-    dataset_root,
+    dataset_args,
+    # dataset_root,
     dataset_names=dataset_names_default,
-    motion_min_length_s=3,
-    motion_max_length_s=10,
-    audio_rep="encodec",
-    motion_rep="full",
+    # motion_min_length_s=3,
+    # motion_max_length_s=10,
+    # audio_rep="encodec",
+    # motion_rep="full",
     split: str = "train",
     weight_scale: Optional[List[int]] = None,
 ):
@@ -72,12 +73,58 @@ def load_dataset(
         dataset_list.append(
             MotionAudioTextDataset(
                 dataset_name,
-                dataset_root=dataset_root,
+                dataset_root=dataset_args.dataset_root,
                 split=split,
-                motion_min_length_s=motion_min_length_s,
-                motion_max_length_s=motion_max_length_s,
-                audio_rep=audio_rep,
-                motion_rep=motion_rep,
+                motion_min_length_s=dataset_args.motion_min_length_s,
+                motion_max_length_s=dataset_args.motion_max_length_s,
+                audio_rep=dataset_args.audio_rep,
+                motion_rep=dataset_args.motion_rep,
+                hml_rep = dataset_args.hml_rep
+            )
+        )
+
+    concat_dataset = torch.utils.data.ConcatDataset(dataset_list)
+
+    if split != "train" or len(dataset_names) == 1:
+        return concat_dataset, None, None
+
+    for i, ds in enumerate(dataset_list):
+        weights.append(
+            [weight_scale[i] * concat_dataset.__len__() / (ds.__len__())] * ds.__len__()
+        )
+
+    weights = list(itertools.chain.from_iterable(weights))
+
+    sampler = torch.utils.data.WeightedRandomSampler(
+        weights=weights, num_samples=len(weights)
+    )
+
+    return concat_dataset, sampler, weights
+
+
+def load_dataset_gen(
+    dataset_args,
+    dataset_names=dataset_names_default,
+    split: str = "train",
+    weight_scale: Optional[List[int]] = None,
+):
+    if weight_scale is None:
+        weight_scale = [1] * len(dataset_names)
+    assert len(dataset_names) == len(weight_scale), "mismatch in size"
+    dataset_list = []
+    weights = []
+    for dataset_name in dataset_names:
+        dataset_list.append(
+            MotionIndicesAudioTextDataset(
+                dataset_name,
+                dataset_root=dataset_args.dataset_root,
+                split=split,
+                motion_min_length_s=dataset_args.motion_min_length_s,
+                motion_max_length_s=dataset_args.motion_max_length_s,
+                audio_rep=dataset_args.audio_rep,
+                motion_rep=dataset_args.motion_rep,
+                fps=dataset_args.fps / dataset_args.down_sampling_ratio,
+                hml_rep = dataset_args.hml_rep
             )
         )
 
@@ -327,14 +374,14 @@ class MotionAudioTextDataset(BaseMotionDataset):
         }
 
 
-class MotionIndicesAudioTextDataset(data.Dataset):
+class MotionIndicesAudioTextDataset(BaseMotionDataset):
     def __init__(
         self,
         dataset_name: str,
         dataset_root: str,
         audio_rep: str = "encodec",
         motion_rep: str = "full",
-        # hml_rep: str = "gprvc",
+        hml_rep: str = "gprvc",
         motion_min_length_s=2,
         motion_max_length_s=10,
         window_size=None,
@@ -344,7 +391,7 @@ class MotionIndicesAudioTextDataset(data.Dataset):
         split: str = "train",
         **kwargs,
     ):
-        super().__init__()
+        super().__init__(dataset_root, MotionRep(motion_rep), hml_rep)
         self.dataset_name = dataset_name
         self.split = split
         self.fps = fps

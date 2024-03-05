@@ -502,6 +502,7 @@ class ConditionFuser(nn.Module):
             elif op == "prepend":
                 if len(cond.shape) == 2:
                     cond = cond.unsqueeze(1)
+                
                 input = torch.cat([cond, input], dim=1)
                 input_padding_mask = torch.cat([cond_mask, input_padding_mask], dim=1)
 

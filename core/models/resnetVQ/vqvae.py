@@ -56,12 +56,20 @@ class VQVAE(nn.Module):
         x = x.permute(0, 2, 1)
         return x
 
-    def encode(self, x):
+    def encode(self, x, mask=None):
         N, T, _ = x.shape
         x_in = self.preprocess(x)
         x_encoder = self.encoder(x_in)
-        x_encoder = self.postprocess(x_encoder)
-        x_encoder = x_encoder.contiguous().view(-1, x_encoder.shape[-1])  # (NT, C)
+        if mask is not None:
+
+            downsampled_motion_mask = torch.nn.functional.max_pool1d(
+                mask.float(),
+                1,
+                stride=4,
+            )
+            x_encoder = x_encoder * downsampled_motion_mask[:, None, :]
+
+        # x_encoder = x_encoder.contiguous().view(-1, x_encoder.shape[-1])  # (NT, C)
         code_idx = self.quantizer.quantize(x_encoder)
         code_idx = code_idx.view(N, -1)
         return code_idx
@@ -104,14 +112,23 @@ class VQVAE(nn.Module):
             quantized_motion=x_quantized.clone().permute(0, 2, 1),
         )
 
-    # x_out, loss, perplexity, code_idx
+    def forward_decoder(self, indices, mask=None):
+        x_quantized = self.quantizer.dequantize(indices)
+        ##need (bs, Jx3, T)
+        x_quantized = x_quantized.permute(0, 2, 1).contiguous()
+        if mask is not None:
 
-    def forward_decoder(self, indices):
-        x_d = self.quantizer.dequantize(indices)
-        x_d = x_d.view(1, -1, self.code_dim).permute(0, 2, 1).contiguous()
+            x_quantized = x_quantized * mask[:, None, :]
 
         # decoder
-        x_decoder = self.decoder(x_d)
+        x_decoder = self.decoder(x_quantized)
+        if mask is not None:
+            upsampled_motion_mask = nn.functional.interpolate(
+                mask[:, None, :].to(torch.float), scale_factor=4
+            ).to(torch.bool)
+
+            x_decoder = x_decoder * upsampled_motion_mask
+
         x_out = self.postprocess(x_decoder)
         return x_out
 
@@ -154,6 +171,6 @@ class HumanVQVAE(nn.Module):
     def forward(self, motion, mask=None):
         return self.vqvae(motion, mask)
 
-    def decode(self, indices):
-        x_out = self.vqvae.forward_decoder(indices)
+    def decode(self, indices, mask=None):
+        x_out = self.vqvae.forward_decoder(indices, mask)
         return x_out

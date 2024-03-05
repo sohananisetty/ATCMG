@@ -1,8 +1,8 @@
 from configs.config_t2m import cfg, get_cfg_defaults
-from ctl.trainer_translation import TranslationTransformerTrainer
+from ctl.trainer_generator import MotionMuseTrainer
 
 if __name__ == "__main__":
-    nme = "motion_translation"
+    nme = "motion_generation"
     path = f"/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/{nme}/{nme}.yaml"
     cfg = get_cfg_defaults()
     print("loading config from:", path)
@@ -10,7 +10,7 @@ if __name__ == "__main__":
     cfg.freeze()
     print("output_dir: ", cfg.output_dir)
 
-    trainer = TranslationTransformerTrainer(
+    trainer = MotionMuseTrainer(
         args=cfg,
     ).cuda()
 
