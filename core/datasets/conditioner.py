@@ -113,19 +113,19 @@ class ConditionProvider(nn.Module):
 
     def _get_audio_features(
         self,
-        max_length: int,
         audio_list: List[np.ndarray],
+        max_length: int = None,
         padding="longest",
         subset_index_list=None,
     ):
         audios = []
         masks = []
-        if padding == "longest":
+        if padding == "longest" or max_length is None:
             max_length_ = max(
                 [audio.shape[0] for audio in audio_list if audio is not None],
                 default=1,
             )
-            max_length = min(max_length_, max_length)
+            max_length = min(max_length_, self.audio_max_length)
 
         for idx, audio_feature in enumerate(audio_list):
 
@@ -214,7 +214,6 @@ class ConditionProvider(nn.Module):
                     if subset_index_list is not None
                     else np.random.randint(0, overflow + 1)
                 )
-                print(start_idx, max_length)
                 motion = motion[start_idx : start_idx + max_length]
                 mask = np.array([1] * max_length)
                 motions.append(motion)
@@ -257,6 +256,8 @@ class ConditionProvider(nn.Module):
 
         if self.text_rep == TextRep.POOLED_TEXT_EMBED:
             padded_text, text_mask = self.text_encoder.get_text_embedding(tokenized)
+            if len(padded_text.shape) == 2:
+                padded_text = padded_text.unsqueeze(1)
         else:
             padded_text, text_mask = self.text_encoder(tokenized)
 
@@ -499,6 +500,8 @@ class ConditionFuser(nn.Module):
                 input_padding_mask = input_padding_mask & cond_mask
 
             elif op == "prepend":
+                if len(cond.shape) == 2:
+                    cond = cond.unsqueeze(1)
                 input = torch.cat([cond, input], dim=1)
                 input_padding_mask = torch.cat([cond_mask, input_padding_mask], dim=1)
 
@@ -510,6 +513,10 @@ class ConditionFuser(nn.Module):
                     cross_attention_mask = torch.cat(
                         [cross_attention_mask, cond_mask], dim=1
                     )
+
+                else:
+                    cross_attention_output = cond
+                    cross_attention_mask = cond_mask
 
             elif op == "cross_seperate":
                 if cross_attention_output is not None:

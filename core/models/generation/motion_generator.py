@@ -215,10 +215,29 @@ class ClassifierFreeGuidanceDropout(nn.Module):
             if mask.dtype != torch.bool:
                 mask = mask.to(torch.bool)
 
-            if drop_prob > 0.0 and (condition_modality != "audio" or not self.training):
+            if drop_prob == 1.0:
+
                 drop_mask = self.prob_mask_like((b, 1), 1.0 - drop_prob, mask.device)
                 new_mask = mask & drop_mask
                 new_embedding = embedding * new_mask.unsqueeze(-1)
+                # if condition_modality == "audio":
+                new_embedding = new_embedding[:, :1, :]
+                new_mask = new_mask[:, :1]
+                conditions_[condition_modality] = (new_embedding, new_mask)
+
+            elif drop_prob > 0.0 and (
+                condition_modality != "audio" or not self.training
+            ):
+                drop_mask = self.prob_mask_like((b, 1), 1.0 - drop_prob, mask.device)
+                new_mask = mask & drop_mask
+
+                new_embedding = embedding * new_mask.unsqueeze(-1)
+                # if condition_modality == "audio":
+                # new_embedding = new_embedding[:, :1, :]
+                # new_mask = new_mask[:, :1]
+
+                # print(new_embedding.shape, new_mask.shape, "new")
+
                 conditions_[condition_modality] = (new_embedding, new_mask)
 
         return conditions_
@@ -245,6 +264,7 @@ class Transformer(nn.Module):
         self.dim = dim
         self.audio_input_dim = audio_input_dim
         self.text_input_dim = text_input_dim
+        self.cond_dropout = cond_dropout
 
         motion_tokenizer_params = MotionTokenizerParams(num_tokens)
 
@@ -270,7 +290,7 @@ class Transformer(nn.Module):
 
         self.condition_fuser = ConditionFuser(fuse_method)
 
-        self.cfg_dropout = ClassifierFreeGuidanceDropout(p=cond_dropout)
+        self.cfg_dropout = ClassifierFreeGuidanceDropout()
         self.emb_dropout = nn.Dropout(emb_dropout)
 
         self.project_audio = (
@@ -291,10 +311,21 @@ class Transformer(nn.Module):
     def _prepare_inputs(self, input, conditions):
         audio_embed = self.project_audio(conditions["audio"][0])
         text_embed = self.project_text(conditions["text"][0])
-        conditions["audio"] = (audio_embed, conditions["audio"][1])
-        conditions["text"] = (text_embed, conditions["text"][1])
+        # conditions["audio"] = (audio_embed, conditions["audio"][1])
+        # conditions["text"] = (text_embed, conditions["text"][1])
 
-        inputs_, cross_inputs = self.condition_fuser(input, conditions)
+        # {
+        #     "text": (text_embed, conditions["text"][1]),
+        #     "audio": (audio_embed, conditions["audio"][1]),
+        # }
+
+        inputs_, cross_inputs = self.condition_fuser(
+            input,
+            {
+                "text": (text_embed, conditions["text"][1]),
+                "audio": (audio_embed, conditions["audio"][1]),
+            },
+        )
 
         return inputs_, cross_inputs
 
@@ -315,9 +346,16 @@ class Transformer(nn.Module):
                 **kwargs,
             )
 
+        print("*")
+        print(inputs[0].shape)
+        print(conditions["audio"][0].shape, conditions["text"][0].shape)
+
         logits, embed = self.forward(
             inputs, conditions, return_embed=True, cond_drop_prob=0.0, **kwargs
         )
+        print("*")
+        print(inputs[0].shape)
+        print(conditions["audio"][0].shape, conditions["text"][0].shape)
 
         null_logits = self.forward(inputs, conditions, cond_drop_prob=1.0, **kwargs)
 
@@ -365,29 +403,36 @@ class Transformer(nn.Module):
         return_embed: bool = False,
         return_logits: bool = False,
         labels: Optional[torch.IntTensor] = None,
-        cond_drop_prob: float = 0.0,
+        cond_drop_prob: float = None,
         ignore_index: int = -100,
     ):
 
         assert len(inputs[0].shape) == 2, "input motion not b n"
-        device, b, n = inputs[0].device, *inputs[0]
+        device, b, n = inputs[0].device, *inputs[0].shape
+        cond_drop_prob = default(cond_drop_prob, self.cond_dropout)
 
         x = inputs[0]
         x = self.token_emb(x)
-        x = x + self.pos_emb(torch.arange(n, device=device))
+        x = x + self.pos_emb(x)
         x = self.post_emb_norm(x)
         x = self.emb_dropout(x)
 
         # classifier free guidance
-        if self.training and cond_drop_prob > 0.0:
+        if cond_drop_prob > 0.0:
             conditions = self.cfg_dropout(conditions, cond_drop_prob)
         # fuse conditions
+
+        # print(x.shape, conditions.keys())
+        # print(conditions["audio"][0].shape, conditions["text"][0].shape)
         inputs_, cross_inputs_ = self._prepare_inputs((x, inputs[1]), conditions)
 
         x_ = inputs_[0]
         x_padding_mask = inputs_[1]
         context = cross_inputs_[0]
         context_padding_mask = cross_inputs_[1]
+
+        # print(x_.shape, x_padding_mask.shape)
+        # print(context.shape, context_padding_mask.shape)
 
         embed = self.transformer_blocks(
             x=x_,
@@ -396,6 +441,8 @@ class Transformer(nn.Module):
             context_mask=context_padding_mask,
         )
         logits = self.to_logits(embed)
+        if len(self.condition_fuser.fuse2cond.get("prepend", [])) > 0:
+            logits = logits[:, -n:, :]
 
         if return_embed:
             return logits, embed
@@ -457,13 +504,10 @@ class MotionMuse(nn.Module):
         transformer: Transformer,
         noise_schedule: Callable = cosine_schedule,
         vqvae: Optional[HumanVQVAE] = None,
-        cond_drop_prob=0.5,
         no_mask_token_prob=0.0,
     ):
         super().__init__()
         self.vqvae = vqvae.eval().freeze() if exists(vqvae) else None
-
-        self.cond_drop_prob = cond_drop_prob
 
         self.transformer = transformer
 
@@ -668,8 +712,8 @@ class MotionMuse(nn.Module):
         if not exists(self.vqvae):
             return ids
 
-        images = self.vqvae.decode(ids)
-        return images
+        motion_generated = self.vqvae.decode(ids)
+        return motion_generated
 
     def forward(
         self,

@@ -344,6 +344,8 @@ class VQVAEMotionTrainer(nn.Module):
 
         self.print(f"validation start")
 
+        cnt = 0
+
         with torch.no_grad():
             for batch in tqdm(
                 (self.valid_dl),
@@ -378,14 +380,16 @@ class VQVAEMotionTrainer(nn.Module):
                     "usage": usage,
                 }
 
-                val_loss_ae.update(loss_dict)
+                for key, value in loss_dict.items():
+                    if key in val_loss_ae:
+                        val_loss_ae[key] += value
+                    else:
+                        val_loss_ae[key] = value
 
-                sums_ae = dict(Counter(val_loss_ae) + Counter(loss_dict))
-                means_ae = {
-                    k: sums_ae[k] / float((k in val_loss_ae) + (k in loss_dict))
-                    for k in sums_ae
-                }
-                val_loss_ae.update(means_ae)
+                cnt += 1
+
+        for key in val_loss_ae.keys():
+            val_loss_ae[key] = val_loss_ae[key] / cnt
 
         for key, value in val_loss_ae.items():
             wandb.log({f"val_loss_vqgan/{key}": value})
