@@ -346,16 +346,16 @@ class Transformer(nn.Module):
                 **kwargs,
             )
 
-        print("*")
-        print(inputs[0].shape)
-        print(conditions["audio"][0].shape, conditions["text"][0].shape)
+        # print("*")
+        # print(inputs[0].shape)
+        # print(conditions["audio"][0].shape, conditions["text"][0].shape)
 
         logits, embed = self.forward(
             inputs, conditions, return_embed=True, cond_drop_prob=0.0, **kwargs
         )
-        print("*")
-        print(inputs[0].shape)
-        print(conditions["audio"][0].shape, conditions["text"][0].shape)
+        # print("*")
+        # print(inputs[0].shape)
+        # print(conditions["audio"][0].shape, conditions["text"][0].shape)
 
         null_logits = self.forward(inputs, conditions, cond_drop_prob=1.0, **kwargs)
 
@@ -504,7 +504,7 @@ class MotionMuse(nn.Module):
         transformer: Transformer,
         noise_schedule: Callable = cosine_schedule,
         vqvae: Optional[HumanVQVAE] = None,
-        no_mask_token_prob=0.0,
+        no_mask_token_prob=0.2,
     ):
         super().__init__()
         self.vqvae = vqvae.eval().freeze() if exists(vqvae) else None
@@ -616,25 +616,27 @@ class MotionMuse(nn.Module):
 
         device = next(self.parameters()).device
 
-        # assert (
-        #     neg_conditions.keys() == conditions.keys()
-        # ), "need same number of negetive conditions and positive conditions"
-
         seq_len = duration
         try:
             if conditions.get("text", None) is not None:
 
-                batch_size = conditions["text"].shape[0]
-                if neg_conditions.get("text", None) is not None:
+                batch_size = conditions["text"][0].shape[0]
+                if (
+                    neg_conditions is not None
+                    and neg_conditions.get("text", None) is not None
+                ):
                     assert (
-                        neg_conditions["text"].shape[0] == batch_size
+                        neg_conditions["text"][0].shape[0] == batch_size
                     ), "negetive text conditions should have same number as positive "
 
             else:
-                batch_size = len(conditions["audio"].shape[0])
-                if neg_conditions.get("audio", None) is not None:
+                batch_size = len(conditions["audio"][0].shape[0])
+                if (
+                    neg_conditions is not None
+                    and neg_conditions.get("audio", None) is not None
+                ):
                     assert (
-                        neg_conditions["audio"].shape[0] == batch_size
+                        neg_conditions["audio"][0].shape[0] == batch_size
                     ), "negetive audio conditions should have same number as positive "
 
         except:
@@ -644,6 +646,7 @@ class MotionMuse(nn.Module):
         shape = (batch_size, seq_len)
 
         ids = torch.full(shape, self.mask_token_id, dtype=torch.long, device=device)
+        mask = torch.ones_like(ids).to(torch.bool)
         scores = torch.zeros(shape, dtype=torch.float32, device=device)
 
         starting_temperature = temperature
@@ -675,13 +678,11 @@ class MotionMuse(nn.Module):
             ids = ids.scatter(1, masked_indices, self.mask_token_id)
 
             logits, embed = demask_fn(
-                inputs=ids,
+                inputs=(ids, mask),
                 conditions=conditions,
                 cond_scale=cond_scale,
                 return_embed=True,
             )
-
-            # self_cond_embed = embed if self.self_cond else None
 
             filtered_logits = top_k(logits, topk_filter_thres)
 
