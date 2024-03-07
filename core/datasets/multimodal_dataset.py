@@ -397,6 +397,7 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         self.fps = fps
         self.audio_rep = audio_rep
         self.downsample_ratio = downsample_ratio
+        self.motion_rep = motion_rep
 
         self.window_size = window_size
 
@@ -406,7 +407,11 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         data_root = dataset_root
 
         self.text_dir = os.path.join(data_root, "texts/semantic_labels")
-        self.motion_dir = os.path.join(data_root, f"indices/{motion_rep}")
+
+        if motion_rep == "full":
+            self.motion_dir = os.path.join(data_root, f"indices/body")
+        else:
+            self.motion_dir = os.path.join(data_root, f"indices/{motion_rep}")
         self.audio_dir = os.path.join(data_root, "audio")
 
         if self.audio_rep == "encodec":
@@ -531,6 +536,26 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         name, ind, f_, to_ = self.id_list[item].rsplit("_", 3)
         f_, to_ = int(f_), int(to_)
         motion = np.load(os.path.join(self.motion_dir, name + ".npy")).squeeze()
+
+        if self.motion_rep == "full":
+            left_hand_motion = np.load(
+                os.path.join(
+                    self.motion_dir.replace("body", "left_hand"), name + ".npy"
+                )
+            ).squeeze()
+            right_hand_motion = np.load(
+                os.path.join(
+                    self.motion_dir.replace("body", "right_hand"), name + ".npy"
+                )
+            ).squeeze()
+
+            min_length = min(
+                motion.shape[0], left_hand_motion.shape[0], right_hand_motion.shape[0]
+            )
+            motion = motion[:min_length]
+            left_hand_motion = left_hand_motion[:min_length]
+            right_hand_motion = right_hand_motion[:min_length]
+
         text = self.text_list[item]
         try:
 
@@ -550,6 +575,14 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
 
             common_len_seconds = min(motion_s, audio_s)
             motion = motion[: int((common_len_seconds * self.fps))]
+            if self.motion_rep == "full":
+                left_hand_motion = left_hand_motion[
+                    : int((common_len_seconds * self.fps))
+                ]
+                right_hand_motion = right_hand_motion[
+                    : int((common_len_seconds * self.fps))
+                ]
+
             audio_data = audio_data[: int(common_len_seconds * self.sampling_rate)]
 
         except:
@@ -557,10 +590,25 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
 
         if to_ * self.fps - f_ * self.fps > self.min_motion_length:
             motion = motion[int(f_ * self.fps) : math.ceil(to_ * self.fps)]
+            left_hand_motion = left_hand_motion[
+                int(f_ * self.fps) : math.ceil(to_ * self.fps)
+            ]
+            right_hand_motion = right_hand_motion[
+                int(f_ * self.fps) : math.ceil(to_ * self.fps)
+            ]
+
+        if self.motion_rep == "full":
+            final_motion = [
+                motion.reshape(-1, 1),
+                left_hand_motion.reshape(-1, 1),
+                right_hand_motion.reshape(-1, 1),
+            ]
+        else:
+            final_motion = motion.reshape(-1, 1)
 
         return {
             "name": name,
-            "motion": motion.reshape(-1, 1),
+            "motion": final_motion,
             "text": text,
             "audio": audio_data,
         }
@@ -574,9 +622,21 @@ def simple_collate(
     audios = []
     names = []
 
+    # body_dim = None
+    # left_dim = None
+    # right_dim = None
+
     for sample in samples:
         names.append(sample["name"])
-        motions.append(sample["motion"])
+
+        if isinstance(sample["motion"], list):
+            # body_dim = sample["motion"][0].shape[-1]
+            # left_dim = sample["motion"][1].shape[-1]
+            # right_dim = sample["motion"][2].shape[-1]
+            motions.append(np.concatenate(sample["motion"], -1))
+        else:
+            motions.append(sample["motion"])
+
         texts.append(sample["text"])
         audios.append(sample["audio"])
 
@@ -585,6 +645,21 @@ def simple_collate(
         raw_motion=motions,
         raw_text=texts,
     )
+
+    # if body_dim is not None and left_dim is not None and right_dim is not None:
+    #     motion_mask = inputs["motion"][1]
+    #     params = np.split(
+    #         inputs["motion"][0], np.cumsum([body_dim, left_dim, right_dim]), -1
+    #     )[:-1]
+
+    #     inputs["motion"] = (params[0], motion_mask)
+    #     inputs["motion_left_hand"] = (params[1], motion_mask)
+    #     inputs["motion_right_hand"] = (params[2], motion_mask)
+
+    # inputs["motion"][0] = inputs["motion"][0]
+
+    ##inputs["motion"[0]] B N K
+
     inputs["names"] = np.array(names)
     inputs["texts"] = np.array(texts)
 

@@ -41,6 +41,9 @@ def batched_sample_vectors(samples, num):
         return samples[indices]
 
     return sample_vectors(samples, num)
+    # return torch.stack(
+    #     [sample_vectors(sample, num) for sample in samples.unbind(dim=0)], dim=0
+    # )
 
 
 def batched_bincount(x, *, minlength):
@@ -85,10 +88,11 @@ def kmeans(
 
 
 class QuantizeEMAReset(nn.Module):
-    def __init__(self, nb_code, code_dim, encdec_dim=None, mu=0.99):
-        super(QuantizeEMAReset, self).__init__()
+    def __init__(self, nb_code, code_dim, encdec_dim=None, kmeans_iters=None, mu=0.99):
+        super().__init__()
         self.nb_code = nb_code
         self.code_dim = code_dim
+        self.kmeans_iters = kmeans_iters
         self.encdec_dim = default(encdec_dim, code_dim)
         self.mu = mu  ##TO_DO
         self.requires_projection = code_dim != encdec_dim
@@ -125,8 +129,18 @@ class QuantizeEMAReset(nn.Module):
         return out
 
     def init_codebook(self, x):
-        out = self._tile(x)
-        self.codebook = out[: self.nb_code]
+
+        if self.kmeans_iters is None:
+
+            out = self._tile(x)
+            self.codebook = out[: self.nb_code]
+        else:
+            embed, cluster_size = kmeans(
+                x,
+                self.nb_code,
+                self.kmeans_iters,
+            )
+            self.codebook = embed * rearrange(cluster_size, "... -> ... 1")
         self.code_sum = self.codebook.clone()
         self.code_count = torch.ones(self.nb_code, device=self.codebook.device)
         self.init = True
@@ -202,6 +216,28 @@ class QuantizeEMAReset(nn.Module):
         perplexity = torch.exp(-torch.sum(prob * torch.log(prob + 1e-7)))
 
         return perplexity
+
+    def encode(self, x, temperature=0.0):
+        shape = x.shape
+
+        need_transpose = (
+            True
+            if (shape[-1] != self.encdec_dim or shape[-1] != self.code_dim)
+            else False
+        )
+
+        if need_transpose:
+            x = rearrange(x, "n c t -> (n t) c")
+            N, width, T = shape
+        else:
+            x = rearrange(x, "n t c -> (n t) c")
+            N, T, width = shape
+
+        x = self.project_in(x)
+
+        code_idx = self.quantize(x, temperature)
+
+        return code_idx
 
     def forward(self, x, return_idx=False, temperature=0.0):
         shape = x.shape

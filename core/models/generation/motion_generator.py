@@ -14,7 +14,7 @@ from core import (
     PositionalEmbeddingType,
     TranslationTransformerParams,
 )
-from core.datasets.conditioner import ConditionFuser
+from core.datasets.conditioner import ConditionFuser, ClassifierFreeGuidanceDropout
 from core.models.attend2 import Attend, Attention
 from core.models.utils import FeedForward, LayerNorm, default, exists, get_obj_from_str
 from einops import rearrange, repeat
@@ -130,7 +130,7 @@ class TransformerBlockMuse(nn.Module):
                             heads=heads,
                             dropout=attn_dropout,
                             cross_attn_tokens_dropout=cross_attn_tokens_dropout,
-                            add_null_kv=True,
+                            add_null_kv=False,
                             flash=flash,
                         ),
                         (
@@ -141,7 +141,7 @@ class TransformerBlockMuse(nn.Module):
                                 cross_attn_tokens_dropout=cross_attn_tokens_dropout,
                                 add_null_kv=True,
                                 flash=flash,
-                                causal=True,
+                                causal=False,
                             )
                             if self.do_cross
                             else nn.Identity()
@@ -172,73 +172,73 @@ class TransformerBlockMuse(nn.Module):
 # transformer - it's all we need
 
 
-class ClassifierFreeGuidanceDropout(nn.Module):
-    """Classifier Free Guidance dropout.
-    All attributes are dropped with the same probability.
+# class ClassifierFreeGuidanceDropout(nn.Module):
+#     """Classifier Free Guidance dropout.
+#     All attributes are dropped with the same probability.
 
-    Args:
-        p (float): Probability to apply condition dropout during training.
-        seed (int): Random seed.
-    """
+#     Args:
+#         p (float): Probability to apply condition dropout during training.
+#         seed (int): Random seed.
+#     """
 
-    def __init__(self, p: float = 0.0, seed: int = 42):
-        super().__init__()
-        self.rng = torch.Generator()
-        self.rng.manual_seed(seed)
-        self.p = p
+#     def __init__(self, p: float = 0.0, seed: int = 42):
+#         super().__init__()
+#         self.rng = torch.Generator()
+#         self.rng.manual_seed(seed)
+#         self.p = p
 
-    def prob_mask_like(self, shape, prob, device=None):
-        if prob == 1:
-            return torch.ones(shape, device=device, dtype=torch.bool)
-        elif prob == 0:
-            return torch.zeros(shape, device=device, dtype=torch.bool)
-        else:
-            return torch.zeros(shape, device=device).float().uniform_(0, 1) < prob
+#     def prob_mask_like(self, shape, prob, device=None):
+#         if prob == 1:
+#             return torch.ones(shape, device=device, dtype=torch.bool)
+#         elif prob == 0:
+#             return torch.zeros(shape, device=device, dtype=torch.bool)
+#         else:
+#             return torch.zeros(shape, device=device).float().uniform_(0, 1) < prob
 
-    def forward(
-        self, conditions: Dict[str, ConditionType], drop_prob: float = None
-    ) -> Dict[str, ConditionType]:
-        """
-        Args:
-            samples (list[ConditioningAttributes]): List of conditions.
-        Returns:
-            list[ConditioningAttributes]: List of conditions after all attributes were set to None.
-        """
+#     def forward(
+#         self, conditions: Dict[str, ConditionType], drop_prob: float = None
+#     ) -> Dict[str, ConditionType]:
+#         """
+#         Args:
+#             samples (list[ConditioningAttributes]): List of conditions.
+#         Returns:
+#             list[ConditioningAttributes]: List of conditions after all attributes were set to None.
+#         """
 
-        drop_prob = drop_prob if drop_prob is not None else self.p
+#         drop_prob = drop_prob if drop_prob is not None else self.p
 
-        conditions_ = deepcopy(conditions)
+#         conditions_ = deepcopy(conditions)
 
-        for condition_modality, (embedding, mask) in conditions.items():
-            b, n = mask.shape
+#         for condition_modality, (embedding, mask) in conditions.items():
+#             b, n = mask.shape
 
-            if mask.dtype != torch.bool:
-                mask = mask.to(torch.bool)
+#             if mask.dtype != torch.bool:
+#                 mask = mask.to(torch.bool)
 
-            if drop_prob == 1.0:
+#             if drop_prob == 1.0:
 
-                drop_mask = self.prob_mask_like((b, 1), 1.0 - drop_prob, mask.device)
-                new_mask = mask & drop_mask
-                new_embedding = embedding * new_mask.unsqueeze(-1)
-                # if condition_modality == "audio":
-                new_embedding = new_embedding[:, :1, :]
-                new_mask = new_mask[:, :1]
-                conditions_[condition_modality] = (new_embedding, new_mask)
+#                 drop_mask = self.prob_mask_like((b, 1), 1.0 - drop_prob, mask.device)
+#                 new_mask = mask & drop_mask
+#                 new_embedding = embedding * new_mask.unsqueeze(-1)
+#                 # if condition_modality == "audio":
+#                 new_embedding = new_embedding[:, :1, :]
+#                 new_mask = new_mask[:, :1]
+#                 conditions_[condition_modality] = (new_embedding, new_mask)
 
-            elif drop_prob > 0.0 and (
-                condition_modality != "audio" or not self.training
-            ):
-                drop_mask = self.prob_mask_like((b, 1), 1.0 - drop_prob, mask.device)
-                new_mask = mask & drop_mask
+#             elif drop_prob > 0.0 and (
+#                 condition_modality != "audio" or not self.training
+#             ):
+#                 drop_mask = self.prob_mask_like((b, 1), 1.0 - drop_prob, mask.device)
+#                 new_mask = mask & drop_mask
 
-                new_embedding = embedding * new_mask.unsqueeze(-1)
+#                 new_embedding = embedding * new_mask.unsqueeze(-1)
 
-                conditions_[condition_modality] = (new_embedding, new_mask)
+#                 conditions_[condition_modality] = (new_embedding, new_mask)
 
-        return conditions_
+#         return conditions_
 
-    def __repr__(self):
-        return f"ClassifierFreeGuidanceDropout(p={self.p})"
+#     def __repr__(self):
+#         return f"ClassifierFreeGuidanceDropout(p={self.p})"
 
 
 class Transformer(nn.Module):

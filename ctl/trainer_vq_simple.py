@@ -248,6 +248,19 @@ class VQVAEMotionTrainer(nn.Module):
 
         return motion
 
+    @torch.no_grad()
+    def compute_perplexity(self, code_idx):
+        # Calculate new centres
+        code_onehot = torch.zeros(
+            self.vqvae_args.codebook_size, code_idx.shape[0], device=code_idx.device
+        )  # nb_code, N * L
+        code_onehot.scatter_(0, code_idx.view(1, code_idx.shape[0]), 1)
+
+        code_count = code_onehot.sum(dim=-1)  # nb_code
+        prob = code_count / torch.sum(code_count)
+        perplexity = torch.exp(-torch.sum(prob * torch.log(prob + 1e-7)))
+        return perplexity
+
     def train_step(self):
         steps = int(self.steps.item())
 
@@ -280,12 +293,12 @@ class VQVAEMotionTrainer(nn.Module):
                 + self.vqvae_args.commit * vqvae_output.commit_loss
             ) / self.grad_accum_every
 
-            used_indices = vqvae_output.indices.flatten().tolist()
-            usage = len(set(used_indices)) / self.vqvae_args.codebook_size
+            # usage = len(set(used_indices)) / self.vqvae_args.codebook_size
 
             # print(loss,loss.shape)
 
             loss.backward()
+            perplexity = self.compute_perplexity(vqvae_output.indices.flatten())
 
             accum_log(
                 logs,
@@ -294,7 +307,7 @@ class VQVAEMotionTrainer(nn.Module):
                     loss_motion=loss_motion.detach().cpu() / self.grad_accum_every,
                     commit_loss=vqvae_output.commit_loss.detach().cpu()
                     / self.grad_accum_every,
-                    usage=usage / self.grad_accum_every,
+                    perplexity=perplexity.detach().cpu() / self.grad_accum_every,
                 ),
             )
 
@@ -304,7 +317,7 @@ class VQVAEMotionTrainer(nn.Module):
 
         # build pretty printed losses
 
-        losses_str = f"{steps}: vqvae model total loss: {logs['loss'].float():.3} reconstruction loss: {logs['loss_motion'].float():.3} commit_loss: {logs['commit_loss'].float():.3} codebook usage: {logs['usage']}"
+        losses_str = f"{steps}: vqvae model total loss: {logs['loss'].float():.3} reconstruction loss: {logs['loss_motion'].float():.3} commit_loss: {logs['commit_loss'].float():.3} codebook usage: {logs['perplexity']}"
 
         # log
         if steps % self.wandb_every == 0:
@@ -370,14 +383,13 @@ class VQVAEMotionTrainer(nn.Module):
                     + self.vqvae_args.commit * vqvae_output.commit_loss
                 ) / self.grad_accum_every
 
-                used_indices = vqvae_output.indices.flatten().tolist()
-                usage = len(set(used_indices)) / self.vqvae_args.codebook_size
+                perplexity = self.compute_perplexity(vqvae_output.indices.flatten())
 
                 loss_dict = {
                     "total_loss": loss.detach().cpu(),
                     "loss_motion": loss_motion.detach().cpu(),
                     "commit_loss": vqvae_output.commit_loss.detach().cpu(),
-                    "usage": usage,
+                    "perplexity": perplexity,
                 }
 
                 for key, value in loss_dict.items():
@@ -392,7 +404,7 @@ class VQVAEMotionTrainer(nn.Module):
             val_loss_ae[key] = val_loss_ae[key] / cnt
 
         for key, value in val_loss_ae.items():
-            wandb.log({f"val_loss_vqgan/{key}": value})
+            wandb.log({f"val_loss_/{key}": value})
 
         print(
             "val/rec_loss",
@@ -401,6 +413,10 @@ class VQVAEMotionTrainer(nn.Module):
         print(
             f"val/total_loss ",
             val_loss_ae["total_loss"],
+        )
+        print(
+            f"val/usage ",
+            val_loss_ae["perplexity"],
         )
 
         self.vqvae_model.train()

@@ -492,6 +492,8 @@ class EuclideanCodebook(nn.Module):
 
         x = x.float()
 
+        print(x.shape)
+
         if needs_codebook_dim:
             x = rearrange(x, "... -> 1 ...")
 
@@ -707,6 +709,19 @@ class VectorQuantize(nn.Module):
 
         codes = codebook[indices]
         return rearrange(codes, "... h d -> ... (h d)")
+
+    @torch.no_grad()
+    def compute_perplexity(self, code_idx):
+        # Calculate new centres
+        code_onehot = torch.zeros(
+            self.codebook_size, code_idx.shape[0], device=code_idx.device
+        )  # nb_code, N * L
+        code_onehot.scatter_(0, code_idx.view(1, code_idx.shape[0]), 1)
+
+        code_count = code_onehot.sum(dim=-1)  # nb_code
+        prob = code_count / torch.sum(code_count)
+        perplexity = torch.exp(-torch.sum(prob * torch.log(prob + 1e-7)))
+        return perplexity
 
     def forward(
         self,

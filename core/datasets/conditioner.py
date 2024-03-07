@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from core.param_dataclasses import AudioRep, MotionRep, TextRep
 from torch import nn
 from transformers.feature_extraction_utils import BatchFeature
-
+from copy import deepcopy
 from .text_encoders import BERTConditioner, ClipConditioner, T5Conditioner
 
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
@@ -328,7 +328,8 @@ class ConditionProvider(nn.Module):
         motion_idx_list = []
         audio_idx_list = []
 
-        # if audio_present:
+        if raw_audio[0] is None and raw_motion[0] is not None:
+            raw_audio = raw_audio * len(raw_motion)
 
         for audio, motion in zip(raw_audio, raw_motion):
 
@@ -362,6 +363,9 @@ class ConditionProvider(nn.Module):
 
         # tokenized = self.text_encoder.tokenize(raw_text)
         # padded_text, text_mask = self.text_encoder(tokenized)
+
+        if raw_text[0] is None and raw_motion[0] is not None:
+            raw_text = raw_text * len(raw_motion)
 
         padded_text, text_mask = self._get_text_features(raw_text)
 
@@ -502,7 +506,7 @@ class ConditionFuser(nn.Module):
             elif op == "prepend":
                 if len(cond.shape) == 2:
                     cond = cond.unsqueeze(1)
-                
+
                 input = torch.cat([cond, input], dim=1)
                 input_padding_mask = torch.cat([cond_mask, input_padding_mask], dim=1)
 
@@ -565,3 +569,72 @@ class ConditionFuser(nn.Module):
             cross_attention_output,
             cross_attention_mask,
         )
+
+
+class ClassifierFreeGuidanceDropout(nn.Module):
+    """Classifier Free Guidance dropout.
+    All attributes are dropped with the same probability.
+
+    Args:
+        p (float): Probability to apply condition dropout during training.
+        seed (int): Random seed.
+    """
+
+    def __init__(self, p: float = 0.0, seed: int = 42):
+        super().__init__()
+        self.rng = torch.Generator()
+        self.rng.manual_seed(seed)
+        self.p = p
+
+    def prob_mask_like(self, shape, prob, device=None):
+        if prob == 1:
+            return torch.ones(shape, device=device, dtype=torch.bool)
+        elif prob == 0:
+            return torch.zeros(shape, device=device, dtype=torch.bool)
+        else:
+            return torch.zeros(shape, device=device).float().uniform_(0, 1) < prob
+
+    def forward(
+        self, conditions: Dict[str, ConditionType], drop_prob: float = None
+    ) -> Dict[str, ConditionType]:
+        """
+        Args:
+            samples (list[ConditioningAttributes]): List of conditions.
+        Returns:
+            list[ConditioningAttributes]: List of conditions after all attributes were set to None.
+        """
+
+        drop_prob = drop_prob if drop_prob is not None else self.p
+
+        conditions_ = deepcopy(conditions)
+
+        for condition_modality, (embedding, mask) in conditions.items():
+            b, n = mask.shape
+
+            if mask.dtype != torch.bool:
+                mask = mask.to(torch.bool)
+
+            if drop_prob == 1.0:
+
+                drop_mask = self.prob_mask_like((b, 1), 1.0 - drop_prob, mask.device)
+                new_mask = mask & drop_mask
+                new_embedding = embedding * new_mask.unsqueeze(-1)
+                # if condition_modality == "audio":
+                new_embedding = new_embedding[:, :1, :]
+                new_mask = new_mask[:, :1]
+                conditions_[condition_modality] = (new_embedding, new_mask)
+
+            elif drop_prob > 0.0 and (
+                condition_modality != "audio" or not self.training
+            ):
+                drop_mask = self.prob_mask_like((b, 1), 1.0 - drop_prob, mask.device)
+                new_mask = mask & drop_mask
+
+                new_embedding = embedding * new_mask.unsqueeze(-1)
+
+                conditions_[condition_modality] = (new_embedding, new_mask)
+
+        return conditions_
+
+    def __repr__(self):
+        return f"ClassifierFreeGuidanceDropout(p={self.p})"

@@ -7,8 +7,17 @@ import clip
 import torch
 import torch.nn as nn
 from core.models.utils import TorchAutocast
-from transformers import (AutoTokenizer, BertConfig, BertForMaskedLM,
-                          BertModel, T5Config, T5EncoderModel, T5Tokenizer)
+from transformers import (
+    AutoTokenizer,
+    BertConfig,
+    BertForMaskedLM,
+    BertModel,
+    T5Config,
+    T5EncoderModel,
+    T5Tokenizer,
+    CLIPTokenizer,
+    CLIPTextModelWithProjection,
+)
 
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
 
@@ -139,23 +148,22 @@ class T5Conditioner(nn.Module):
 
 
 class ClipConditioner(nn.Module):
+    """Uses the CLIP transformer encoder for text (from Hugging Face)"""
+
     def __init__(
-        self,
-        device: str = "cuda" if torch.cuda.is_available() else "cpu",
-        name: str = "ViT-B/32",
+        self, version="openai/clip-vit-large-patch14", device="cuda", max_length=77
     ):
         super().__init__()
+        self.tokenizer = CLIPTokenizer.from_pretrained(version)
+        self.transformer = CLIPTextModelWithProjection.from_pretrained(version)
         self.device = device
-        self.encoder, self.preprocess = clip.load(name)
-        clip.model.convert_weights(self.encoder)
-
-        self.encoder = self.encoder.eval()
-        self.config = {"hidden_size": 512}
+        self.max_length = max_length
         self.freeze()
 
-    # @property
-    # def device(self):
-    #     return next(self.encoder.parameters()).device
+    def freeze(self):
+        self.transformer = self.transformer.eval()
+        for param in self.parameters():
+            param.requires_grad = False
 
     def tokenize(self, x: tp.List[tp.Optional[str]]) -> tp.Dict[str, torch.Tensor]:
         if x is not None and isinstance(x, str):
@@ -164,32 +172,96 @@ class ClipConditioner(nn.Module):
 
         empty_idx = torch.LongTensor([i for i, xi in enumerate(entries) if xi == ""])
 
-        inputs = {}
+        # inputs = {}
 
-        inputs["input_ids"] = clip.tokenize(entries, truncate=True).to(self.device)
-        inputs["attention_mask"] = torch.ones(len(inputs)).to(self.device)  ## B
+        # inputs["input_ids"] = clip.tokenize(entries, truncate=True).to(self.device)
+        inputs = self.tokenizer(
+            entries,
+            truncation=True,
+            max_length=self.max_length,
+            return_length=True,
+            return_overflowing_tokens=False,
+            padding="max_length",
+            return_tensors="pt",
+        )
+        # inputs["attention_mask"] = torch.ones(len(inputs)).to(self.device)  ## B
 
         inputs["attention_mask"][empty_idx, :] = 0
 
         return inputs
 
     def forward(self, inputs: tp.Dict[str, torch.Tensor]) -> ConditionType:
-        return self.get_text_embedding(inputs)
+        mask = inputs["attention_mask"]
+        with torch.no_grad():
+            embeds = self.transformer(**inputs).last_hidden_state
+        embeds = embeds * mask.unsqueeze(-1)
+        return embeds, mask
 
     def get_text_embedding(self, inputs: tp.Dict[str, torch.Tensor]) -> ConditionType:
 
         mask = inputs["attention_mask"]
+        mask = mask[:, 0:1]
 
         with torch.no_grad():
-            embeds = self.encoder.encode_text(inputs["input_ids"]).float()
+            embeds = self.transformer(**inputs).text_embeds
 
-        embeds = embeds * mask.unsqueeze(-1)
+        encoding = embeds * mask.unsqueeze(-1)
 
-        return embeds, mask
+        return encoding, mask
 
-    def freeze(self):
-        for p in self.encoder.parameters():
-            p.requires_grad = False
+
+# class ClipConditioner(nn.Module):
+#     def __init__(
+#         self,
+#         device: str = "cuda" if torch.cuda.is_available() else "cpu",
+#         name: str = "ViT-B/32",
+#     ):
+#         super().__init__()
+#         self.device = device
+#         self.encoder, self.preprocess = clip.load(name)
+#         clip.model.convert_weights(self.encoder)
+
+#         self.encoder = self.encoder.eval()
+#         self.config = {"hidden_size": 512}
+#         self.freeze()
+
+#     # @property
+#     # def device(self):
+#     #     return next(self.encoder.parameters()).device
+
+#     def tokenize(self, x: tp.List[tp.Optional[str]]) -> tp.Dict[str, torch.Tensor]:
+#         if x is not None and isinstance(x, str):
+#             x = [x]
+#         entries = [xi if xi is not None else "" for xi in x]
+
+#         empty_idx = torch.LongTensor([i for i, xi in enumerate(entries) if xi == ""])
+
+#         inputs = {}
+
+#         inputs["input_ids"] = clip.tokenize(entries, truncate=True).to(self.device)
+#         inputs["attention_mask"] = torch.ones(len(inputs)).to(self.device)  ## B
+
+#         inputs["attention_mask"][empty_idx, :] = 0
+
+#         return inputs
+
+#     def forward(self, inputs: tp.Dict[str, torch.Tensor]) -> ConditionType:
+#         return self.get_text_embedding(inputs)
+
+#     def get_text_embedding(self, inputs: tp.Dict[str, torch.Tensor]) -> ConditionType:
+
+#         mask = inputs["attention_mask"]
+
+#         with torch.no_grad():
+#             embeds = self.encoder.encode_text(inputs["input_ids"]).float()
+
+#         embeds = embeds * mask.unsqueeze(-1)
+
+#         return embeds, mask
+
+#     def freeze(self):
+#         for p in self.encoder.parameters():
+#             p.requires_grad = False
 
 
 class BERTConditioner(nn.Module):
@@ -236,16 +308,24 @@ class BERTConditioner(nn.Module):
         return inputs
 
     def forward(self, inputs: tp.Dict[str, torch.Tensor]) -> ConditionType:
-        return self.get_text_embedding(inputs)
+        # return self.get_text_embedding(inputs)
+        mask = inputs["attention_mask"]
+
+        with torch.no_grad():
+            embeds = self.encoding(**inputs).last_hidden_state
+
+        encoding = embeds * mask.unsqueeze(-1)
+
+        return encoding, mask
 
     def get_text_embedding(self, inputs: tp.Dict[str, torch.Tensor]) -> ConditionType:
 
         mask = inputs["attention_mask"]
         mask = mask[:, 0:1]
 
-        with torch.no_grad(), self.autocast:
+        with torch.no_grad():
             embeds = self.encoding(**inputs).last_hidden_state
 
-        encoding = embeds[:, 0] * mask
+        encoding = embeds[:, 0] * mask.unsqueeze(-1)
 
         return encoding, mask
