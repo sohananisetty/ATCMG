@@ -64,22 +64,22 @@ cfg.train.warmup_steps = 4000
 cfg.train.gamma = 0.05
 cfg.train.lr_scheduler_type = "cosine"
 
+##optimizations
+cfg.train.autocast = True
+cfg.train.autocast_dtype = "float16"
+
+
 cfg.codebooks_pattern = CN()
-cfg.codebooks_pattern.modeling = "delay"
-cfg.codebooks_pattern.delay = [
-    {
-        "delays": [0, 1, 2, 3],
-        "flatten_first": 0,
-        "empty_initial": 0,
-    }
-]
-cfg.codebooks_pattern.unroll = [
-    {
-        "flattening": [0, 1, 2, 3],
-        "delays": [0, 0, 0, 0],
-    }
-]
-cfg.codebooks_pattern.coarse_first = [{"delays": [0, 0, 0]}]
+cfg.codebooks_pattern.modeling = "delay"  ## delay parralel unroll coarse_first
+cfg.codebooks_pattern.delays = [0, 1, 2]
+cfg.codebooks_pattern.flatten_first = 0
+cfg.codebooks_pattern.empty_initial = 0
+cfg.codebooks_pattern.flattening = [0, 1, 2]
+
+cfg.fuser = CN()
+cfg.fuser.fuse_method = [{"cross": ["audio"], "prepend": ["text"]}]
+cfg.fuser.cross_attention_pos_emb = False
+cfg.fuser.cross_attention_pos_emb_scale = 1.0
 
 
 cfg.transformer_lm = CN()
@@ -87,6 +87,8 @@ cfg.transformer_lm.dim = 512
 cfg.transformer_lm.num_heads = 8
 cfg.transformer_lm.num_layers = 8
 cfg.transformer_lm.hidden_scale = 4
+
+
 cfg.transformer_lm.n_q = 3  # number of streams to model
 cfg.transformer_lm.card = 1024
 cfg.transformer_lm.dropout = 0.0
@@ -98,6 +100,15 @@ cfg.transformer_lm.bias_attn = True  # use bias for the attention
 cfg.transformer_lm.bias_proj = True  # use bias for the output projections
 cfg.transformer_lm.past_context = None
 cfg.transformer_lm.causal = True
+
+cfg.transformer_lm.proj_input = False
+cfg.transformer_lm.audio_input_dim = 128
+cfg.transformer_lm.text_input_dim = 768
+
+## CFG
+cfg.transformer_lm.cfg_dropout = 0.0
+cfg.transformer_lm.cfg_coef = 0.3
+## Optimizations
 cfg.transformer_lm.custom = False  # use custom MHA implementation
 cfg.transformer_lm.memory_efficient = False  # use flash attention
 cfg.transformer_lm.attention_as_float32 = False  # use float32 for the attention part,
@@ -112,6 +123,9 @@ cfg.transformer_lm.checkpointing = (
 )
 # torch is the slowest but uses the least memory,
 # xformers_default is somewhere in between.
+
+
+##Initilizations
 cfg.transformer_lm.weight_init = (
     None  # weight initialization (None, gaussian or uniform)
 )
@@ -122,6 +136,9 @@ cfg.transformer_lm.zero_bias_init = (
     False  # initialize bias to zero if bias in linears and
 )
 # if a weight_init method is used.
+
+
+## Normalizations
 cfg.transformer_lm.norm = "layer_norm"  # normalization method to use in transformer.
 cfg.transformer_lm.cross_attention = True
 cfg.transformer_lm.qk_layer_norm = False

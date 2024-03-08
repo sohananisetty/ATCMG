@@ -9,10 +9,11 @@ from functools import partial
 import logging
 import math
 import typing as tp
-
+import torch.nn.functional as F
 import torch
 from torch import nn
-
+from core import MotionTokenizerParams
+from core import pattern_providers
 from .streaming_transformer.streaming import StreamingModule, State
 from .streaming_transformer.transformer import StreamingTransformer, create_norm_fn
 from core.datasets.conditioner import (
@@ -26,6 +27,7 @@ from core.datasets.conditioner import (
 from .streaming_transformer.codebooks_patterns import CodebooksPatternProvider
 
 from .streaming_transformer.activations import get_activation_fn
+from core.models.utils import TorchAutocast
 
 
 def multinomial(
@@ -249,9 +251,14 @@ class LMModel(StreamingModule):
             else nn.Identity()
         )
 
+        motion_tokenizer_params = MotionTokenizerParams(card)
+        self.card = motion_tokenizer_params.num_tokens
+        self.mask_token_id = motion_tokenizer_params.mask_token_id
+        self.pad_token_id = motion_tokenizer_params.pad_token_id
+
         self.fuser = fuser
-        self.card = card
-        embed_dim = self.card + 1
+        # self.card = card
+        embed_dim = motion_tokenizer_params.vocab_size  # self.card + 1
         self.n_q = n_q
         self.dim = dim
         self.pattern_provider = pattern_provider
@@ -343,7 +350,8 @@ class LMModel(StreamingModule):
 
     @property
     def special_token_id(self) -> int:
-        return self.card
+        return self.mask_token_id
+        # return self.card
 
     @property
     def num_codebooks(self) -> int:
@@ -427,13 +435,13 @@ class LMModel(StreamingModule):
         )
 
         x_ = input_[0]
-        x_padding_mask = input_[1]
+        x_padding_mask = ~input_[1]
         context = cross_attention_input[0]
-        context_padding_mask = cross_attention_input[1]
+        context_padding_mask = ~cross_attention_input[1]
 
         out = self.transformer(
             x_,
-            src_key_padding_mask=x_padding_mask,
+            # src_key_padding_mask=x_padding_mask,
             cross_attention_src=context,
             cross_key_padding_mask=context_padding_mask,
             # src_mask=(self.attn_mask_per_stage[stage] if stage >= 0 else None),
@@ -459,6 +467,7 @@ class LMModel(StreamingModule):
         condition_tensors: tp.Optional[ConditionTensors] = None,
         stage: int = -1,
         keep_only_valid_steps: bool = True,
+        cond_drop_prob: float = None,
     ) -> LMOutput:
         """Given an input tensor of codes [B, K, T] and list of conditions, runs the model
         forward using the specified codes interleaving pattern.
@@ -499,11 +508,21 @@ class LMModel(StreamingModule):
                 keep_only_valid_steps=keep_only_valid_steps,
             )
         )
+        new_codes_mask = torch.ones_like(sequence_mask).repeat(B, 1, 1)
+        for i in range(K):
+            new_codes_mask[:, i, i + 1 :] = codes_mask[:, 0 : T - i]
+
+        # sequence_mask = torch.where(
+        #     sequence_codes == self.special_token_id, False, True
+        # )
 
         # apply model on pattern sequence
         model = self if self._fsdp is None else self._fsdp
         logits = model(
-            sequence_codes, condition_tensors, stage=stage
+            (sequence_codes, new_codes_mask),
+            condition_tensors,
+            stage=stage,
+            cond_drop_prob=cond_drop_prob,
         )  # [B, K, S, card]
         # map back the logits on pattern sequence to logits on original codes: [B, K, S, card] -> [B, K, T, card]
         # and provide the corresponding mask over invalid positions of tokens
@@ -836,3 +855,88 @@ class LMModel(StreamingModule):
         # ensure the returned codes are all valid
         assert (out_codes >= 0).all() and (out_codes <= self.card).all()
         return out_codes
+
+
+class MotionGen(nn.Module):
+    def __init__(self, tranformer_config, fuse_config, pattern_config):
+        super().__init__()
+
+        fuse_method = fuse_config.pop("fuse_method")
+        if isinstance(fuse_method, list):
+            fuse_method = fuse_method[0]
+        condition_fuser = ConditionFuser(fuse_method, **fuse_config)
+        modeling = pattern_config.pop("modeling")
+
+        pattern_provider = pattern_providers[modeling](
+            tranformer_config.n_q, **pattern_config
+        )
+
+        self.model = LMModel(
+            pattern_provider=pattern_provider,
+            fuser=condition_fuser,
+            **tranformer_config
+        )
+
+   
+
+    def _compute_cross_entropy(
+        self, logits: torch.Tensor, targets: torch.Tensor, mask: torch.Tensor
+    ) -> tp.Tuple[torch.Tensor, tp.List[torch.Tensor]]:
+        """Compute cross entropy between multi-codebook targets and model's logits.
+        The cross entropy is computed per codebook to provide codebook-level cross entropy.
+        Valid timesteps for each of the codebook are pulled from the mask, where invalid
+        timesteps are set to 0.
+
+        Args:
+            logits (torch.Tensor): Model's logits of shape [B, K, T, card].
+            targets (torch.Tensor): Target codes, of shape [B, K, T].
+            mask (torch.Tensor): Mask for valid target codes, of shape [B, K, T].
+        Returns:
+            ce (torch.Tensor): Cross entropy averaged over the codebooks
+            ce_per_codebook (list of torch.Tensor): Cross entropy per codebook (detached).
+        """
+        B, K, T = targets.shape
+        assert logits.shape[:-1] == targets.shape
+        assert mask.shape == targets.shape
+        ce = torch.zeros([], device=targets.device)
+        ce_per_codebook: tp.List[torch.Tensor] = []
+        for k in range(K):
+            logits_k = (
+                logits[:, k, ...].contiguous().view(-1, logits.size(-1))
+            )  # [B x T, card]
+            targets_k = targets[:, k, ...].contiguous().view(-1)  # [B x T]
+            mask_k = mask[:, k, ...].contiguous().view(-1)  # [B x T]
+            ce_targets = targets_k[mask_k]
+            ce_logits = logits_k[mask_k]
+            q_ce = F.cross_entropy(ce_logits, ce_targets)
+            ce += q_ce
+            ce_per_codebook.append(q_ce.detach())
+        # average cross entropy across codebooks
+        ce = ce / K
+        return ce, ce_per_codebook
+
+    def forward(
+        self,
+        inputs: tp.Dict[str, ConditionType],
+        conditions: tp.Dict[str, ConditionType],
+        ignore_index: int = -100,
+        cond_drop_prob=None,
+        return_logits=False,
+    ):
+        # tokenize if needed
+
+        motions_or_ids = inputs[0]
+        input_mask = inputs[1]
+
+        
+
+        # with self.autocast:
+        model_output = self.model.compute_predictions(inputs, condition_tensors=conditions, cond_drop_prob=cond_drop_prob)  # type: ignore
+        logits = model_output.logits
+        mask = input_mask & model_output.mask
+        ce, ce_per_codebook = self._compute_cross_entropy(logits, motions_or_ids, mask)
+        loss = ce
+
+        if return_logits:
+            return (logits, loss, ce_per_codebook)
+        return loss, ce_per_codebook

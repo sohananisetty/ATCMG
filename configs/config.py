@@ -33,7 +33,6 @@ cfg.dataset.window_size = None
 cfg.dataset.sampling_rate = 16000
 cfg.dataset.motion_padding = "longest"
 cfg.dataset.use_motion_augmentation = False
-cfg.dataset.kmeans_iters = None
 
 cfg.train = CN()
 cfg.train.resume = True
@@ -75,6 +74,7 @@ cfg.vqvae.rearrange_output = False
 cfg.vqvae.heads = 8
 cfg.vqvae.codebook_dim = 768
 cfg.vqvae.codebook_size = 1024
+cfg.vqvae.kmeans_iters = None
 
 cfg.vqvae.num_quantizers = 2
 cfg.vqvae.quantize_dropout_prob = 0.2

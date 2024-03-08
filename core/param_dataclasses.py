@@ -2,7 +2,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 from functools import partial
 from typing import Dict, List, Optional
-
+from core.models.generation.streaming_transformer.codebooks_patterns import (
+    ParallelPatternProvider,
+    DelayedPatternProvider,
+    UnrolledPatternProvider,
+    CoarseFirstPattern,
+    MusicLMPattern,
+)
 import torch
 
 
@@ -31,6 +37,15 @@ class AudioRep(Enum):
     ENCODEC = "encodec"
     LIBROSA = "librosa"
     WAV = "wav"
+
+
+pattern_providers = {
+    "parallel": ParallelPatternProvider,
+    "delay": DelayedPatternProvider,
+    "unroll": UnrolledPatternProvider,
+    "coarse_first": CoarseFirstPattern,
+    "musiclm": MusicLMPattern,
+}
 
 
 @dataclass
