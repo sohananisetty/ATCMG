@@ -622,17 +622,11 @@ def simple_collate(
     audios = []
     names = []
 
-    # body_dim = None
-    # left_dim = None
-    # right_dim = None
-
     for sample in samples:
         names.append(sample["name"])
 
         if isinstance(sample["motion"], list):
-            # body_dim = sample["motion"][0].shape[-1]
-            # left_dim = sample["motion"][1].shape[-1]
-            # right_dim = sample["motion"][2].shape[-1]
+
             motions.append(np.concatenate(sample["motion"], -1))
         else:
             motions.append(sample["motion"])
@@ -645,20 +639,6 @@ def simple_collate(
         raw_motion=motions,
         raw_text=texts,
     )
-
-    # if body_dim is not None and left_dim is not None and right_dim is not None:
-    #     motion_mask = inputs["motion"][1]
-    #     params = np.split(
-    #         inputs["motion"][0], np.cumsum([body_dim, left_dim, right_dim]), -1
-    #     )[:-1]
-
-    #     inputs["motion"] = (params[0], motion_mask)
-    #     inputs["motion_left_hand"] = (params[1], motion_mask)
-    #     inputs["motion_right_hand"] = (params[2], motion_mask)
-
-    # inputs["motion"][0] = inputs["motion"][0]
-
-    ##inputs["motion"[0]] B N K
 
     inputs["names"] = np.array(names)
     inputs["texts"] = np.array(texts)

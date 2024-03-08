@@ -83,7 +83,12 @@ cfg.fuser.cross_attention_pos_emb_scale = 1.0
 
 
 cfg.transformer_lm = CN()
+cfg.transformer_lm.target = "core.models.generation.lm.MotionGen"
 cfg.transformer_lm.dim = 512
+
+cfg.transformer_lm.proj_input = False
+cfg.transformer_lm.audio_input_dim = 128
+cfg.transformer_lm.text_input_dim = 768
 cfg.transformer_lm.num_heads = 8
 cfg.transformer_lm.num_layers = 8
 cfg.transformer_lm.hidden_scale = 4
@@ -101,9 +106,6 @@ cfg.transformer_lm.bias_proj = True  # use bias for the output projections
 cfg.transformer_lm.past_context = None
 cfg.transformer_lm.causal = True
 
-cfg.transformer_lm.proj_input = False
-cfg.transformer_lm.audio_input_dim = 128
-cfg.transformer_lm.text_input_dim = 768
 
 ## CFG
 cfg.transformer_lm.cfg_dropout = 0.0
@@ -114,27 +116,22 @@ cfg.transformer_lm.memory_efficient = False  # use flash attention
 cfg.transformer_lm.attention_as_float32 = False  # use float32 for the attention part,
 # recommended at the moment when memory_efficient is True.
 cfg.transformer_lm.layer_scale = None
-cfg.transformer_lm.positional_embedding = (
-    "sin"  # positional embedding strategy (sin, rope, or sin_rope).
-)
+# positional embedding strategy (sin, rope, or sin_rope).
+cfg.transformer_lm.positional_embedding = "sin"
 cfg.transformer_lm.xpos = False  # apply xpos decay (rope only).
-cfg.transformer_lm.checkpointing = (
-    None  # layer checkpointing method, can be None, torch, xformers_default.
-)
+# layer checkpointing method, can be none, torch, xformers_default.
+cfg.transformer_lm.checkpointing = "none"
 # torch is the slowest but uses the least memory,
 # xformers_default is somewhere in between.
 
 
 ##Initilizations
-cfg.transformer_lm.weight_init = (
-    None  # weight initialization (None, gaussian or uniform)
-)
-cfg.transformer_lm.depthwise_init = (
-    None  # perform depthwise initialization (None, current, global)
-)
-cfg.transformer_lm.zero_bias_init = (
-    False  # initialize bias to zero if bias in linears and
-)
+# weight initialization (none, gaussian or uniform)
+cfg.transformer_lm.weight_init = "none"
+# perform depthwise initialization (none, current, global)
+cfg.transformer_lm.depthwise_init = "none"
+# initialize bias to zero if bias in linears and
+cfg.transformer_lm.zero_bias_init = False
 # if a weight_init method is used.
 
 

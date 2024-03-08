@@ -228,14 +228,17 @@ class LMModel(StreamingModule):
         audio_input_dim: int = 128,
         text_input_dim: int = 768,
         proj_input=False,
-        # attribute_dropout: tp.Dict[str, tp.Dict[str, float]] = {},
         two_step_cfg: bool = False,
         **kwargs
     ):
         super().__init__()
+        self.dim = dim
+        self.n_q = n_q
         self.cfg_coef = cfg_coef
         self.cfg_dropout = ClassifierFreeGuidanceDropout(p=cfg_dropout)
-        # self.att_dropout = AttributeDropout(p=attribute_dropout)
+        self.fuser = fuser
+        self.pattern_provider = pattern_provider
+
         # self.condition_provider = condition_provider
         self.audio_input_dim = audio_input_dim
         self.text_input_dim = text_input_dim
@@ -256,12 +259,9 @@ class LMModel(StreamingModule):
         self.mask_token_id = motion_tokenizer_params.mask_token_id
         self.pad_token_id = motion_tokenizer_params.pad_token_id
 
-        self.fuser = fuser
         # self.card = card
         embed_dim = motion_tokenizer_params.vocab_size  # self.card + 1
-        self.n_q = n_q
-        self.dim = dim
-        self.pattern_provider = pattern_provider
+
         self.two_step_cfg = two_step_cfg
         self.emb = nn.ModuleList(
             [ScaledEmbedding(embed_dim, dim, lr=emb_lr) for _ in range(n_q)]
@@ -469,11 +469,11 @@ class LMModel(StreamingModule):
         keep_only_valid_steps: bool = True,
         cond_drop_prob: float = None,
     ) -> LMOutput:
-        """Given an input tensor of codes [B, K, T] and list of conditions, runs the model
+        """Given an input tensor of codes [B, T, K] and list of conditions, runs the model
         forward using the specified codes interleaving pattern.
 
         Args:
-            codes (torch.Tensor): Input codes of shape [B, K, T] with B the batch size,
+            codes (torch.Tensor): Input codes of shape [B, T, K] with B the batch size,
                 K the number of codebooks and T the number of timesteps.
             conditions (list of ConditioningAttributes): conditionings to use when modeling
                 the given codes. Note that when evaluating multiple time with the same conditioning
@@ -495,7 +495,7 @@ class LMModel(StreamingModule):
                     not be considered as valid predictions because of invalid context.
         """
 
-        codes = inputs[0]
+        codes = inputs[0].permute(0, 2, 1)
         codes_mask = inputs[1]
         B, K, T = codes.shape
         codes = codes.contiguous()
@@ -868,7 +868,10 @@ class MotionGen(nn.Module):
         modeling = pattern_config.pop("modeling")
 
         pattern_provider = pattern_providers[modeling](
-            tranformer_config.n_q, **pattern_config
+            n_q=tranformer_config.n_q,
+            delays=pattern_config.delays,
+            flatten_first=pattern_config.flatten_first,
+            empty_initial=pattern_config.empty_initial,
         )
 
         self.model = LMModel(
@@ -876,8 +879,6 @@ class MotionGen(nn.Module):
             fuser=condition_fuser,
             **tranformer_config
         )
-
-   
 
     def _compute_cross_entropy(
         self, logits: torch.Tensor, targets: torch.Tensor, mask: torch.Tensor
@@ -927,8 +928,6 @@ class MotionGen(nn.Module):
 
         motions_or_ids = inputs[0]
         input_mask = inputs[1]
-
-        
 
         # with self.autocast:
         model_output = self.model.compute_predictions(inputs, condition_tensors=conditions, cond_drop_prob=cond_drop_prob)  # type: ignore
