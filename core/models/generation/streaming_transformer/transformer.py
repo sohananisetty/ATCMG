@@ -673,10 +673,10 @@ class StreamingTransformerLayer(nn.TransformerEncoderLayer):
         assert self.cross_attention is not None
         # queries are from src, keys and values from cross_attention_src.
         x = self.cross_attention(
-            src,
-            cross_attention_src,
-            cross_attention_src,
-            cross_key_padding_mask,
+            query=src,
+            key=cross_attention_src,
+            value=cross_attention_src,
+            key_padding_mask=cross_key_padding_mask,
             need_weights=False,
         )[0]
         return self.dropout_cross(x)  # type: ignore
@@ -714,7 +714,9 @@ class StreamingTransformerLayer(nn.TransformerEncoderLayer):
                 x = self.norm_cross(
                     x
                     + self.layer_scale_cross(
-                        self._cross_attention_block(src, cross_attention_src)
+                        self._cross_attention_block(
+                            src, cross_attention_src, cross_key_padding_mask
+                        )
                     )
                 )
             x = self.norm2(x + self.layer_scale_2(self._ff_block(x)))

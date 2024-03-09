@@ -12,16 +12,12 @@ import typing as tp
 import torch.nn.functional as F
 import torch
 from torch import nn
-from core import MotionTokenizerParams
-from core import pattern_providers
+from core import MotionTokenizerParams, pattern_providers
 from .streaming_transformer.streaming import StreamingModule, State
 from .streaming_transformer.transformer import StreamingTransformer, create_norm_fn
 from core.datasets.conditioner import (
     ConditionFuser,
     ClassifierFreeGuidanceDropout,
-    # AttributeDropout,
-    # ConditioningProvider,
-    # ConditioningAttributes,
     ConditionType,
 )
 from .streaming_transformer.codebooks_patterns import CodebooksPatternProvider
@@ -260,11 +256,13 @@ class LMModel(StreamingModule):
         self.pad_token_id = motion_tokenizer_params.pad_token_id
 
         # self.card = card
-        embed_dim = motion_tokenizer_params.vocab_size  # self.card + 1
+        self.vocab_size = (
+            motion_tokenizer_params.vocab_size
+        )  # embed_dim = self.card + 1
 
         self.two_step_cfg = two_step_cfg
         self.emb = nn.ModuleList(
-            [ScaledEmbedding(embed_dim, dim, lr=emb_lr) for _ in range(n_q)]
+            [ScaledEmbedding(self.vocab_size, dim, lr=emb_lr) for _ in range(n_q)]
         )
 
         self.project_input = (
@@ -414,20 +412,6 @@ class LMModel(StreamingModule):
 
             input_ = self.project_input(input_)
 
-        # if condition_tensors is None:
-        #     assert (
-        #         not self._is_streaming
-        #     ), "Conditions tensors should be precomputed when streaming."
-        #     # apply dropout modules
-        #     conditions = self.cfg_dropout(conditions)
-        #     conditions = self.att_dropout(conditions)
-        #     tokenized = self.condition_provider.tokenize(conditions)
-        #     # encode conditions and fuse, both have a streaming cache to not recompute when generating.
-        #     condition_tensors = self.condition_provider(tokenized)
-        # else:
-        #     assert (
-        #         not conditions
-        #     ), "Shouldn't pass both conditions and condition_tensors."
         condition_tensors = self.cfg_dropout(condition_tensors, cond_drop_prob)
 
         input_, cross_attention_input = self._prepare_inputs(
@@ -441,7 +425,7 @@ class LMModel(StreamingModule):
 
         out = self.transformer(
             x_,
-            # src_key_padding_mask=x_padding_mask,
+            src_key_padding_mask=x_padding_mask,
             cross_attention_src=context,
             cross_key_padding_mask=context_padding_mask,
             # src_mask=(self.attn_mask_per_stage[stage] if stage >= 0 else None),
@@ -462,8 +446,6 @@ class LMModel(StreamingModule):
     def compute_predictions(
         self,
         inputs: ConditionTensors,
-        # codes: torch.Tensor,
-        # conditions: tp.List[ConditioningAttributes],
         condition_tensors: tp.Optional[ConditionTensors] = None,
         stage: int = -1,
         keep_only_valid_steps: bool = True,
@@ -495,7 +477,7 @@ class LMModel(StreamingModule):
                     not be considered as valid predictions because of invalid context.
         """
 
-        codes = inputs[0].permute(0, 2, 1)
+        codes = inputs[0].permute(0, 2, 1)  # [B, T, K] -> [B, K , T]
         codes_mask = inputs[1]
         B, K, T = codes.shape
         codes = codes.contiguous()
@@ -512,14 +494,12 @@ class LMModel(StreamingModule):
         for i in range(K):
             new_codes_mask[:, i, i + 1 :] = codes_mask[:, 0 : T - i]
 
-        # sequence_mask = torch.where(
-        #     sequence_codes == self.special_token_id, False, True
-        # )
+        new_new_mask = new_codes_mask.sum(1) == K
 
         # apply model on pattern sequence
         model = self if self._fsdp is None else self._fsdp
         logits = model(
-            (sequence_codes, new_codes_mask),
+            (sequence_codes, new_new_mask.to(torch.bool)),
             condition_tensors,
             stage=stage,
             cond_drop_prob=cond_drop_prob,
@@ -533,6 +513,7 @@ class LMModel(StreamingModule):
         )
         logits = logits.permute(0, 2, 3, 1)  # [B, K, T, card]
         logits_mask = logits_mask[None, :, :].expand(B, -1, -1)  # [K, T] -> [B, K, T]
+        mask = new_codes_mask & logits_mask
         return LMOutput(logits, logits_mask)
 
     def _sample_next_token(

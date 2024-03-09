@@ -158,4 +158,4 @@ class MotionTokenizerParams:
 
     @property
     def vocab_size(self):
-        return self.mask_token_id + 1
+        return self.num_tokens + 2
