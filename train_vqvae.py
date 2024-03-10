@@ -1,6 +1,6 @@
 from configs.config import cfg, get_cfg_defaults
-from ctl.trainer_vq_simple import VQVAEMotionTrainer
 from core import MotionRep
+from ctl.trainer_vq_simple import VQVAEMotionTrainer
 
 
 def nb_joints(motion_rep):

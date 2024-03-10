@@ -4,13 +4,13 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
+import logging
+import typing as tp
+from abc import ABC, abstractmethod
 from collections import namedtuple
 from dataclasses import dataclass
 from functools import lru_cache
-import logging
-import typing as tp
 
-from abc import ABC, abstractmethod
 import torch
 
 LayoutCoord = namedtuple("LayoutCoord", ["t", "q"])  # (timestep, codebook index)

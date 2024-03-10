@@ -11,6 +11,7 @@ import torch
 import transformers
 import utils.vis_utils.plot_3d_global as plot_3d
 import wandb
+from core import MotionRep
 from core.datasets.conditioner import ConditionProvider
 from core.datasets.vq_dataset import load_dataset, simple_collate
 from core.models.loss import ReConsLoss
@@ -20,9 +21,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AdamW, get_scheduler
-
 from yacs.config import CfgNode
-from core import MotionRep
 
 
 def exists(val):

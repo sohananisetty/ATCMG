@@ -15,13 +15,13 @@ Unlike regular PyTorch Transformer, we make the hard choice that batches are fir
 
 import typing as tp
 
-from einops import rearrange
 import torch
 import torch.nn as nn
+from core.models.attend2 import Attend, Attention, CustomMHA
+from einops import rearrange, repeat
 from torch.nn import functional as F
 from torch.utils.checkpoint import checkpoint as torch_checkpoint
 from xformers import ops
-from einops import rearrange, repeat
 
 from .rope import RotaryEmbedding
 from .streaming import StreamingModule
@@ -195,6 +195,7 @@ class StreamingMultiheadAttention(StreamingModule):
         cross_attention: bool = False,
         safe_streaming: bool = True,
         qk_layer_norm: bool = False,
+        add_null_kv: bool = False,
         kv_repeat: int = 1,
         device=None,
         dtype=None,
@@ -224,21 +225,17 @@ class StreamingMultiheadAttention(StreamingModule):
 
         self.custom = _is_custom(custom, memory_efficient)
         if self.custom:
-            out_dim = embed_dim
-            assert num_heads % kv_repeat == 0
-            assert not cross_attention or kv_repeat == 1
-            num_kv = num_heads // kv_repeat
-            kv_dim = (embed_dim // num_heads) * num_kv
-            out_dim += 2 * kv_dim
-            in_proj = nn.Linear(embed_dim, out_dim, bias=bias, **factory_kwargs)
-            # We try to follow the default PyTorch MHA convention, to easily compare results.
-            self.in_proj_weight = in_proj.weight
-            self.in_proj_bias = in_proj.bias
-            if bias:
-                self.in_proj_bias.data.zero_()  # Following Pytorch convention
-            self.out_proj = nn.Linear(embed_dim, embed_dim, bias=bias, **factory_kwargs)
-            if bias:
-                self.out_proj.bias.data.zero_()
+
+            self.mha = CustomMHA(
+                dim=embed_dim,
+                heads=num_heads,
+                dropout=dropout,
+                causal=causal,
+                bias_att=bias,
+                add_null_kv=add_null_kv,
+                flash=True,
+            )
+
         else:
             assert not qk_layer_norm
             assert kv_repeat == 1
@@ -395,129 +392,20 @@ class StreamingMultiheadAttention(StreamingModule):
             attn_mask = self._get_mask(query.shape[1], query.device, query.dtype)
 
         if self.custom:
-            # custom implementation
-            assert need_weights is False
-            assert key_padding_mask is None
-            if self.cross_attention:
-                # Different queries, keys, values, we have to spit manually the weights
-                # before applying the linear.
-                dim = self.in_proj_weight.shape[0] // 3
-                if self.in_proj_bias is None:
-                    bias_q, bias_k, bias_v = None, None, None
-                else:
-                    bias_q = self.in_proj_bias[:dim]
-                    bias_k = self.in_proj_bias[dim : 2 * dim]
-                    bias_v = self.in_proj_bias[2 * dim :]
-                q = nn.functional.linear(query, self.in_proj_weight[:dim], bias_q)
-                # todo: when streaming, we could actually save k, v and check the shape actually match.
-                k = nn.functional.linear(
-                    key, self.in_proj_weight[dim : 2 * dim], bias_k
-                )
-                v = nn.functional.linear(value, self.in_proj_weight[2 * dim :], bias_v)
-                if self.qk_layer_norm is True:
-                    q = self.q_layer_norm(q)
-                    k = self.k_layer_norm(k)
-                q, k, v = [
-                    rearrange(x, f"b t (h d) -> {layout}", h=self.num_heads)
-                    for x in [q, k, v]
-                ]
-            else:
-                if not _is_profiled():
-                    # profiling breaks that propertysomehow.
-                    assert query is key, "specialized implementation"
-                    assert value is key, "specialized implementation"
-                projected = nn.functional.linear(
-                    query, self.in_proj_weight, self.in_proj_bias
-                )
-                if self.kv_repeat == 1:
-                    if time_dim == 2:
-                        bound_layout = "b h p t d"
-                    else:
-                        bound_layout = "b t p h d"
-                    packed = rearrange(
-                        projected,
-                        f"b t (p h d) -> {bound_layout}",
-                        p=3,
-                        h=self.num_heads,
-                    )
-                    q, k, v = ops.unbind(packed, dim=2)
-                else:
-                    embed_dim = self.embed_dim
-                    per_head_dim = embed_dim // self.num_heads
-                    kv_heads = self.num_heads // self.kv_repeat
-                    q = projected[:, :, :embed_dim]
-                    start = embed_dim
-                    end = start + per_head_dim * kv_heads
-                    k = projected[:, :, start:end]
-                    v = projected[:, :, end:]
-                    q = rearrange(q, f"b t (h d) -> {layout}", h=self.num_heads)
-                    k = rearrange(k, f"b t (h d) -> {layout}", h=kv_heads)
-                    v = rearrange(v, f"b t (h d) -> {layout}", h=kv_heads)
 
-                if self.qk_layer_norm is True:
-                    assert self.kv_repeat == 1
-                    q, k = [rearrange(x, f"{layout} -> b t (h d)") for x in [q, k]]
-                    q = self.q_layer_norm(q)
-                    k = self.k_layer_norm(k)
-                    q, k = [
-                        rearrange(x, f"b t (h d) -> {layout}", h=self.num_heads)
-                        for x in [q, k]
-                    ]
-                if self.rope:
-                    q, k = self._apply_rope(q, k)
-                k, v = self._complete_kv(k, v)
-                if self.kv_repeat > 1:
-                    k = expand_repeated_kv(k, self.kv_repeat, self.memory_efficient)
-                    v = expand_repeated_kv(v, self.kv_repeat, self.memory_efficient)
+            key, value = self._complete_kv(key, value)
+
             if self.attention_as_float32:
-                q, k, v = [x.float() for x in [q, k, v]]
-            if self.memory_efficient:
-                if custom_attn_mask:
-                    # When using a custom attn mask:
-                    # Move to query's device, repeat for each sample, remove align8 padding
-                    seq_len = query.shape[1]
-                    attn_mask = attn_mask.to(q.dtype)
-                    attn_mask = attn_mask.repeat((q.shape[0], 1, 1, 1))
-                    attn_mask = attn_mask[..., :seq_len, :seq_len]
+                query, key, value = [x.float() for x in [query, key, value]]
 
-                p = self.dropout if self.training else 0
-                if _efficient_attention_backend == "torch":
-                    x = torch.nn.functional.scaled_dot_product_attention(
-                        q, k, v, is_causal=attn_mask is not None, dropout_p=p
-                    )
-                else:
-                    x = ops.memory_efficient_attention(q, k, v, attn_mask, p=p)
-            else:
-                # We include the dot product as float32, for consistency
-                # with the other implementations that include that step
-                # as part of the attention. Note that when using `autocast`,
-                # the einsums would be done as bfloat16, but the softmax
-                # would be done as bfloat16, so `attention_as_float32` will
-                # extend a bit the range of operations done in float32,
-                # although this should make no difference.
-                q = q / q.shape[-1] ** 0.5
-                key_layout = layout.replace("t", "k")
-                query_layout = layout
-                if (
-                    self._is_streaming
-                    and self.safe_streaming
-                    and q.device.type == "cuda"
-                ):
-                    with torch.autocast(device_type=q.device.type, dtype=torch.float32):
-                        pre_w = torch.einsum(
-                            f"{query_layout},{key_layout}-> b h t k", q, k
-                        )
-                else:
-                    pre_w = torch.einsum(f"{query_layout},{key_layout}-> b h t k", q, k)
-                if attn_mask is not None:
-                    pre_w = pre_w + attn_mask
-                w = torch.softmax(pre_w, dim=-1)
-                w = F.dropout(w, self.dropout, training=self.training).to(v)
-                # Key and value have the same format.
-                x = torch.einsum(f"b h t k, {key_layout} -> {layout}", w, v)
+            assert key is value, "only same key value suppoted"
+            x = self.mha(
+                query,
+                key,
+                value,
+                key_padding_mask,
+            )
             x = x.to(dtype)
-            x = rearrange(x, f"{layout} -> b t (h d)", h=self.num_heads)
-            x = self.out_proj(x)
         else:
             key, value = self._complete_kv(key, value)
             if self.attention_as_float32:
@@ -611,6 +499,8 @@ class StreamingTransformerLayer(nn.TransformerEncoderLayer):
         # Redefine self_attn to our streaming multi-head attention
         self.d_model = d_model
         self.num_heads = num_heads
+        self.custom = custom
+        self.add_null_kv = add_null_kv
         attn_kwargs: tp.Dict[str, tp.Any] = {
             "embed_dim": d_model,
             "num_heads": num_heads,
@@ -626,8 +516,6 @@ class StreamingTransformerLayer(nn.TransformerEncoderLayer):
             rope=rope,
             qk_layer_norm=qk_layer_norm,
             kv_repeat=kv_repeat,
-            # custom=True,
-            # memory_efficient=False,
             **attn_kwargs,
             **factory_kwargs,
         )  # type: ignore
@@ -651,13 +539,13 @@ class StreamingTransformerLayer(nn.TransformerEncoderLayer):
 
         self.cross_attention: tp.Optional[nn.Module] = None
         if cross_attention:
-            self.add_null_kv = add_null_kv
-            self.null_kv = nn.Parameter(torch.randn(2, 1, d_model))
+            if not self.custom:
+
+                self.null_kv = nn.Parameter(torch.randn(2, 1, d_model))
             self.cross_attention = StreamingMultiheadAttention(
                 cross_attention=True,
                 qk_layer_norm=qk_layer_norm_cross,
-                # custom=False,
-                # memory_efficient=False,
+                add_null_kv=True,
                 **attn_kwargs,
                 **factory_kwargs,
             )
@@ -683,7 +571,7 @@ class StreamingTransformerLayer(nn.TransformerEncoderLayer):
     ) -> torch.Tensor:
         assert self.cross_attention is not None
 
-        if self.add_null_kv:
+        if self.add_null_kv and not self.custom:
             nk, nv = self.null_kv
             nk, nv = map(lambda t: repeat(t, "1 d -> b 1 d", b=src.shape[0]), (nk, nv))
 
@@ -905,7 +793,8 @@ class StreamingTransformer(StreamingModule):
         elif method == "torch":
             return torch_checkpoint(layer, *args, use_reentrant=False, **kwargs)
         elif method.startswith("xformers"):
-            from xformers.checkpoint_fairinternal import checkpoint, _get_default_policy
+            from xformers.checkpoint_fairinternal import (_get_default_policy,
+                                                          checkpoint)
 
             if method == "xformers_default":
                 # those operations will be saved, and not recomputed.
@@ -970,7 +859,8 @@ class StreamingTransformer(StreamingModule):
 
 def _verify_xformers_memory_efficient_compat():
     try:
-        from xformers.ops import memory_efficient_attention, LowerTriangularMask  # noqa
+        from xformers.ops import (LowerTriangularMask,  # noqa
+                                  memory_efficient_attention)
     except ImportError:
         raise ImportError(
             "xformers is not installed. Please install it and try again.\n"
@@ -985,10 +875,8 @@ def _verify_xformers_memory_efficient_compat():
 
 def _verify_xformers_internal_compat():
     try:
-        from xformers.checkpoint_fairinternal import (
-            checkpoint,
-            _get_default_policy,
-        )  # noqa
+        from xformers.checkpoint_fairinternal import (  # noqa
+            _get_default_policy, checkpoint)
     except ImportError:
         raise ImportError(
             "Francisco's fairinternal xformers is not installed. Please install it and try again.\n"

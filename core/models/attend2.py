@@ -6,15 +6,8 @@ from functools import partial, wraps
 import torch
 import torch.nn.functional as F
 from core import AttentionParams
-from core.models.utils import (
-    LayerNorm,
-    create_causal_mask,
-    default,
-    dropout_seq,
-    exists,
-    l2norm,
-    print_once,
-)
+from core.models.utils import (LayerNorm, create_causal_mask, default,
+                               dropout_seq, exists, l2norm, print_once)
 from einops import rearrange, repeat
 from packaging import version
 from torch import einsum, nn
@@ -50,6 +43,23 @@ class Attend(nn.Module):
         assert not (
             flash and version.parse(torch.__version__) < version.parse("2.0.0")
         ), "in order to use flash attention, you must be using pytorch 2.0 or above"
+
+        device_properties = torch.cuda.get_device_properties(torch.device("cuda"))
+
+        if device_properties.major == 8 and device_properties.minor == 0:
+            print_once(
+                "A100 GPU detected, using flash attention if input tensor is on cuda"
+            )
+            sdp_kwargs = dict(
+                enable_flash=True, enable_math=False, enable_mem_efficient=False
+            )
+        else:
+            print_once(
+                "Non-A100 GPU detected, using math or mem efficient attention if input tensor is on cuda"
+            )
+            sdp_kwargs = dict(
+                enable_flash=False, enable_math=True, enable_mem_efficient=True
+            )
 
         self.sdp_kwargs = sdp_kwargs
 
@@ -223,6 +233,107 @@ class Attend(nn.Module):
         return out
 
 
+class CustomMHA(nn.Module):
+    def __init__(
+        self,
+        dim: int = 768,
+        heads: int = 8,
+        causal: bool = False,
+        qk_norm: bool = False,
+        qk_norm_scale: int = 8,
+        dropout: float = 0.0,
+        add_null_kv: bool = False,
+        flash: bool = False,
+        bias_att: bool = False,
+        **kwargs,
+    ):
+        super().__init__()
+        self.dim = dim
+        self.heads = heads
+        self.causal = causal
+        self.qk_norm = qk_norm
+        self.flash = flash
+        self.qk_norm_scale = qk_norm_scale
+        self.add_null_kv = add_null_kv
+        self.dropout = dropout
+
+        self.dim_head = self.dim // self.heads
+        self.scale = self.dim_head**-0.5
+
+        inner_dim = self.dim_head * self.heads
+
+        self.norm = LayerNorm(self.dim)
+
+        self.attend = Attend(
+            dropout=self.dropout,
+            scale=self.qk_norm_scale if self.qk_norm else self.scale,
+            causal=self.causal,
+            qk_norm=self.qk_norm,
+            flash=self.flash,
+        )
+
+        self.null_kv = nn.Parameter(torch.randn(2, self.heads, 1, self.dim_head))
+
+        self.to_q = nn.Linear(self.dim, inner_dim, bias=bias_att)
+        self.to_kv = nn.Linear(self.dim, inner_dim * 2, bias=bias_att)
+
+        self.q_scale = nn.Parameter(torch.ones(self.dim_head))
+        self.k_scale = nn.Parameter(torch.ones(self.dim_head))
+
+        self.to_out = nn.Linear(inner_dim, self.dim, bias=bias_att)
+
+    def forward(self, q, k, v, key_padding_mask=None, rel_pos=None):
+        n = q.shape[-2]
+        h = self.heads
+
+        assert k is v, "only same key value suppoted"
+
+        if exists(key_padding_mask):
+            key_padding_mask = rearrange(key_padding_mask, "b j -> b 1 1 j")
+
+        q = self.norm(q)
+
+        q, k, v = (self.to_q(q), *self.to_kv(k).chunk(2, dim=-1))
+
+        q, k, v = map(lambda t: rearrange(t, "b n (h d) -> b h n d", h=h), (q, k, v))
+
+        if self.add_null_kv:
+            nk, nv = self.null_kv
+            nk, nv = map(
+                lambda t: repeat(t, "h 1 d -> b h 1 d", b=q.shape[0]), (nk, nv)
+            )
+
+            k = torch.cat((nk, k), dim=-2)
+            v = torch.cat((nv, v), dim=-2)
+
+            key_padding_mask = repeat(key_padding_mask, "b 1 1 j -> b h i j", h=h, i=n)
+
+            key_padding_mask = F.pad(key_padding_mask, (1, 0), value=True)
+
+            ## When no context
+            if key_padding_mask.shape[-1] == 2:
+                key_padding_mask = key_padding_mask[..., :1]
+                k = k[..., :1, :]
+                v = v[..., :1, :]
+
+        if self.qk_norm:
+            q, k = map(l2norm, (q, k))
+            q = q * self.q_scale
+            k = k * self.k_scale
+
+        i, j = map(lambda t: t.shape[-2], (q, k))
+        attn_bias = None
+        if exists(rel_pos):
+            attn_bias = rel_pos(i, j)
+
+        # print(q.shape, k.shape, v.shape, input_mask.shape)
+
+        out = self.attend(q, k, v, mask=key_padding_mask, attn_bias=attn_bias)
+
+        out = rearrange(out, "b h n d -> b n (h d)")
+        return self.to_out(out)
+
+
 class Attention(nn.Module):
     def __init__(
         self,
@@ -235,6 +346,7 @@ class Attention(nn.Module):
         cross_attn_tokens_dropout: float = 0.0,
         add_null_kv: bool = False,
         flash: bool = False,
+        bias_att: bool = False,
         **kwargs,
     ):
         super().__init__()
@@ -265,13 +377,13 @@ class Attention(nn.Module):
 
         self.null_kv = nn.Parameter(torch.randn(2, self.heads, 1, self.dim_head))
 
-        self.to_q = nn.Linear(self.dim, inner_dim, bias=False)
-        self.to_kv = nn.Linear(self.dim, inner_dim * 2, bias=False)
+        self.to_q = nn.Linear(self.dim, inner_dim, bias=bias_att)
+        self.to_kv = nn.Linear(self.dim, inner_dim * 2, bias=bias_att)
 
         self.q_scale = nn.Parameter(torch.ones(self.dim_head))
         self.k_scale = nn.Parameter(torch.ones(self.dim_head))
 
-        self.to_out = nn.Linear(inner_dim, self.dim, bias=False)
+        self.to_out = nn.Linear(inner_dim, self.dim, bias=bias_att)
 
     def forward(self, x, mask=None, context=None, context_mask=None, rel_pos=None):
         n = x.shape[-2]

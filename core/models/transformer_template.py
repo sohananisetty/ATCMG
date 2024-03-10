@@ -9,13 +9,10 @@ from typing import Callable, List, Optional, Union
 import torch
 import torch.nn.functional as F
 from core.models.attend import Attend, Attention
-from core.param_dataclasses import (
-    AttentionParams,
-    PositionalEmbeddingParams,
-    PositionalEmbeddingType,
-    TransformerParams,
-)
-from core.models.utils import FeedForward, LayerNorm, default, exists, get_obj_from_str
+from core.models.utils import (FeedForward, LayerNorm, default, exists,
+                               get_obj_from_str)
+from core.param_dataclasses import (AttentionParams, PositionalEmbeddingParams,
+                                    PositionalEmbeddingType, TransformerParams)
 from einops import rearrange, repeat
 from torch import einsum, nn
 from tqdm.auto import tqdm

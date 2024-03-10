@@ -1,10 +1,10 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import utils.rotation_conversions as geometry
-from core.models.smpl.body_model import BodyModel
 from core import MotionRep
-import numpy as np
+from core.models.smpl.body_model import BodyModel
 
 
 class ReConsLoss(nn.Module):

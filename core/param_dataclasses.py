@@ -2,14 +2,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from functools import partial
 from typing import Dict, List, Optional
-from core.models.generation.streaming_transformer.codebooks_patterns import (
-    ParallelPatternProvider,
-    DelayedPatternProvider,
-    UnrolledPatternProvider,
-    CoarseFirstPattern,
-    MusicLMPattern,
-)
+
 import torch
+from core.models.generation.streaming_transformer.codebooks_patterns import (
+    CoarseFirstPattern, DelayedPatternProvider, MusicLMPattern,
+    ParallelPatternProvider, UnrolledPatternProvider)
 
 
 class PositionalEmbeddingType(Enum):

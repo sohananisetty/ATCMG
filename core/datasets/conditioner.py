@@ -1,4 +1,5 @@
 import typing as tp
+from copy import deepcopy
 from typing import Any, Dict, List, Optional, Union
 
 import einops
@@ -8,7 +9,7 @@ import torch.nn.functional as F
 from core.param_dataclasses import AudioRep, MotionRep, TextRep
 from torch import nn
 from transformers.feature_extraction_utils import BatchFeature
-from copy import deepcopy
+
 from .text_encoders import BERTConditioner, ClipConditioner, T5Conditioner
 
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask

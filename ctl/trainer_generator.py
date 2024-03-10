@@ -12,21 +12,23 @@ import torch
 import transformers
 import utils.vis_utils.plot_3d_global as plot_3d
 import wandb
+from configs.config import get_cfg_defaults as get_cfg_defaults3
 from configs.config_t2m import cfg, get_cfg_defaults
+from core import AudioRep, MotionRep, TextRep
 from core.datasets.conditioner import ConditionProvider
 from core.datasets.multimodal_dataset import load_dataset_gen, simple_collate
-from core.models.utils import instantiate_from_config, get_obj_from_str
+from core.models.resnetVQ.vqvae import HumanVQVAE
+from core.models.utils import get_obj_from_str, instantiate_from_config
 from core.optimizer import get_optimizer
 from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AdamW, get_scheduler
-from utils.motion_processing.hml_process import recover_from_ric, recover_root_rot_pos
+from utils.motion_processing.hml_process import (recover_from_ric,
+                                                 recover_root_rot_pos)
 from yacs.config import CfgNode
-from core import MotionRep, AudioRep, TextRep
 
-from configs.config import get_cfg_defaults as get_cfg_defaults3
-from core.models.resnetVQ.vqvae import HumanVQVAE
+
 def cycle(dl):
     while True:
         for data in dl:
@@ -72,15 +74,18 @@ class MotionMuseTrainer(nn.Module):
         target = self.model_args.pop("target")
 
         self.motion_muse = get_obj_from_str(target)(self.model_args).to(self.device)
-        
-        
+
         vcfg = get_cfg_defaults3()
-        vcfg.merge_from_file("/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gprvc/vqvae_body_gprvc.yaml")
+        vcfg.merge_from_file(
+            "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gprvc/vqvae_body_gprvc.yaml"
+        )
         vqvae_args = vcfg.vqvae
         vqvae_args.nb_joints = 22
         vqvae_args.motion_dim = 263
         self.vqvae_model = HumanVQVAE(vqvae_args).to(self.device).eval()
-        self.vqvae_model.load("/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_generation/vqvae_motion.pt")
+        self.vqvae_model.load(
+            "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_generation/vqvae_motion.pt"
+        )
 
         # self.motion_muse = instantiate_from_config(self.model_args).to(self.device)
 
@@ -256,17 +261,13 @@ class MotionMuseTrainer(nn.Module):
 
             loss = self.motion_muse((motions, motion_mask), conditions)
 
-          
-
             loss = loss / self.grad_accum_every
 
             loss.backward()
 
             accum_log(
                 logs,
-                dict(
-                    loss=loss.detach().cpu()
-                ),
+                dict(loss=loss.detach().cpu()),
             )
 
         self.optim.step()
@@ -375,21 +376,16 @@ class MotionMuseTrainer(nn.Module):
                 inputs = self.to_device(inputs)
                 conditions = self.to_device(conditions)
 
-                motions = inputs["motion"][0].squeeze().to(torch.long)[None] ###  1 n
+                motions = inputs["motion"][0].squeeze().to(torch.long)[None]  ###  1 n
                 motion_mask = inputs["motion"][1]
                 gt_len = int(sum(motion_mask[0]))
-                
-                gt_motion  = self.vqvae_model.decode(motions[: , :gt_len])
-                
-                
-                
-                gen_ids = self.motion_muse.generate(conditions)
-                
-                pred_motion  = self.vqvae_model.decode(gen_ids)
-                
-                
 
-                
+                gt_motion = self.vqvae_model.decode(motions[:, :gt_len])
+
+                gen_ids = self.motion_muse.generate(conditions)
+
+                pred_motion = self.vqvae_model.decode(gen_ids)
+
                 dset.render_hml(
                     gt_motion.squeeze().cpu(),
                     os.path.join(
@@ -403,7 +399,7 @@ class MotionMuseTrainer(nn.Module):
                 #         save_file, os.path.basename(name).split(".")[0] + "_pred.gif"
                 #     ),
                 # )
-                
+
                 dset.render_hml(
                     pred_motion.squeeze().cpu(),
                     os.path.join(

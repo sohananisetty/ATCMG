@@ -4,26 +4,25 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-from dataclasses import dataclass
-from functools import partial
 import logging
 import math
 import typing as tp
-import torch.nn.functional as F
+from dataclasses import dataclass
+from functools import partial
+
 import torch
-from torch import nn
+import torch.nn.functional as F
 from core import MotionTokenizerParams, pattern_providers
-from .streaming_transformer.streaming import StreamingModule, State
-from .streaming_transformer.transformer import StreamingTransformer, create_norm_fn
-from core.datasets.conditioner import (
-    ConditionFuserStreamer,
-    ClassifierFreeGuidanceDropout,
-    ConditionType,
-)
-from .streaming_transformer.codebooks_patterns import CodebooksPatternProvider
+from core.datasets.conditioner import (ClassifierFreeGuidanceDropout,
+                                       ConditionFuserStreamer, ConditionType)
+from core.models.utils import TorchAutocast
+from torch import nn
 
 from .streaming_transformer.activations import get_activation_fn
-from core.models.utils import TorchAutocast
+from .streaming_transformer.codebooks_patterns import CodebooksPatternProvider
+from .streaming_transformer.streaming import State, StreamingModule
+from .streaming_transformer.transformer import (StreamingTransformer,
+                                                create_norm_fn)
 
 
 def multinomial(
@@ -206,7 +205,7 @@ class LMModel(StreamingModule):
         self,
         pattern_provider: CodebooksPatternProvider,
         # condition_provider: ConditioningProvider,
-        fuser: ConditionFuser,
+        fuser: ConditionFuserStreamer,
         n_q: int = 3,
         card: int = 1024,
         dim: int = 128,

@@ -1,29 +1,27 @@
 import math
 import pathlib
+from copy import deepcopy
 from functools import partial
 from pathlib import Path
 from random import random
-from typing import Callable, List, Optional, Dict, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
-from core import (
-    AttentionParams,
-    PositionalEmbeddingParams,
-    PositionalEmbeddingType,
-    TranslationTransformerParams,
-)
-from core.datasets.conditioner import ConditionFuser, ClassifierFreeGuidanceDropout
+from core import (AttentionParams, MotionTokenizerParams,
+                  PositionalEmbeddingParams, PositionalEmbeddingType,
+                  TranslationTransformerParams)
+from core.datasets.conditioner import (ClassifierFreeGuidanceDropout,
+                                       ConditionFuser)
 from core.models.attend2 import Attend, Attention
-from core.models.utils import FeedForward, LayerNorm, default, exists, get_obj_from_str
+from core.models.resnetVQ.vqvae import HumanVQVAE
+from core.models.utils import (FeedForward, LayerNorm, default, exists,
+                               get_obj_from_str)
 from einops import rearrange, repeat
 from torch import einsum, nn
 from tqdm.auto import tqdm
 from yacs.config import CfgNode as CN
-from copy import deepcopy
-from core import MotionTokenizerParams
-from core.models.resnetVQ.vqvae import HumanVQVAE
 
 ConditionType = Tuple[torch.Tensor, torch.Tensor]
 # helpers

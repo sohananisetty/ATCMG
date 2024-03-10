@@ -8,12 +8,12 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
+import utils.vis_utils.plot_3d_global as plot_3d
 from core import Motion, MotionRep
 from core.models.utils import default
 from torch.utils import data
 from tqdm import tqdm
 from utils.motion_processing.quaternion import qinv, qrot, quaternion_to_cont6d
-import utils.vis_utils.plot_3d_global as plot_3d
 
 from .kinematics import getSkeleton
 

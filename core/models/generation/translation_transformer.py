@@ -9,16 +9,13 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.nn.functional as F
-from core import (
-    AttentionParams,
-    PositionalEmbeddingParams,
-    PositionalEmbeddingType,
-    TranslationTransformerOutput,
-    TranslationTransformerParams,
-)
+from core import (AttentionParams, PositionalEmbeddingParams,
+                  PositionalEmbeddingType, TranslationTransformerOutput,
+                  TranslationTransformerParams)
 from core.datasets.conditioner import ConditionFuser
 from core.models.attend import Attend, Attention
-from core.models.utils import FeedForward, LayerNorm, default, exists, get_obj_from_str
+from core.models.utils import (FeedForward, LayerNorm, default, exists,
+                               get_obj_from_str)
 from einops import rearrange, repeat
 from torch import einsum, nn
 from tqdm.auto import tqdm

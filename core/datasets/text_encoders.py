@@ -7,17 +7,9 @@ import clip
 import torch
 import torch.nn as nn
 from core.models.utils import TorchAutocast
-from transformers import (
-    AutoTokenizer,
-    BertConfig,
-    BertForMaskedLM,
-    BertModel,
-    T5Config,
-    T5EncoderModel,
-    T5Tokenizer,
-    CLIPTokenizer,
-    CLIPTextModelWithProjection,
-)
+from transformers import (AutoTokenizer, BertConfig, BertForMaskedLM,
+                          BertModel, CLIPTextModelWithProjection,
+                          CLIPTokenizer, T5Config, T5EncoderModel, T5Tokenizer)
 
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
 

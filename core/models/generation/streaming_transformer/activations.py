@@ -4,10 +4,11 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
+from typing import Callable, Union
+
 import torch
 import torch.nn as nn
 from torch import Tensor
-from typing import Union, Callable
 
 
 class CustomGLU(nn.Module):
@@ -30,6 +31,7 @@ class CustomGLU(nn.Module):
         >>> input = torch.randn(4, 2)
         >>> output = m(input)
     """
+
     def __init__(self, activation: nn.Module, dim: int = -1):
         super(CustomGLU, self).__init__()
         self.dim = dim
@@ -49,6 +51,7 @@ class SwiGLU(CustomGLU):
     Args:
         dim (int): the dimension on which to split the input. Default: -1
     """
+
     def __init__(self, dim: int = -1):
         super(SwiGLU, self).__init__(nn.SiLU(), dim)
 
@@ -61,6 +64,7 @@ class GeGLU(CustomGLU):
     Args:
         dim (int): the dimension on which to split the input. Default: -1
     """
+
     def __init__(self, dim: int = -1):
         super(GeGLU, self).__init__(nn.GELU(), dim)
 
@@ -73,6 +77,7 @@ class ReGLU(CustomGLU):
     Args:
         dim (int): the dimension on which to split the input. Default: -1
     """
+
     def __init__(self, dim: int = -1):
         super(ReGLU, self).__init__(nn.ReLU(), dim)
 
