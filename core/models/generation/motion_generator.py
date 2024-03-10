@@ -285,7 +285,7 @@ class Transformer(nn.Module):
 
         self.condition_fuser = ConditionFuser(fuse_method)
 
-        self.cfg_dropout = ClassifierFreeGuidanceDropout()
+        self.cfg_dropout = ClassifierFreeGuidanceDropout(p=self.cond_dropout)
         self.emb_dropout = nn.Dropout(emb_dropout)
 
         self.project_audio = (
@@ -306,13 +306,6 @@ class Transformer(nn.Module):
     def _prepare_inputs(self, input, conditions):
         audio_embed = self.project_audio(conditions["audio"][0])
         text_embed = self.project_text(conditions["text"][0])
-        # conditions["audio"] = (audio_embed, conditions["audio"][1])
-        # conditions["text"] = (text_embed, conditions["text"][1])
-
-        # {
-        #     "text": (text_embed, conditions["text"][1]),
-        #     "audio": (audio_embed, conditions["audio"][1]),
-        # }
 
         inputs_, cross_inputs = self.condition_fuser(
             input,

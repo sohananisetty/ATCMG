@@ -17,6 +17,14 @@ import utils.vis_utils.plot_3d_global as plot_3d
 
 from .kinematics import getSkeleton
 
+# root_rot_velocity (B, seq_len, 1)
+# root_linear_velocity (B, seq_len, 2)
+# root_y (B, seq_len, 1)
+# ric_data (B, seq_len, (joint_num - 1)*3)
+# rot_data (B, seq_len, (joint_num - 1)*6)
+# local_velocity (B, seq_len, joint_num*3)
+# foot contact (B, seq_len, 4)
+
 
 class Motion2Positions:
 

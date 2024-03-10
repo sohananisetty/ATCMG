@@ -615,7 +615,9 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
 
 
 def simple_collate(
-    samples: List[Tuple[torch.Tensor, str]], conditioner: ConditionProvider
+    samples: List[Tuple[torch.Tensor, str]],
+    conditioner: ConditionProvider,
+    permute: bool = False,
 ) -> Dict[str, torch.Tensor]:
     motions = []
     texts = []
@@ -639,6 +641,12 @@ def simple_collate(
         raw_motion=motions,
         raw_text=texts,
     )
+
+    if permute:
+        inputs["motion"] = (
+            inputs["motion"][0].permute(0, 2, 1).to(torch.long),
+            inputs["motion"][1].to(torch.bool),
+        )  # [B, T, K] -> [B, K , T]
 
     inputs["names"] = np.array(names)
     inputs["texts"] = np.array(texts)

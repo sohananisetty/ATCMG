@@ -96,7 +96,7 @@ cfg.transformer_lm.hidden_scale = 4
 
 cfg.transformer_lm.n_q = 3  # number of streams to model
 cfg.transformer_lm.card = 1024
-cfg.transformer_lm.dropout = 0.0
+cfg.transformer_lm.dropout = 0.0  ## Dropout probability on attn_output_weights
 cfg.transformer_lm.emb_lr = None
 cfg.transformer_lm.activation = "gelu"
 cfg.transformer_lm.norm_first = True  # use pre-norm instead of post-norm
@@ -105,7 +105,7 @@ cfg.transformer_lm.bias_attn = True  # use bias for the attention
 cfg.transformer_lm.bias_proj = True  # use bias for the output projections
 cfg.transformer_lm.past_context = None
 cfg.transformer_lm.causal = True
-
+cfg.transformer_lm.add_null_kv = False
 
 ## CFG
 cfg.transformer_lm.cfg_dropout = 0.0

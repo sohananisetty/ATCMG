@@ -21,6 +21,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 from torch.utils.checkpoint import checkpoint as torch_checkpoint
 from xformers import ops
+from einops import rearrange, repeat
 
 from .rope import RotaryEmbedding
 from .streaming import StreamingModule
@@ -591,6 +592,7 @@ class StreamingTransformerLayer(nn.TransformerEncoderLayer):
         attention_dropout: tp.Optional[float] = None,
         kv_repeat: int = 1,
         norm: str = "layer_norm",
+        add_null_kv: bool = False,
         device=None,
         dtype=None,
         **kwargs,
@@ -607,6 +609,8 @@ class StreamingTransformerLayer(nn.TransformerEncoderLayer):
         )
         factory_kwargs = {"device": device, "dtype": dtype}
         # Redefine self_attn to our streaming multi-head attention
+        self.d_model = d_model
+        self.num_heads = num_heads
         attn_kwargs: tp.Dict[str, tp.Any] = {
             "embed_dim": d_model,
             "num_heads": num_heads,
@@ -622,9 +626,12 @@ class StreamingTransformerLayer(nn.TransformerEncoderLayer):
             rope=rope,
             qk_layer_norm=qk_layer_norm,
             kv_repeat=kv_repeat,
+            # custom=True,
+            # memory_efficient=False,
             **attn_kwargs,
             **factory_kwargs,
         )  # type: ignore
+        self.dropout = nn.Dropout(dropout)
         # Redefine feedforward layers to expose bias parameter
         self.linear1 = nn.Linear(
             d_model, dim_feedforward, bias=bias_ff, **factory_kwargs
@@ -644,9 +651,13 @@ class StreamingTransformerLayer(nn.TransformerEncoderLayer):
 
         self.cross_attention: tp.Optional[nn.Module] = None
         if cross_attention:
+            self.add_null_kv = add_null_kv
+            self.null_kv = nn.Parameter(torch.randn(2, 1, d_model))
             self.cross_attention = StreamingMultiheadAttention(
                 cross_attention=True,
                 qk_layer_norm=qk_layer_norm_cross,
+                # custom=False,
+                # memory_efficient=False,
                 **attn_kwargs,
                 **factory_kwargs,
             )
@@ -671,6 +682,29 @@ class StreamingTransformerLayer(nn.TransformerEncoderLayer):
         cross_key_padding_mask: tp.Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         assert self.cross_attention is not None
+
+        if self.add_null_kv:
+            nk, nv = self.null_kv
+            nk, nv = map(lambda t: repeat(t, "1 d -> b 1 d", b=src.shape[0]), (nk, nv))
+
+            k = torch.cat((nk, cross_attention_src), dim=-2)
+            v = torch.cat((nv, cross_attention_src), dim=-2)
+
+            kv_mask = F.pad(cross_key_padding_mask, (1, 0), value=False)
+            if kv_mask.shape[-1] == 2:
+                kv_mask = kv_mask[..., :1]
+                k = k[..., :1, :]
+                v = v[..., :1, :]
+
+            x = self.cross_attention(
+                query=src,
+                key=k,
+                value=v,
+                key_padding_mask=kv_mask,
+                need_weights=False,
+            )[0]
+            return self.dropout_cross(x)
+
         # queries are from src, keys and values from cross_attention_src.
         x = self.cross_attention(
             query=src,
@@ -680,6 +714,22 @@ class StreamingTransformerLayer(nn.TransformerEncoderLayer):
             need_weights=False,
         )[0]
         return self.dropout_cross(x)  # type: ignore
+
+    def _self_attention_block(
+        self,
+        src: torch.Tensor,
+        key_padding_mask: tp.Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+
+        # queries are from src, keys and values from cross_attention_src.
+        x = self.self_attn(
+            query=src,
+            key=src,
+            value=src,
+            key_padding_mask=key_padding_mask,
+            need_weights=False,
+        )[0]
+        return self.dropout(x)  # type: ignore
 
     def forward(
         self,
@@ -776,6 +826,7 @@ class StreamingTransformer(StreamingModule):
         memory_efficient: bool = False,
         attention_as_float32: bool = False,
         cross_attention: bool = False,
+        add_null_kv: bool = False,
         layer_scale: tp.Optional[float] = None,
         positional_embedding: str = "sin",
         max_period: float = 10_000,
@@ -832,6 +883,7 @@ class StreamingTransformer(StreamingModule):
                     memory_efficient=memory_efficient,
                     attention_as_float32=attention_as_float32,
                     cross_attention=cross_attention,
+                    add_null_kv=add_null_kv,
                     layer_scale=layer_scale,
                     rope=self.rope,
                     device=device,

@@ -16,7 +16,7 @@ from core import MotionTokenizerParams, pattern_providers
 from .streaming_transformer.streaming import StreamingModule, State
 from .streaming_transformer.transformer import StreamingTransformer, create_norm_fn
 from core.datasets.conditioner import (
-    ConditionFuser,
+    ConditionFuserStreamer,
     ClassifierFreeGuidanceDropout,
     ConditionType,
 )
@@ -219,6 +219,7 @@ class LMModel(StreamingModule):
         weight_init: tp.Optional[str] = None,
         depthwise_init: tp.Optional[str] = None,
         zero_bias_init: bool = False,
+        # add_zero_attn_cross: bool = False,
         cfg_dropout: float = 0,
         cfg_coef: float = 1.0,
         audio_input_dim: int = 128,
@@ -422,6 +423,8 @@ class LMModel(StreamingModule):
         x_padding_mask = ~input_[1]
         context = cross_attention_input[0]
         context_padding_mask = ~cross_attention_input[1]
+        # print(context.shape, context_padding_mask, context_padding_mask.shape)
+        # print(x_padding_mask.shape, x_padding_mask)
 
         out = self.transformer(
             x_,
@@ -477,7 +480,7 @@ class LMModel(StreamingModule):
                     not be considered as valid predictions because of invalid context.
         """
 
-        codes = inputs[0].permute(0, 2, 1)  # [B, T, K] -> [B, K , T]
+        codes = inputs[0]
         codes_mask = inputs[1]
         B, K, T = codes.shape
         codes = codes.contiguous()
@@ -494,6 +497,11 @@ class LMModel(StreamingModule):
         for i in range(K):
             new_codes_mask[:, i, i + 1 :] = codes_mask[:, 0 : T - i]
 
+        # print(new_codes_mask.shape)
+
+        # print(new_codes_mask)
+        # print(new_codes_mask.sum(1))
+
         new_new_mask = new_codes_mask.sum(1) == K
 
         # apply model on pattern sequence
@@ -504,6 +512,7 @@ class LMModel(StreamingModule):
             stage=stage,
             cond_drop_prob=cond_drop_prob,
         )  # [B, K, S, card]
+        # print(logits)
         # map back the logits on pattern sequence to logits on original codes: [B, K, S, card] -> [B, K, T, card]
         # and provide the corresponding mask over invalid positions of tokens
         logits = logits.permute(0, 3, 1, 2)  # [B, card, K, S]
@@ -513,7 +522,7 @@ class LMModel(StreamingModule):
         )
         logits = logits.permute(0, 2, 3, 1)  # [B, K, T, card]
         logits_mask = logits_mask[None, :, :].expand(B, -1, -1)  # [K, T] -> [B, K, T]
-        mask = new_codes_mask & logits_mask
+        # mask = new_codes_mask & logits_mask
         return LMOutput(logits, logits_mask)
 
     def _sample_next_token(
@@ -845,7 +854,7 @@ class MotionGen(nn.Module):
         fuse_method = fuse_config.pop("fuse_method")
         if isinstance(fuse_method, list):
             fuse_method = fuse_method[0]
-        condition_fuser = ConditionFuser(fuse_method, **fuse_config)
+        condition_fuser = ConditionFuserStreamer(fuse_method, **fuse_config)
         modeling = pattern_config.pop("modeling")
 
         pattern_provider = pattern_providers[modeling](
@@ -862,7 +871,11 @@ class MotionGen(nn.Module):
         )
 
     def _compute_cross_entropy(
-        self, logits: torch.Tensor, targets: torch.Tensor, mask: torch.Tensor
+        self,
+        logits: torch.Tensor,
+        targets: torch.Tensor,
+        mask: torch.Tensor,
+        ignore_index=-100,
     ) -> tp.Tuple[torch.Tensor, tp.List[torch.Tensor]]:
         """Compute cross entropy between multi-codebook targets and model's logits.
         The cross entropy is computed per codebook to provide codebook-level cross entropy.
@@ -890,7 +903,7 @@ class MotionGen(nn.Module):
             mask_k = mask[:, k, ...].contiguous().view(-1)  # [B x T]
             ce_targets = targets_k[mask_k]
             ce_logits = logits_k[mask_k]
-            q_ce = F.cross_entropy(ce_logits, ce_targets)
+            q_ce = F.cross_entropy(ce_logits, ce_targets, ignore_index=ignore_index)
             ce += q_ce
             ce_per_codebook.append(q_ce.detach())
         # average cross entropy across codebooks
@@ -909,12 +922,20 @@ class MotionGen(nn.Module):
 
         motions_or_ids = inputs[0]
         input_mask = inputs[1]
+        B, K, T = motions_or_ids.shape
+        target = torch.where(
+            motions_or_ids == self.model.pad_token_id, ignore_index, motions_or_ids
+        )
 
         # with self.autocast:
         model_output = self.model.compute_predictions(inputs, condition_tensors=conditions, cond_drop_prob=cond_drop_prob)  # type: ignore
         logits = model_output.logits
-        mask = input_mask & model_output.mask
-        ce, ce_per_codebook = self._compute_cross_entropy(logits, motions_or_ids, mask)
+        mask = (
+            input_mask.unsqueeze(1).expand(-1, K, -1).contiguous() & model_output.mask
+        )
+        ce, ce_per_codebook = self._compute_cross_entropy(
+            logits, target, mask, ignore_index
+        )
         loss = ce
 
         if return_logits:

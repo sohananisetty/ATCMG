@@ -508,7 +508,199 @@ class ConditionFuser(nn.Module):
                     cond = cond.unsqueeze(1)
 
                 input = torch.cat([cond, input], dim=1)
-                input_padding_mask = torch.cat([cond_mask, input_padding_mask], dim=1)
+                ## some weird error when condition id masked in mask only. So we dont mask it in mask but zero out in tensor.
+
+                input_padding_mask = torch.cat(
+                    [cond_mask, input_padding_mask],
+                    dim=1,
+                )
+
+            elif op == "cross":
+                if cross_attention_output is not None:
+                    cross_attention_output = torch.cat(
+                        [cross_attention_output, cond], dim=1
+                    )
+                    cross_attention_mask = torch.cat(
+                        [cross_attention_mask, cond_mask], dim=1
+                    )
+
+                else:
+                    cross_attention_output = cond
+                    cross_attention_mask = cond_mask
+
+            elif op == "cross_seperate":
+                if cross_attention_output is not None:
+                    cross_attention_output[cond_type] = cond
+                    cross_attention_mask[cond_type] = cond_mask
+                else:
+                    cross_attention_output = {cond_type: cond}
+                    cross_attention_mask = {cond_type: cond_mask}
+            else:
+                raise ValueError(f"unknown op ({op})")
+
+        if self.cross_attention_pos_emb and cross_attention_output is not None:
+
+            if isinstance(cross_attention_output, torch.Tensor):
+                positions = torch.arange(
+                    cross_attention_output.shape[1],
+                    device=cross_attention_output.device,
+                ).view(1, -1, 1)
+                pos_emb = self.create_sin_embedding(
+                    positions, cross_attention_output.shape[-1]
+                )
+                cross_attention_output = (
+                    cross_attention_output
+                    + self.cross_attention_pos_emb_scale * pos_emb
+                )
+
+            else:
+                for (
+                    cond_type,
+                    cross_attention_condition,
+                ) in cross_attention_output.items():
+                    positions = torch.arange(
+                        cross_attention_condition.shape[1],
+                        device=cross_attention_condition.device,
+                    ).view(1, -1, 1)
+                    pos_emb = self.create_sin_embedding(
+                        positions, cross_attention_condition.shape[-1]
+                    )
+                    cross_attention_output[cond_type] = (
+                        cross_attention_condition
+                        + self.cross_attention_pos_emb_scale * pos_emb
+                    )
+
+        return (input, input_padding_mask), (
+            cross_attention_output,
+            cross_attention_mask,
+        )
+
+
+class ConditionFuserStreamer(nn.Module):
+    """Condition fuser handles the logic to combine the different conditions
+    to the actual model input.
+
+    Args:
+        fuse2cond (tp.Dict[str, str]): A dictionary that says how to fuse
+            each condition. For example:
+            {
+                "prepend": ["text"],
+                "sum": ["bpm"],
+                "cross": ["audio"],
+            }
+        cross_attention_pos_emb (bool, optional): Use positional embeddings in cross attention.
+        cross_attention_pos_emb_scale (int): Scale for positional embeddings in cross attention if used.
+    """
+
+    FUSING_METHODS = ["sum", "prepend", "cross", "input_interpolate", "cross_seperate"]
+
+    def __init__(
+        self,
+        fuse2cond: tp.Dict[str, tp.List[str]],
+        cross_attention_pos_emb: bool = False,
+        cross_attention_pos_emb_scale: float = 1.0,
+    ):
+        super().__init__()
+        assert all(
+            [k in self.FUSING_METHODS for k in fuse2cond.keys()]
+        ), f"Got invalid fuse method, allowed methods: {self.FUSING_METHODS}"
+        self.cross_attention_pos_emb = cross_attention_pos_emb
+        self.cross_attention_pos_emb_scale = cross_attention_pos_emb_scale
+        self.fuse2cond: tp.Dict[str, tp.List[str]] = fuse2cond
+        self.cond2fuse: tp.Dict[str, str] = {}
+        for fuse_method, conditions in fuse2cond.items():
+            for condition in conditions:
+                self.cond2fuse[condition] = fuse_method
+
+    def create_sin_embedding(
+        self,
+        positions: torch.Tensor,
+        dim: int,
+        max_period: float = 10000,
+        dtype: torch.dtype = torch.float32,
+    ) -> torch.Tensor:
+        """Create sinusoidal positional embedding, with shape `[B, T, C]`.
+
+        Args:
+            positions (torch.Tensor): LongTensor of positions.
+            dim (int): Dimension of the embedding.
+            max_period (float): Maximum period of the cosine/sine functions.
+            dtype (torch.dtype or str): dtype to use to generate the embedding.
+        Returns:
+            torch.Tensor: Sinusoidal positional embedding.
+        """
+        # We aim for BTC format
+        assert dim % 2 == 0
+        half_dim = dim // 2
+        positions = positions.to(dtype)
+        adim = torch.arange(half_dim, device=positions.device, dtype=dtype).view(
+            1, 1, -1
+        )
+        max_period_tensor = torch.full(
+            [], max_period, device=positions.device, dtype=dtype
+        )  # avoid sync point
+        phase = positions / (max_period_tensor ** (adim / (half_dim - 1)))
+        return torch.cat([torch.cos(phase), torch.sin(phase)], dim=-1)
+
+    def forward(
+        self,
+        input_: tp.Dict[str, ConditionType],
+        conditions: tp.Dict[str, ConditionType],
+    ) -> tp.Tuple[
+        ConditionType,
+        tp.Optional[
+            tp.Union[
+                tp.Tuple[torch.Tensor, torch.Tensor],
+                tp.Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]],
+            ]
+        ],
+    ]:
+        """Fuse the conditions to the provided model input.
+
+        Args:
+            input (torch.Tensor): Transformer input.
+            conditions (dict[str, ConditionType]): Dict of conditions.
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: The first tensor is the transformer input
+                after the conditions have been fused. The second output tensor is the tensor
+                used for cross-attention or None if no cross attention inputs exist.
+        """
+
+        input = input_[0]
+        input_padding_mask = input_[1]
+        B, T, _ = input.shape
+
+        assert set(conditions.keys()).issubset(set(self.cond2fuse.keys())), (
+            f"given conditions contain unknown attributes for fuser, "
+            f"expected {self.cond2fuse.keys()}, got {conditions.keys()}"
+        )
+        cross_attention_output = None
+        cross_attention_mask = None
+
+        for cond_type, (cond, cond_mask) in conditions.items():
+            op = self.cond2fuse[cond_type]
+            if op == "sum":
+                input += cond
+                input_padding_mask = input_padding_mask & cond_mask
+
+            elif op == "input_interpolate":
+                cond = einops.rearrange(cond, "b t d -> b d t")
+                cond = F.interpolate(cond, size=input.shape[1])
+                cond_mask = F.interpolate(cond_mask, size=input.shape[1])
+                input += einops.rearrange(cond, "b d t -> b t d")
+                input_padding_mask = input_padding_mask & cond_mask
+
+            elif op == "prepend":
+                if len(cond.shape) == 2:
+                    cond = cond.unsqueeze(1)
+
+                input = torch.cat([cond, input], dim=1)
+                ## some weird error when condition id masked in mask only. So we dont mask it in mask but zero out in tensor.
+
+                input_padding_mask = torch.cat(
+                    [torch.ones_like(cond_mask).to(torch.bool), input_padding_mask],
+                    dim=1,
+                )
 
             elif op == "cross":
                 if cross_attention_output is not None:
@@ -632,7 +824,7 @@ class ClassifierFreeGuidanceDropout(nn.Module):
 
                 new_embedding = embedding * new_mask.unsqueeze(-1)
 
-                conditions_[condition_modality] = (new_embedding, new_mask)
+                conditions_[condition_modality] = (embedding, new_mask)
 
         return conditions_
 
