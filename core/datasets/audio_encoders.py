@@ -9,7 +9,6 @@ import torchaudio
 # from encodec import EncodecModel
 # from encodec.utils import convert_audio, save_audio
 from transformers import AutoProcessor, EncodecModel
-from transformers.models.encodec.modeling_encodec import EncodecDecoderOutput
 import librosa
 
 
@@ -33,10 +32,11 @@ def convert_audio(wav: torch.Tensor, sr: int, target_sr: int, target_channels: i
 
 class AudioConditionerEncodec(nn.Module):
     def __init__(self, target_bandwidth=6, target_sr=16000, device="cuda"):
+        super().__init__()
         self.encoder = (
             EncodecModel.from_pretrained("facebook/encodec_24khz", cache_dir="./")
             .to(device)
-            .to(eval)
+            .eval()
         )
         self.processor = AutoProcessor.from_pretrained(
             "facebook/encodec_24khz", cache_dir="./"
@@ -83,17 +83,26 @@ class AudioConditionerEncodec(nn.Module):
                 decoded_frames, self.encoder.config.chunk_stride or 1
             )
 
+        quantized_values = quantized_values.contiguous().permute(
+            0, 2, 1
+        )  ## b d n -> b n d
+
         # truncate based on padding mask
         if padding_mask is not None:
-            scale_mask = padding_mask.shape[-1] // quantized_values.shape[-1]
-            padding_mask = torch.nn.functional.interpolate(
-                padding_mask[:, None, :].float(), scale_factor=(1 / scale_mask)
-            ).to(torch.bool)
-            audio_values = audio_values[..., : padding_mask.shape[-1]]
+            scale_mask = padding_mask.shape[-1] // quantized_values.shape[1]
+            padding_mask = (
+                torch.nn.functional.interpolate(
+                    padding_mask[:, None, :].float(), scale_factor=(1 / scale_mask)
+                )
+                .squeeze(1)
+                .to(torch.bool)
+            )
 
-        return quantized_values
+            quantized_values = quantized_values * padding_mask[..., None]
 
-    def get_audio_embedding(
+        return quantized_values, padding_mask
+
+    def forward(
         self,
         path_or_wav: tp.Union[str, tp.List[str], torch.Tensor, tp.List[torch.Tensor]],
     ) -> torch.Tensor:
@@ -103,9 +112,9 @@ class AudioConditionerEncodec(nn.Module):
         if not isinstance(path_or_wav[0], torch.Tensor):
             wavs = []
             for pth in path_or_wav:
-                wav, sr = torchaudio.load(path_or_wav)
+                wav, sr = torchaudio.load(pth)
                 audio_sample = convert_audio(
-                    audio_sample, sr, self.target_sr, 1
+                    wav, sr, self.target_sr, 1
                 )  ## channel time
                 wavs.append(audio_sample[0].numpy())
             inputs = self.processor(
@@ -131,15 +140,26 @@ class AudioConditionerEncodec(nn.Module):
                 inputs["padding_mask"].to(self.device),
                 bandwidth=self.target_bandwidth,
             )
-            embs = self._decode(
-                encoder_outputs.audio_codes, encoder_outputs.audio_scales
+            embs, red_masks = self._decode(
+                encoder_outputs.audio_codes,
+                encoder_outputs.audio_scales,
+                inputs["padding_mask"].to(self.device),
             )
 
-        return embs.permute(0, 2, 1)  ## B N d
+        out_embs = []
+        for emb, msk in zip(embs, red_masks):
+            len_emb = torch.sum(msk)
+            out_embs.append(emb[:len_emb])
+
+        if len(out_embs) == 1:
+            return out_embs[0]
+
+        return out_embs  ## B N d
 
 
 class AudioConditionerLibrosa(nn.Module):
     def __init__(self, fps=30, device="cuda"):
+        super().__init__()
 
         self.device = device
         self.fps = fps
@@ -148,10 +168,10 @@ class AudioConditionerLibrosa(nn.Module):
         self.EPS = 1e-6
 
     def get_audio_feat(self, data: np.ndarray):
-        envelope = librosa.onset.onset_strength(data, sr=self.SR)  # (seq_len,)
-        mfcc = librosa.feature.mfcc(data, sr=self.SR, n_mfcc=20).T  # (seq_len, 20)
+        envelope = librosa.onset.onset_strength(y=data, sr=self.SR)  # (seq_len,)
+        mfcc = librosa.feature.mfcc(y=data, sr=self.SR, n_mfcc=20).T  # (seq_len, 20)
         chroma = librosa.feature.chroma_cens(
-            data, sr=self.SR, hop_length=self.HOP_LENGTH, n_chroma=12
+            y=data, sr=self.SR, hop_length=self.HOP_LENGTH, n_chroma=12
         ).T  # (seq_len, 12)
 
         peak_idxs = librosa.onset.onset_detect(
@@ -183,7 +203,7 @@ class AudioConditionerLibrosa(nn.Module):
 
         return audio_feature
 
-    def get_audio_embedding(
+    def forward(
         self,
         path_or_wav: tp.Union[str, tp.List[str], torch.Tensor, tp.List[torch.Tensor]],
     ):
@@ -201,9 +221,12 @@ class AudioConditionerLibrosa(nn.Module):
                 assert len(wav.shape) == 1, "should be T"
                 audio_features.append(self.get_audio_feat(data))
 
-        embs = np.stack(audio_features, 0)
+        # embs = np.stack(audio_features, 0)
 
-        return embs  ## B N d
+        if len(audio_features) == 1:
+            return audio_features[0]
+
+        return audio_features  ## B N d
 
 
 # class AudioConditionerEncodec(nn.Module):
