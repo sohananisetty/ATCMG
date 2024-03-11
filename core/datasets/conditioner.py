@@ -24,6 +24,9 @@ def is_batched(raw):
     )
 
 
+### Mask: True/1 attend to it, False/o is padding/dont attend
+
+
 class ConditionProvider(nn.Module):
     """
     Provides conditioned features for text, audio, and motion.
@@ -796,7 +799,10 @@ class ClassifierFreeGuidanceDropout(nn.Module):
             return torch.zeros(shape, device=device).float().uniform_(0, 1) < prob
 
     def forward(
-        self, conditions: Dict[str, ConditionType], drop_prob: float = None
+        self,
+        conditions: Dict[str, ConditionType],
+        drop_prob: float = None,
+        keep_len=False,
     ) -> Dict[str, ConditionType]:
         """
         Args:
@@ -821,8 +827,10 @@ class ClassifierFreeGuidanceDropout(nn.Module):
                 new_mask = mask & drop_mask
                 new_embedding = embedding * new_mask.unsqueeze(-1)
                 # if condition_modality == "audio":
-                new_embedding = new_embedding[:, :1, :]
-                new_mask = new_mask[:, :1]
+
+                if not keep_len:
+                    new_embedding = new_embedding[:, :1, :]
+                    new_mask = new_mask[:, :1]
                 conditions_[condition_modality] = (new_embedding, new_mask)
 
             elif drop_prob > 0.0 and (
@@ -833,7 +841,7 @@ class ClassifierFreeGuidanceDropout(nn.Module):
 
                 new_embedding = embedding * new_mask.unsqueeze(-1)
 
-                conditions_[condition_modality] = (embedding, new_mask)
+                conditions_[condition_modality] = (new_embedding, new_mask)
 
         return conditions_
 

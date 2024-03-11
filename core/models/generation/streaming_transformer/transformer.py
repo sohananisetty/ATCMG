@@ -585,10 +585,10 @@ class StreamingTransformerLayer(nn.TransformerEncoderLayer):
             v = torch.cat((nv, cross_attention_src), dim=-2)
 
             kv_mask = F.pad(cross_key_padding_mask, (1, 0), value=False)
-            if kv_mask.shape[-1] == 2:
-                kv_mask = kv_mask[..., :1]
-                k = k[..., :1, :]
-                v = v[..., :1, :]
+            # if kv_mask.shape[-1] == 2:
+            #     kv_mask = kv_mask[..., :1]
+            #     k = k[..., :1, :]
+            #     v = v[..., :1, :]
 
             x = self.cross_attention(
                 query=src,

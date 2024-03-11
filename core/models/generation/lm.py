@@ -358,18 +358,22 @@ class LMModel(StreamingModule):
         return self.n_q
 
     def _prepare_inputs(self, input: ConditionTensors, conditions: ConditionTensors):
-        audio_embed = self.project_audio(conditions["audio"][0])
-        text_embed = self.project_text(conditions["text"][0])
 
-        inputs_, cross_inputs = self.fuser(
-            input,
-            {
-                "text": (text_embed, conditions["text"][1]),
-                "audio": (audio_embed, conditions["audio"][1]),
-            },
-        )
+        if conditions != {}:
+            audio_embed = self.project_audio(conditions["audio"][0])
+            text_embed = self.project_text(conditions["text"][0])
 
-        return inputs_, cross_inputs
+            inputs_, cross_inputs = self.fuser(
+                input,
+                {
+                    "text": (text_embed, conditions["text"][1]),
+                    "audio": (audio_embed, conditions["audio"][1]),
+                },
+            )
+
+            return inputs_, cross_inputs
+        else:
+            return input, None
 
     def forward(
         self,
@@ -419,8 +423,12 @@ class LMModel(StreamingModule):
 
         x_ = input_[0]
         x_padding_mask = ~input_[1]
-        context = cross_attention_input[0]
-        context_padding_mask = ~cross_attention_input[1]
+
+        if cross_attention_input is not None:
+            context = cross_attention_input[0]
+            context_padding_mask = ~cross_attention_input[1]
+        else:
+            context, context_padding_mask = self.get_null_context(x_)
 
         out = self.transformer(
             x_,
@@ -552,12 +560,14 @@ class LMModel(StreamingModule):
             assert isinstance(cfg_conditions, tuple), type(cfg_conditions)
             condition_tensors, null_condition_tensors = cfg_conditions
             cond_logits = model(
-                sequence, conditions=[], condition_tensors=condition_tensors
+                inputs=(sequence, torch.ones_like(sequence).to(torch.bool)),
+                condition_tensors=condition_tensors,
             )
             state = self.get_streaming_state()
             self.set_streaming_state(unconditional_state)
             uncond_logits = model(
-                sequence, conditions=[], condition_tensors=null_condition_tensors
+                inputs=(sequence, torch.ones_like(sequence).to(torch.bool)),
+                condition_tensors=null_condition_tensors,
             )
             unconditional_state.update(self.get_streaming_state())
             self.set_streaming_state(state)
@@ -569,7 +579,8 @@ class LMModel(StreamingModule):
                 # Preparing for CFG, predicting both conditional and unconditional logits.
                 sequence = torch.cat([sequence, sequence], dim=0)
             all_logits = model(
-                sequence, conditions=[], condition_tensors=condition_tensors
+                inputs=(sequence, torch.ones_like(sequence).to(torch.bool)),
+                condition_tensors=condition_tensors,
             )
             if condition_tensors:
                 cond_logits, uncond_logits = all_logits.split(
@@ -595,6 +606,31 @@ class LMModel(StreamingModule):
             next_token = torch.argmax(logits, dim=-1, keepdim=True)
 
         return next_token
+
+    def get_null_context(self, x):
+        cross_cond = self.fuser.fuse2cond.get("cross", None)
+        if cross_cond is not None:
+            if cross_cond[0] == "audio":
+                cc = torch.zeros(
+                    (x.shape[0], 1, self.audio_input_dim),
+                    device=x.device,
+                    dtype=x.dtype,
+                )
+
+                cc = self.project_audio(cc)
+
+            elif cross_cond[0] == "text":
+                cc = torch.zeros(
+                    (x.shape[0], 1, self.text_input_dim), device=x.device, dtype=x.dtype
+                )
+
+                cc = self.project_text(cc)
+
+            cm = torch.zeros((x.shape[0], 1), dtype=torch.bool, device=x.device)
+
+            return (cc, cm)
+
+        return (None, None)
 
     @torch.no_grad()
     def generate(
@@ -712,14 +748,27 @@ class LMModel(StreamingModule):
             if neg_conditions is not None:
                 null_conditions = neg_conditions
             else:
-                null_conditions = self.cfg_dropout(conditions, 1.0)
+                null_conditions = self.cfg_dropout(conditions, 1.0, not two_step_cfg)
             if two_step_cfg:
                 cfg_conditions = (conditions, null_conditions)
             else:
+                ## concat the conditions on batch dim
+                cfg_conditions = {}
+                for cond_type in conditions.keys():
+                    assert (
+                        conditions[cond_type][0].shape[1]
+                        == null_conditions[cond_type][0].shape[1]
+                    ), "conditions and neg conditions dont have same length. Use 2 step cfg"
+                    new_cond = torch.cat(
+                        [conditions[cond_type][0], null_conditions[cond_type][0]],
+                        dim=0,
+                    )
+                    new_cond_mask = torch.cat(
+                        [conditions[cond_type][1], null_conditions[cond_type][1]],
+                        dim=0,
+                    )
+                    cfg_conditions[cond_type] = (new_cond, new_cond_mask)
 
-                cfg_conditions = torch.cat(
-                    [conditions, null_conditions], dim=0
-                )  ## stack on batch dim
         else:
             cfg_conditions = {}
 
