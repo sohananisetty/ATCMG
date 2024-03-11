@@ -6,8 +6,15 @@ from functools import partial, wraps
 import torch
 import torch.nn.functional as F
 from core import AttentionParams
-from core.models.utils import (LayerNorm, create_causal_mask, default,
-                               dropout_seq, exists, l2norm, print_once)
+from core.models.utils import (
+    LayerNorm,
+    create_causal_mask,
+    default,
+    dropout_seq,
+    exists,
+    l2norm,
+    print_once,
+)
 from einops import rearrange, repeat
 from packaging import version
 from torch import einsum, nn
@@ -21,6 +28,7 @@ class Attend(nn.Module):
         scale=None,
         qk_norm=False,
         flash=False,
+        causal_map_function=None,
         sdp_kwargs: dict = dict(
             enable_flash=True, enable_math=True, enable_mem_efficient=True
         ),
@@ -30,7 +38,11 @@ class Attend(nn.Module):
         self.qk_norm = qk_norm
 
         self.causal = causal
-        self.create_causal_mask = create_causal_mask
+        self.create_causal_mask = (
+            causal_map_function
+            if causal_map_function is not None
+            else create_causal_mask
+        )
 
         self.attn_fn = (
             partial(F.softmax, dtype=torch.float32) if not qk_norm else F.softmax
@@ -118,7 +130,11 @@ class Attend(nn.Module):
         row_is_entirely_masked = None
 
         if exists(mask) and causal:
-            causal_mask = self.create_causal_mask(q_len, k_len, device=device)
+            if q_len == k_len:
+                causal_mask = self.create_causal_mask(q_len, device=device)
+            else:
+
+                causal_mask = self.create_causal_mask(q_len, k_len, device=device)
             mask = mask & ~causal_mask
 
             # protect against an entire row being masked out
@@ -213,10 +229,14 @@ class Attend(nn.Module):
         mask_value = -torch.finfo(dots.dtype).max
 
         if exists(mask):
+
             dots = dots.masked_fill(~mask, mask_value)
 
         if self.causal:
-            causal_mask = self.create_causal_mask(i, j, device=device)
+            if i == j:
+                causal_mask = self.create_causal_mask(i, device=device)
+            else:
+                causal_mask = self.create_causal_mask(i, j, device=device)
             dots = dots.masked_fill(causal_mask, mask_value)
 
         pre_softmax_attn = dots.clone()
@@ -245,6 +265,7 @@ class CustomMHA(nn.Module):
         add_null_kv: bool = False,
         flash: bool = False,
         bias_att: bool = False,
+        causal_map_function=None,
         **kwargs,
     ):
         super().__init__()
@@ -270,6 +291,7 @@ class CustomMHA(nn.Module):
             causal=self.causal,
             qk_norm=self.qk_norm,
             flash=self.flash,
+            causal_map_function=causal_map_function,
         )
 
         self.null_kv = nn.Parameter(torch.randn(2, self.heads, 1, self.dim_head))

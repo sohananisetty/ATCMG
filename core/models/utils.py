@@ -50,8 +50,8 @@ def pad_at_dim(t, pad, dim=-1, value=0.0):
     return F.pad(t, (*zeros, *pad), value=value)
 
 
-def create_causal_mask(i, j, device):
-    if i != j:
+def create_causal_mask(i, j=None, device="cuda"):
+    if j is not None and i != j:
         mask = torch.zeros((i, j), device=device, dtype=torch.bool)
 
         scale = j / i
@@ -67,7 +67,7 @@ def create_causal_mask(i, j, device):
             mask[idx, int(num) :] = True
         return mask
 
-    return torch.ones((i, j), device=device, dtype=torch.bool).triu(j - i + 1)
+    return torch.ones((i, i), device=device, dtype=torch.bool).triu(i - i + 1)
 
 
 def l2norm(t):
