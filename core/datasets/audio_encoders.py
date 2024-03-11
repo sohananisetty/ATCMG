@@ -1,13 +1,12 @@
 import typing as tp
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, List
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torchaudio
 
-# from encodec import EncodecModel
-# from encodec.utils import convert_audio, save_audio
+
 from transformers import AutoProcessor, EncodecModel
 import librosa
 
@@ -30,7 +29,7 @@ def convert_audio(wav: torch.Tensor, sr: int, target_sr: int, target_channels: i
     return wav
 
 
-class AudioConditionerEncodec(nn.Module):
+class EncodecConditioner(nn.Module):
     def __init__(self, target_bandwidth=6, target_sr=16000, device="cuda"):
         super().__init__()
         self.encoder = (
@@ -44,6 +43,7 @@ class AudioConditionerEncodec(nn.Module):
         self.target_sr = target_sr
         self.device = device
         self.target_bandwidth = target_bandwidth
+        self.dim = self.encoder.config.codebook_dim
         self.freeze()
 
     def freeze(self):
@@ -104,12 +104,12 @@ class AudioConditionerEncodec(nn.Module):
 
     def forward(
         self,
-        path_or_wav: tp.Union[str, tp.List[str], torch.Tensor, tp.List[torch.Tensor]],
-    ) -> torch.Tensor:
+        path_or_wav: tp.Union[str, tp.List[str], np.ndarray, tp.List[np.ndarray]],
+    ) -> Union[List[torch.Tensor], torch.Tensor]:
         if not isinstance(path_or_wav, list):
             path_or_wav = [path_or_wav]
 
-        if not isinstance(path_or_wav[0], torch.Tensor):
+        if not isinstance(path_or_wav[0], np.ndarray):
             wavs = []
             for pth in path_or_wav:
                 wav, sr = torchaudio.load(pth)
@@ -127,7 +127,7 @@ class AudioConditionerEncodec(nn.Module):
             wavs = []
             for wav in path_or_wav:
                 assert len(wav.shape) == 2, "should be chn T"
-                wavs.append(np.array(wav[0]))
+                wavs.append(wav[0])
             inputs = self.processor(
                 raw_audio=wavs,
                 sampling_rate=self.processor.sampling_rate,
@@ -157,7 +157,7 @@ class AudioConditionerEncodec(nn.Module):
         return out_embs  ## B N d
 
 
-class AudioConditionerLibrosa(nn.Module):
+class LibrosaConditioner(nn.Module):
     def __init__(self, fps=30, device="cuda"):
         super().__init__()
 
@@ -166,6 +166,7 @@ class AudioConditionerLibrosa(nn.Module):
         self.HOP_LENGTH = 512
         self.SR = self.fps * self.HOP_LENGTH
         self.EPS = 1e-6
+        self.dim = 35
 
     def get_audio_feat(self, data: np.ndarray):
         envelope = librosa.onset.onset_strength(y=data, sr=self.SR)  # (seq_len,)
@@ -205,8 +206,8 @@ class AudioConditionerLibrosa(nn.Module):
 
     def forward(
         self,
-        path_or_wav: tp.Union[str, tp.List[str], torch.Tensor, tp.List[torch.Tensor]],
-    ):
+        path_or_wav: tp.Union[str, tp.List[str], np.ndarray, tp.List[np.ndarray]],
+    ) -> Union[List[torch.Tensor], torch.Tensor]:
         if not isinstance(path_or_wav, list):
             path_or_wav = [path_or_wav]
 
@@ -219,7 +220,9 @@ class AudioConditionerLibrosa(nn.Module):
         else:
             for wav in path_or_wav:
                 assert len(wav.shape) == 1, "should be T"
-                audio_features.append(self.get_audio_feat(data))
+                audio_features.append(
+                    torch.Tensor(self.get_audio_feat(data)).to(self.device)
+                )
 
         # embs = np.stack(audio_features, 0)
 
@@ -229,20 +232,4 @@ class AudioConditionerLibrosa(nn.Module):
         return audio_features  ## B N d
 
 
-# class AudioConditionerEncodec(nn.Module):
-#     def __init__(self, target_bandwidth=6, target_sr=16000, device="cuda"):
-#         self.model = EncodecModel.encodec_model_24khz().to(device).eval()
-#         self.model.set_target_bandwidth(target_bandwidth)
-#         self.target_sr = target_sr
-#         self.device = device
-
-#     def get_audio_embedding(path_or_wav: tp.Union[str, torch.Tensor]):
-#         if isinstance(path_or_wav, str):
-#             wav, sr = torchaudio.load(path_or_wav)
-#         wav = convert_audio(wav, sr, self.target_sr, self.model.channels)
-#         wav = wav.unsqueeze(0).to(self.device)
-#         with torch.no_grad():
-#             encoded_frames = self.model.encode(wav)
-#         embs = self.model.decode2emb(encoded_frames)
-
-#         return embs[0].permute(1, 0)  ## N d
+# HB2Ev297GQ4

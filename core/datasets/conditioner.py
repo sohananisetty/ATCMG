@@ -11,6 +11,7 @@ from torch import nn
 from transformers.feature_extraction_utils import BatchFeature
 
 from .text_encoders import BERTConditioner, ClipConditioner, T5Conditioner
+from .audio_encoders import EncodecConditioner, LibrosaConditioner
 
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
 
@@ -79,7 +80,14 @@ class ConditionProvider(nn.Module):
         self.motion_max_length = motion_max_length_s * fps
         self.pad_id = pad_id
 
-        self.audio_dim = 128 if audio_rep == AudioRep.ENCODEC else 35
+        if audio_rep == AudioRep.ENCODEC:
+            self.audio_encoder = EncodecConditioner(device=device)
+            self.audio_dim = self.audio_encoder.dim
+        elif audio_rep == AudioRep.LIBROSA:
+            self.audio_encoder = LibrosaConditioner(device=device)
+            self.audio_dim = self.audio_encoder.dim
+
+        # self.audio_dim = 128 if audio_rep == AudioRep.ENCODEC else 35
 
         if "t5" in text_conditioner_name:
 
@@ -266,7 +274,7 @@ class ConditionProvider(nn.Module):
 
     def __call__(
         self,
-        raw_audio: Optional[Union[np.ndarray, List[np.ndarray]]] = None,
+        raw_audio: Optional[Union[str, List[str], np.ndarray, List[np.ndarray]]] = None,
         raw_motion: Optional[Union[np.ndarray, List[np.ndarray]]] = None,
         raw_text: Optional[Union[str, List[str]]] = None,
         audio_padding: Optional[str] = None,
@@ -339,6 +347,9 @@ class ConditionProvider(nn.Module):
 
             if audio is not None:
 
+                if isinstance(audio, str):
+                    audio = self.audio_encoder(audio)
+
                 subset_idx_audio, subset_idx_motion = self._select_common_start_idx(
                     motion=motion, audio=audio, max_length_s=max_length_s
                 )
@@ -361,9 +372,6 @@ class ConditionProvider(nn.Module):
             padding=motion_padding,
             subset_index_list=motion_idx_list,
         )
-
-        # tokenized = self.text_encoder.tokenize(raw_text)
-        # padded_text, text_mask = self.text_encoder(tokenized)
 
         if raw_text[0] is None and raw_motion[0] is not None:
             raw_text = raw_text * len(raw_motion)

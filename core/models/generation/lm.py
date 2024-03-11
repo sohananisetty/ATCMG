@@ -13,16 +13,18 @@ from functools import partial
 import torch
 import torch.nn.functional as F
 from core import MotionTokenizerParams, pattern_providers
-from core.datasets.conditioner import (ClassifierFreeGuidanceDropout,
-                                       ConditionFuserStreamer, ConditionType)
+from core.datasets.conditioner import (
+    ClassifierFreeGuidanceDropout,
+    ConditionFuserStreamer,
+    ConditionType,
+)
 from core.models.utils import TorchAutocast
 from torch import nn
 
 from .streaming_transformer.activations import get_activation_fn
 from .streaming_transformer.codebooks_patterns import CodebooksPatternProvider
 from .streaming_transformer.streaming import State, StreamingModule
-from .streaming_transformer.transformer import (StreamingTransformer,
-                                                create_norm_fn)
+from .streaming_transformer.transformer import StreamingTransformer, create_norm_fn
 
 
 def multinomial(
@@ -372,7 +374,6 @@ class LMModel(StreamingModule):
     def forward(
         self,
         inputs: ConditionTensors,
-        # conditions: tp.Dict[str, ConditionType],
         condition_tensors: tp.Optional[ConditionTensors] = None,
         stage: int = -1,
         cond_drop_prob: float = None,
@@ -402,8 +403,6 @@ class LMModel(StreamingModule):
             K == self.num_codebooks
         ), "Sequence shape must match the specified number of codebooks"
 
-        # input_ = sum([self.emb[k](sequence[:, k]) for k in range(K)])
-
         if isinstance(self.project_input, nn.Identity):
             input_ = sum([self.emb[k](sequence[:, k]) for k in range(K)])
         else:
@@ -422,8 +421,6 @@ class LMModel(StreamingModule):
         x_padding_mask = ~input_[1]
         context = cross_attention_input[0]
         context_padding_mask = ~cross_attention_input[1]
-        # print(context.shape, context_padding_mask, context_padding_mask.shape)
-        # print(x_padding_mask.shape, x_padding_mask)
 
         out = self.transformer(
             x_,
@@ -439,7 +436,6 @@ class LMModel(StreamingModule):
         )  # [B, K, S, card]
 
         # remove the prefix from the model outputs
-        # if len(self.fuser.fuse2cond["prepend"]) > 0:
         if len(self.fuser.fuse2cond.get("prepend", [])) > 0:
             logits = logits[:, :, -S:]
 
@@ -495,11 +491,6 @@ class LMModel(StreamingModule):
         new_codes_mask = torch.ones_like(sequence_mask).repeat(B, 1, 1)
         for i in range(K):
             new_codes_mask[:, i, i + 1 :] = codes_mask[:, 0 : T - i]
-
-        # print(new_codes_mask.shape)
-
-        # print(new_codes_mask)
-        # print(new_codes_mask.sum(1))
 
         new_new_mask = new_codes_mask.sum(1) == K
 
@@ -613,7 +604,7 @@ class LMModel(StreamingModule):
         conditions: tp.Optional[ConditionTensors] = None,
         neg_conditions: tp.Optional[ConditionTensors] = None,
         num_samples: tp.Optional[int] = None,
-        max_gen_len: int = 256,
+        max_gen_len: int = 225,
         use_sampling: bool = True,
         temp: float = 1.0,
         top_k: int = 250,
@@ -629,7 +620,7 @@ class LMModel(StreamingModule):
         be performed in a greedy fashion or using sampling with top K and top P strategies.
 
         Args:
-            prompt (torch.Tensor, optional): Prompt tokens of shape [B, K, T].
+            prompt (torch.Tensor, optional): Prompt tokens of shape [B, K, T]. Existing motion
             conditions_tensors (list of ConditioningAttributes, optional): List of conditions.
             num_samples (int, optional): Number of samples to generate when no prompt and no conditions are given.
             max_gen_len (int): Maximum generation length.
@@ -651,17 +642,6 @@ class LMModel(StreamingModule):
 
         # Checking all input shapes are consistent.
         possible_num_samples = []
-        # if num_samples is not None:
-        #     possible_num_samples.append(num_samples)
-        # elif prompt is not None:
-        #     possible_num_samples.append(prompt.shape[0])
-        # elif conditions:
-        #     possible_num_samples.append(len(conditions))
-        # else:
-        #     possible_num_samples.append(1)
-        # assert [
-        #     x == possible_num_samples[0] for x in possible_num_samples
-        # ], "Inconsistent inputs shapes"
 
         try:
             if conditions.get("text", None) is not None:
@@ -689,7 +669,7 @@ class LMModel(StreamingModule):
 
         except:
             print("generating without conditions")
-            if num_samples is not None:
+            if num_samples is None:
                 possible_num_samples.append(1)
             else:
                 possible_num_samples.append(num_samples)
@@ -743,11 +723,11 @@ class LMModel(StreamingModule):
         else:
             cfg_conditions = {}
 
-        # if prompt is None:
-        #     assert num_samples > 0
-        #     prompt = torch.zeros(
-        #         (num_samples, self.num_codebooks, 0), dtype=torch.long, device=device
-        #     )
+        if prompt is None:
+            assert num_samples > 0
+            prompt = torch.zeros(
+                (num_samples, self.num_codebooks, 0), dtype=torch.long, device=device
+            )
 
         B, K, T = prompt.shape
         start_offset = T
