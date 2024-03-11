@@ -220,6 +220,11 @@ class StreamingMultiheadAttention(StreamingModule):
             assert not causal, "Causal cannot work with cross attention."
             assert rope is None, "Rope cannot work with cross attention."
 
+        if causal:
+            assert (
+                not add_null_kv
+            ), "Causal cannot not work with adding dummy tokens to kv"
+
         if memory_efficient:
             _verify_xformers_memory_efficient_compat()
 
@@ -234,7 +239,7 @@ class StreamingMultiheadAttention(StreamingModule):
                 bias_att=bias,
                 add_null_kv=add_null_kv,
                 flash=True,
-                causal_map_function=partial(self._get_mask, dtype=torch.bool),
+                # causal_map_function=partial(self._get_mask, dtype=torch.bool),
             )
 
         else:
@@ -394,6 +399,7 @@ class StreamingMultiheadAttention(StreamingModule):
                 value.shape[1] == key.shape[1]
             ), "Causal only for same length query / key / value"
             attn_mask = self._get_mask(query.shape[1], query.device, query.dtype)
+            # print("attn_mask", attn_mask.shape)
             # print(attn_mask.shape, attn_mask.dtype)
             # print(key_padding_mask.shape, key_padding_mask.dtype)
 
@@ -405,17 +411,23 @@ class StreamingMultiheadAttention(StreamingModule):
                 query, key, value = [x.float() for x in [query, key, value]]
 
             assert key is value, "only same key value suppoted"
+
+            # print(query.shape, key.shape, value.shape, key_padding_mask.shape)
+
             x = self.mha(
                 query,
                 key,
                 value,
                 key_padding_mask,
+                attn_mask,
             )
             x = x.to(dtype)
         else:
             key, value = self._complete_kv(key, value)
             if self.attention_as_float32:
                 query, key, value = [x.float() for x in [query, key, value]]
+
+            # value of True indicates that the element should NOT take part in attention.
             x, _ = self.mha(
                 query,
                 key,
@@ -550,6 +562,7 @@ class StreamingTransformerLayer(nn.TransformerEncoderLayer):
                 self.null_kv = nn.Parameter(torch.randn(2, 1, d_model))
             self.cross_attention = StreamingMultiheadAttention(
                 cross_attention=True,
+                causal=False,
                 qk_layer_norm=qk_layer_norm_cross,
                 add_null_kv=True,
                 **attn_kwargs,

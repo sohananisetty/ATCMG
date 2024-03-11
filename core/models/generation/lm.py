@@ -430,9 +430,11 @@ class LMModel(StreamingModule):
         else:
             context, context_padding_mask = self.get_null_context(x_)
 
+        # print(x_.shape, x_padding_mask.shape, context.shape, context_padding_mask.shape)
+
         out = self.transformer(
             x_,
-            src_key_padding_mask=x_padding_mask,
+            src_key_padding_mask=x_padding_mask if self.training else None,
             cross_attention_src=context,
             cross_key_padding_mask=context_padding_mask,
             # src_mask=(self.attn_mask_per_stage[stage] if stage >= 0 else None),
@@ -553,20 +555,42 @@ class LMModel(StreamingModule):
             next_token (torch.Tensor): Next token tensor of shape [B, K, 1].
         """
         B = sequence.shape[0]
+        seq_mask = torch.ones(
+            B, sequence.shape[-1], dtype=torch.bool, device=sequence.device
+        )
+
         cfg_coef = self.cfg_coef if cfg_coef is None else cfg_coef
         model = self if self._fsdp is None else self._fsdp
         two_step_cfg = self.two_step_cfg if two_step_cfg is None else two_step_cfg
         if two_step_cfg and cfg_conditions != {}:
             assert isinstance(cfg_conditions, tuple), type(cfg_conditions)
             condition_tensors, null_condition_tensors = cfg_conditions
+
+            # print(
+            #     condition_tensors["text"][0].shape, condition_tensors["audio"][0].shape
+            # )
+            # print(
+            #     condition_tensors["text"][1].shape, condition_tensors["audio"][1].shape
+            # )
+            # print(
+            #     null_condition_tensors["text"][0].shape,
+            #     null_condition_tensors["audio"][0].shape,
+            # )
+            # print(
+            #     null_condition_tensors["text"][1].shape,
+            #     null_condition_tensors["audio"][1].shape,
+            # )
+
+            # print(sequence.shape, seq_mask.shape)
+
             cond_logits = model(
-                inputs=(sequence, torch.ones_like(sequence).to(torch.bool)),
+                inputs=(sequence, seq_mask),
                 condition_tensors=condition_tensors,
             )
             state = self.get_streaming_state()
             self.set_streaming_state(unconditional_state)
             uncond_logits = model(
-                inputs=(sequence, torch.ones_like(sequence).to(torch.bool)),
+                inputs=(sequence, seq_mask),
                 condition_tensors=null_condition_tensors,
             )
             unconditional_state.update(self.get_streaming_state())
@@ -579,7 +603,7 @@ class LMModel(StreamingModule):
                 # Preparing for CFG, predicting both conditional and unconditional logits.
                 sequence = torch.cat([sequence, sequence], dim=0)
             all_logits = model(
-                inputs=(sequence, torch.ones_like(sequence).to(torch.bool)),
+                inputs=(sequence, seq_mask),
                 condition_tensors=condition_tensors,
             )
             if condition_tensors:

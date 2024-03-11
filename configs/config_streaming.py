@@ -81,6 +81,10 @@ cfg.fuser.fuse_method = [{"cross": ["audio"], "prepend": ["text"]}]
 cfg.fuser.cross_attention_pos_emb = False
 cfg.fuser.cross_attention_pos_emb_scale = 1.0
 
+cfg.vqvae = CN()
+cfg.vqvae.body_config = "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_rv/vqvae_rv.yaml"
+cfg.vqvae.left_hand_config = "/srv/hays-lab/scratch/sanisetty3/music_motion/ACMG/checkpoints/smplx_resnet_left/smplx_resnet_left.yaml"
+cfg.vqvae.right_hand_config = "/srv/hays-lab/scratch/sanisetty3/music_motion/ACMG/checkpoints/smplx_resnet_right/smplx_resnet_right.yaml"
 
 cfg.transformer_lm = CN()
 cfg.transformer_lm.target = "core.models.generation.lm.MotionGen"

@@ -75,7 +75,15 @@ class Attend(nn.Module):
 
         self.sdp_kwargs = sdp_kwargs
 
-    def flash_attn(self, q, k, v, mask=None, attn_bias=None):
+    def flash_attn(
+        self,
+        q,
+        k,
+        v,
+        mask=None,
+        attn_bias=None,
+        is_causal=False,  ## mask already has causal mask or not
+    ):
         batch, heads, q_len, _, k_len, is_cuda, device = (
             *q.shape,
             k.shape[-2],
@@ -113,11 +121,11 @@ class Attend(nn.Module):
 
         if exists(mask):
             assert mask.ndim == 4
-            mask = mask.expand(batch, heads, q_len, k_len)
+            mask = mask.expand(batch, heads, q_len, k_len).clone()
 
         # handle kv cache - this should be bypassable in updated flash attention 2
 
-        if k_len > q_len and causal:
+        if k_len > q_len and causal and not is_causal:
             causal_mask = self.create_causal_mask(q_len, k_len, device=device)
             if not exists(mask):
                 mask = ~causal_mask
@@ -130,12 +138,11 @@ class Attend(nn.Module):
         row_is_entirely_masked = None
 
         if exists(mask) and causal:
-            if q_len == k_len:
-                causal_mask = self.create_causal_mask(q_len, device=device)
-            else:
+            if not is_causal:
 
                 causal_mask = self.create_causal_mask(q_len, k_len, device=device)
-            mask = mask & ~causal_mask
+                # print(causal_mask.shape)
+                mask = mask & ~causal_mask
 
             # protect against an entire row being masked out
 
@@ -176,7 +183,7 @@ class Attend(nn.Module):
                 q,
                 k,
                 v,
-                attn_mask=mask,
+                attn_mask=mask,  ##value of True indicates that the element should take part in attention.
                 dropout_p=self.dropout if self.training else 0.0,
                 is_causal=causal,
             )
@@ -188,7 +195,15 @@ class Attend(nn.Module):
 
         return out
 
-    def forward(self, q, k, v, mask=None, attn_bias=None):
+    def forward(
+        self,
+        q,
+        k,
+        v,
+        mask=None,
+        attn_bias=None,
+        is_causal=False,  ## mask already has causal mask or not
+    ):
         """
         einstein notation
         b - batch
@@ -213,7 +228,9 @@ class Attend(nn.Module):
 
         if self.flash:
 
-            return self.flash_attn(q, k, v, mask=mask, attn_bias=attn_bias)
+            return self.flash_attn(
+                q, k, v, mask=mask, attn_bias=attn_bias, is_causal=is_causal
+            )
 
         kv_einsum_eq = "b j d" if k.ndim == 3 else "b h j d"
 
@@ -232,11 +249,9 @@ class Attend(nn.Module):
 
             dots = dots.masked_fill(~mask, mask_value)
 
-        if self.causal:
-            if i == j:
-                causal_mask = self.create_causal_mask(i, device=device)
-            else:
-                causal_mask = self.create_causal_mask(i, j, device=device)
+        if self.causal and not is_causal:
+
+            causal_mask = self.create_causal_mask(i, j, device=device)
             dots = dots.masked_fill(causal_mask, mask_value)
 
         pre_softmax_attn = dots.clone()
@@ -304,14 +319,27 @@ class CustomMHA(nn.Module):
 
         self.to_out = nn.Linear(inner_dim, self.dim, bias=bias_att)
 
-    def forward(self, q, k, v, key_padding_mask=None, rel_pos=None):
+    def forward(self, q, k, v, key_padding_mask=None, attn_mask=None, rel_pos=None):
         n = q.shape[-2]
         h = self.heads
 
         assert k is v, "only same key value suppoted"
 
+        is_causal = True if exists(attn_mask) else False
+
+        mask = None
+
         if exists(key_padding_mask):
-            key_padding_mask = rearrange(key_padding_mask, "b j -> b 1 1 j")
+            mask = rearrange(key_padding_mask, "b j -> b 1 1 j")
+
+        if exists(attn_mask):
+            attn_mask = repeat(attn_mask, "i j -> b 1 i j", b=q.shape[0])
+            attn_mask = attn_mask.to(torch.bool)
+
+            if exists(mask):
+                mask = mask & ~attn_mask
+            else:
+                mask = ~attn_mask
 
         q = self.norm(q)
 
@@ -328,9 +356,9 @@ class CustomMHA(nn.Module):
             k = torch.cat((nk, k), dim=-2)
             v = torch.cat((nv, v), dim=-2)
 
-            key_padding_mask = repeat(key_padding_mask, "b 1 1 j -> b h i j", h=h, i=n)
+            mask = repeat(mask, "b 1 1 j -> b h i j", h=h, i=n)
 
-            key_padding_mask = F.pad(key_padding_mask, (1, 0), value=True)
+            mask = F.pad(mask, (1, 0), value=True)
 
             ## When no context
             # if key_padding_mask.shape[-1] == 2:
@@ -350,7 +378,9 @@ class CustomMHA(nn.Module):
 
         # print(q.shape, k.shape, v.shape, input_mask.shape)
 
-        out = self.attend(q, k, v, mask=key_padding_mask, attn_bias=attn_bias)
+        # print("in custom", q.shape, k.shape, v.shape, mask.shape)
+
+        out = self.attend(q, k, v, mask=mask, attn_bias=attn_bias, is_causal=is_causal)
 
         out = rearrange(out, "b h n d -> b n (h d)")
         return self.to_out(out)
