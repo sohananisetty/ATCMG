@@ -260,7 +260,12 @@ class BaseMotionDataset(ABC, data.Dataset):
 
         return trn_data
 
-    def toMotion(self, motion, motion_rep=None, hml_rep=None):
+    def toMotion(
+        self,
+        motion: Union[torch.Tensor, np.ndarray],
+        motion_rep: MotionRep = None,
+        hml_rep: str = None,
+    ):
 
         assert len(motion.shape) == 2, "remove batch dimension"
         if hml_rep is None:

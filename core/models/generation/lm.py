@@ -566,23 +566,6 @@ class LMModel(StreamingModule):
             assert isinstance(cfg_conditions, tuple), type(cfg_conditions)
             condition_tensors, null_condition_tensors = cfg_conditions
 
-            # print(
-            #     condition_tensors["text"][0].shape, condition_tensors["audio"][0].shape
-            # )
-            # print(
-            #     condition_tensors["text"][1].shape, condition_tensors["audio"][1].shape
-            # )
-            # print(
-            #     null_condition_tensors["text"][0].shape,
-            #     null_condition_tensors["audio"][0].shape,
-            # )
-            # print(
-            #     null_condition_tensors["text"][1].shape,
-            #     null_condition_tensors["audio"][1].shape,
-            # )
-
-            # print(sequence.shape, seq_mask.shape)
-
             cond_logits = model(
                 inputs=(sequence, seq_mask),
                 condition_tensors=condition_tensors,
@@ -750,23 +733,6 @@ class LMModel(StreamingModule):
         # With a batch size of 1, this can be slower though.
         cfg_conditions: CFGConditions
         two_step_cfg = self.two_step_cfg if two_step_cfg is None else two_step_cfg
-        # if conditions:
-        #     null_conditions = ClassifierFreeGuidanceDropout(p=1.0)(conditions)
-        #     if two_step_cfg:
-        #         cfg_conditions = (
-        #             self.condition_provider(
-        #                 self.condition_provider.tokenize(conditions)
-        #             ),
-        #             self.condition_provider(
-        #                 self.condition_provider.tokenize(null_conditions)
-        #             ),
-        #         )
-        #     else:
-        #         conditions = conditions + null_conditions
-        #         tokenized = self.condition_provider.tokenize(conditions)
-        #         cfg_conditions = self.condition_provider(tokenized)
-        # else:
-        #     cfg_conditions = {}
 
         if conditions:
             if neg_conditions is not None:
@@ -991,5 +957,15 @@ class MotionGen(nn.Module):
         loss = ce
 
         if return_logits:
-            return (logits, loss, ce_per_codebook)
-        return loss, ce_per_codebook
+            return MotionGenOutput(
+                logits=logits, loss=loss, ce_per_codebook=ce_per_codebook
+            )
+        return MotionGenOutput(loss=loss, ce_per_codebook=ce_per_codebook)
+
+
+@dataclass
+class MotionGenOutput:
+    loss: torch.Tensor
+    logits: torch.Tensor = None
+
+    ce_per_codebook: torch.Tensor = None

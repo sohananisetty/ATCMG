@@ -202,6 +202,7 @@ def simple_collate(
         motion_list=motions,
         max_length=max(lens),
     )
+
     inputs["names"] = np.array(names)
     inputs["motion"] = (torch.Tensor(motion), torch.Tensor(mask))
 

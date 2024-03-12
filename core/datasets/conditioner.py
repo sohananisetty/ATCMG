@@ -37,7 +37,7 @@ class ConditionProvider(nn.Module):
     - sampling_rate (int): The sampling rate for audio.
     - audio_max_length_s (int): The maximum length of audio in seconds.
     - audio_padding (str): The type of padding for audio (e.g., 'longest', 'repeat', or 'repeatpad').
-    - motion_padding (str): The type of padding for motion (e.g., 'longest', 'repeat', or 'repeatpad').
+    - motion_padding (str): The type of padding for motion (e.g., 'max_length', 'longest', 'repeat', or 'repeatpad').
     - motion_max_length_s (int): The maximum length of motion in seconds.
     - fps (int): The frame rate for motion.
     - motion_rep (str): The representation of motion (e.g., 'full' , 'body' , 'left_hand' , 'right_hand' , 'hand').
@@ -79,6 +79,7 @@ class ConditionProvider(nn.Module):
         self.audio_rep = audio_rep
 
         self.motion_padding = motion_padding
+
         self.motion_max_length_s = motion_max_length_s
         self.motion_max_length = motion_max_length_s * fps
         self.pad_id = pad_id
@@ -202,11 +203,16 @@ class ConditionProvider(nn.Module):
         motion_list: List[np.ndarray],
         max_length: int = None,
         down_sampling_factor=4,
-        padding="longest",
+        padding=None,
         subset_index_list=None,
     ) -> tp.Tuple[np.ndarray, np.ndarray]:
         motions = []
         masks = []
+
+        padding = padding if padding is not None else self.motion_padding
+
+        if padding == "max_length":
+            assert len(motion_list) == 1, "if using max length batch size should be 1"
 
         if padding == "longest" or max_length is None:
             max_length_ = (
@@ -217,6 +223,12 @@ class ConditionProvider(nn.Module):
         for idx, motion in enumerate(motion_list):
 
             seq_len = motion.shape[0]
+
+            if padding == "max_length":
+                mask = np.array([1] * seq_len)
+                motions.append(motion)
+                masks.append(mask)
+                continue
 
             if seq_len >= max_length:
 

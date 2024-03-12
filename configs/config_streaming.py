@@ -111,6 +111,10 @@ cfg.transformer_lm.past_context = None
 cfg.transformer_lm.causal = True
 cfg.transformer_lm.add_null_kv = False
 
+## Loss
+cfg.transformer_lm.hand_loss = 0.6
+cfg.transformer_lm.body_loss = 1.2
+
 ## CFG
 cfg.transformer_lm.cfg_dropout = 0.0
 cfg.transformer_lm.cfg_coef = 0.3

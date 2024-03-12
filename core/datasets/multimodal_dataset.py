@@ -410,7 +410,7 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         self.text_dir = os.path.join(data_root, "texts/semantic_labels")
 
         if motion_rep == "full":
-            self.motion_dir = os.path.join(data_root, f"indices/body")
+            self.motion_dir = os.path.join(data_root, f"indices/body_rv")
         else:
             self.motion_dir = os.path.join(data_root, f"indices/{motion_rep}")
         self.audio_dir = os.path.join(data_root, "audio")
@@ -541,12 +541,12 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         if self.motion_rep == "full":
             left_hand_motion = np.load(
                 os.path.join(
-                    self.motion_dir.replace("body", "left_hand"), name + ".npy"
+                    self.motion_dir.replace("body_rv", "left_hand"), name + ".npy"
                 )
             ).squeeze()
             right_hand_motion = np.load(
                 os.path.join(
-                    self.motion_dir.replace("body", "right_hand"), name + ".npy"
+                    self.motion_dir.replace("body_rv", "right_hand"), name + ".npy"
                 )
             ).squeeze()
 

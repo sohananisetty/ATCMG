@@ -61,8 +61,6 @@ cfg.vqvae = CN()
 cfg.vqvae.target = "core.models"
 
 cfg.vqvae.nb_joints = 52
-# cfg.vqvae.nb_joints_hands = 30
-# cfg.vqvae.nb_joints_body = 22
 cfg.vqvae.motion_dim = 623
 cfg.vqvae.dim = 512
 cfg.vqvae.depth = 3
