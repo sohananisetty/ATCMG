@@ -67,6 +67,9 @@ cfg.train.lr_scheduler_type = "cosine"
 ##optimizations
 cfg.train.autocast = True
 cfg.train.autocast_dtype = "float16"
+## Loss
+cfg.train.hand_loss = 0.6
+cfg.train.body_loss = 1.2
 
 
 cfg.codebooks_pattern = CN()
@@ -111,9 +114,6 @@ cfg.transformer_lm.past_context = None
 cfg.transformer_lm.causal = True
 cfg.transformer_lm.add_null_kv = False
 
-## Loss
-cfg.transformer_lm.hand_loss = 0.6
-cfg.transformer_lm.body_loss = 1.2
 
 ## CFG
 cfg.transformer_lm.cfg_dropout = 0.0

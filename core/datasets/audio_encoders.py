@@ -74,10 +74,10 @@ class EncodecConditioner(nn.Module):
             quantized_values = _decode_frame(audio_codes[0], audio_scales[0])
         else:
             decoded_frames = []
-            for codes, scale in zip(audio_codes, audio_scales):
+            for code, scale in zip(audio_codes, audio_scales):
 
-                frames = _decode_frame(frame, scale)
-                decoded_frames.append(outputs)
+                frames = _decode_frame(code, scale)
+                decoded_frames.append(frames)
 
             quantized_values = self.encoder._linear_overlap_add(
                 decoded_frames, self.encoder.config.chunk_stride or 1
@@ -98,7 +98,9 @@ class EncodecConditioner(nn.Module):
                 .to(torch.bool)
             )
 
-            quantized_values = quantized_values * padding_mask[..., None]
+            quantized_values = (
+                quantized_values * padding_mask[:, : quantized_values.shape[0], None]
+            )
 
         return quantized_values, padding_mask
 

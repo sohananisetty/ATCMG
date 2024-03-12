@@ -103,7 +103,7 @@ class MotionStreamerTrainer(nn.Module):
         )
 
         dataset_names = {
-            "animation": 0.8,
+            "animation": 1.0,
             "humanml": 3.5,
             "perform": 0.6,
             "GRAB": 1.0,
@@ -286,8 +286,8 @@ class MotionStreamerTrainer(nn.Module):
 
             loss = (
                 avg_loss
-                + self.model_args.body_loss * loss_body
-                + self.model_args.hand_loss * (loss_left + loss_right)
+                + self.training_args.body_loss * loss_body
+                + self.training_args.hand_loss * (loss_left + loss_right)
             )
 
             loss.backward()
@@ -372,8 +372,8 @@ class MotionStreamerTrainer(nn.Module):
 
                 loss = (
                     avg_loss
-                    + self.model_args.body_loss * loss_body
-                    + self.model_args.hand_loss * (loss_left + loss_right)
+                    + self.training_args.body_loss * loss_body
+                    + self.training_args.hand_loss * (loss_left + loss_right)
                 )
 
                 loss_dict["loss"] = loss.detach().cpu()

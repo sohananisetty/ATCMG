@@ -64,7 +64,7 @@ class ConditionProvider(nn.Module):
         self.audio_padding = audio_padding
 
         if audio_rep == AudioRep.ENCODEC:
-            self.sampling_rate = 50
+            self.sampling_rate = 30
         elif audio_rep == AudioRep.LIBROSA:
             self.sampling_rate = 30
         else:

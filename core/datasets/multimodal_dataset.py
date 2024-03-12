@@ -416,7 +416,7 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         self.audio_dir = os.path.join(data_root, "audio")
 
         if self.audio_rep == "encodec":
-            self.sampling_rate = 50
+            self.sampling_rate = 30
         elif self.audio_rep == "librosa":
             self.sampling_rate = 30
         else:

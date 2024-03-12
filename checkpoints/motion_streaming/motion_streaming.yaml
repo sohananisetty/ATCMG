@@ -44,11 +44,11 @@ transformer_lm:
   dim : 512
   audio_input_dim: 128
   text_input_dim: 768
-  num_layers: 2
+  num_layers: 8
   num_heads: 8
   n_q: 3
   card: 512
-  cfg_dropout: 0.4
+  cfg_dropout: 0.3
   cfg_coef: 3.0
   
   cross_attention: True
