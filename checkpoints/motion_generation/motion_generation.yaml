@@ -1,0 +1,42 @@
+model_name: "motion_generation"
+output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_generation"
+dataset:
+  dataset_name: "mix"
+  dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
+  motion_rep: "body"
+  text_rep: "pooled_text_embed"
+  audio_rep: "encodec"
+  hml_rep: "gprvc"
+  motion_min_length_s: 5
+  motion_max_length_s: 15
+train:
+  resume: False
+  num_train_iters : 310000 #'Number of training steps
+  save_steps : 10000
+  logging_steps : 10
+  wandb_every : 200
+  evaluate_every : 10000
+  eval_bs : 200
+  train_bs : 200
+  gradient_accumulation_steps : 3
+  learning_rate : 2e-4
+  weight_decay : 1e-3
+  warmup_steps : 4000
+  gamma : 0.05
+  lr_scheduler_type : "cosine"
+motion_generator:
+  target: "core.models.generation.motion_generator.MotionMuse"
+  dim : 512
+  depth: 6
+  cond_dropout: 0.4
+  no_mask_token_prob: 0.3
+  emb_dropout: 0.1
+  num_tokens: 1024
+  fuse_method: [{"cross": ["audio"], "prepend": ["text"]}]
+  causal: True
+  flash: True
+
+
+  
+  
+

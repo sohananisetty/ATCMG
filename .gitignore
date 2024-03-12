@@ -6,6 +6,12 @@ logs/*
 body_models/*
 paper_renders/*
 models--t5-base/*
+models--facebook--encodec_24khz/*
+
+data/
+outputs/
+
+.DS_Store
 
 !pretrained/.gitkeep
 !body_models/.gitkeep
@@ -122,9 +128,3 @@ venv.bak/
 
 # mypy
 .mypy_cache/
-
-data/
-checkpoints/
-outputs/
-
-.DS_Store

@@ -1,0 +1,41 @@
+model_name: "motion_translation"
+output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ACTMG/checkpoints/motion_translation"
+dataset:
+  dataset_name: "mix"
+  dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
+  motion_rep: "body"
+  text_rep: "pooled_text_embed"
+  audio_rep: "encodec"
+  motion_min_length_s: 3
+  motion_max_length_s: 20
+
+train:
+  resume: False
+  num_train_iters : 310000 #'Number of training steps
+  save_steps : 10000
+  logging_steps : 10
+  wandb_every : 200
+  evaluate_every : 10000
+  eval_bs : 400
+  train_bs : 400
+  gradient_accumulation_steps : 1
+  learning_rate : 2e-4
+  weight_decay : 1e-3
+  warmup_steps : 4000
+  gamma : 0.05
+  lr_scheduler_type : "cosine"
+translation_transformer:
+  target: "core.models.generation.translation_transformer.TranslationTransformer"
+  dim : 256
+  depth: 2
+  cond_dropout: 0.2
+  emb_dropout: 0.1
+  dim_out: 4
+  fuse_method: [{"cross": ["audio"], "prepend": ["text"]}]
+  is_self_causal: True
+  is_cross_causal: True
+
+
+  
+  
+
