@@ -1,0 +1,78 @@
+model_name: "motion_streaming_add_full"
+output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_streaming_add_full"
+dataset:
+  dataset_name: "mix"
+  dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
+  motion_rep: "full"
+  text_rep: "full_text_embed"
+  audio_rep: "encodec"
+  hml_rep: "gprvc"
+  motion_min_length_s: 3
+  motion_max_length_s: 15
+
+train:
+  resume: False
+  num_train_iters : 110001 #'Number of training steps
+  save_steps : 10000
+  logging_steps : 10
+  wandb_every : 200
+  evaluate_every : 10000
+  eval_bs : 200
+  train_bs : 200
+  gradient_accumulation_steps : 2
+  learning_rate : 2e-4
+  weight_decay : 1e-3
+  warmup_steps : 4000
+  gamma : 0.05
+  lr_scheduler_type : "cosine"
+
+vqvae:
+  body_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_rv/vqvae_rv.yaml"
+  left_hand_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_left_hand/vqvae_left_hand.yaml"
+  right_hand_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_right_hand/vqvae_right_hand.yaml"
+
+
+codebooks_pattern:
+  modeling: "delay"
+  delays: [0 ,1 , 1]
+
+fuser:
+  fuse_method: [{'cross': ['text'], 'input_interpolate': ['audio']}]
+
+transformer_lm:
+  target: "core.models.generation.lm.MotionGen"
+  dim : 512
+  audio_input_dim: 128
+  text_input_dim: 768
+  num_layers: 8
+  num_heads: 8
+  n_q: 3
+  card: 512
+  cfg_dropout: 0.3
+  cfg_coef: 3.0
+  
+  cross_attention: True
+  causal: True
+  add_null_kv: True
+  two_step_cfg: False
+  bias_proj: False
+  bias_ff: False
+  bias_attn: False
+  norm_first: True
+  proj_input: False
+
+  ##iniitialization
+  weight_init: "gaussian"
+  depthwise_init: "current"
+  zero_bias_init: True
+
+  ##optimizations
+  custom: False
+  attention_as_float32: False
+  memory_efficient: False
+  
+
+
+  
+  
+

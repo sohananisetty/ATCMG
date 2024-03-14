@@ -204,7 +204,7 @@ class MotionAudioTextDataset(BaseMotionDataset):
         self.audio_dir = os.path.join(data_root, "audio")
 
         if self.audio_rep == "encodec":
-            self.sampling_rate = 50
+            self.sampling_rate = 30
         elif self.audio_rep == "librosa":
             self.sampling_rate = 30
         else:
@@ -410,7 +410,7 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         self.text_dir = os.path.join(data_root, "texts/semantic_labels")
 
         if motion_rep == "full":
-            self.motion_dir = os.path.join(data_root, f"indices/body_rv")
+            self.motion_dir = os.path.join(data_root, f"indices/body")
         else:
             self.motion_dir = os.path.join(data_root, f"indices/{motion_rep}")
         self.audio_dir = os.path.join(data_root, "audio")
@@ -433,6 +433,19 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
                         motion = np.load(
                             os.path.join(self.motion_dir, line.strip())
                         ).squeeze()
+                        if self.motion_rep == "full":
+                            left_hand_motion = np.load(
+                                os.path.join(
+                                    self.motion_dir.replace("body", "left_hand"),
+                                    line.strip(),
+                                )
+                            ).squeeze()
+                            right_hand_motion = np.load(
+                                os.path.join(
+                                    self.motion_dir.replace("body", "right_hand"),
+                                    line.strip(),
+                                )
+                            ).squeeze()
                         if motion.shape[0] < default(
                             self.window_size, self.min_motion_length
                         ):
@@ -541,12 +554,12 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         if self.motion_rep == "full":
             left_hand_motion = np.load(
                 os.path.join(
-                    self.motion_dir.replace("body_rv", "left_hand"), name + ".npy"
+                    self.motion_dir.replace("body", "left_hand"), name + ".npy"
                 )
             ).squeeze()
             right_hand_motion = np.load(
                 os.path.join(
-                    self.motion_dir.replace("body_rv", "right_hand"), name + ".npy"
+                    self.motion_dir.replace("body", "right_hand"), name + ".npy"
                 )
             ).squeeze()
 

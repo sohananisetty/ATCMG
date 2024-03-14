@@ -517,15 +517,24 @@ class ConditionFuser(nn.Module):
         for cond_type, (cond, cond_mask) in conditions.items():
             op = self.cond2fuse[cond_type]
             if op == "sum":
-                input += cond
-                input_padding_mask = input_padding_mask & cond_mask
+                input += cond * cond_mask[..., None]
+                # input_padding_mask = input_padding_mask
+                # & cond_mask
 
             elif op == "input_interpolate":
                 cond = einops.rearrange(cond, "b t d -> b d t")
                 cond = F.interpolate(cond, size=input.shape[1])
-                cond_mask = F.interpolate(cond_mask, size=input.shape[1])
-                input += einops.rearrange(cond, "b d t -> b t d")
-                input_padding_mask = input_padding_mask & cond_mask
+                cond_mask = (
+                    F.interpolate(
+                        cond_mask.unsqueeze(1).to(torch.float),
+                        size=input.shape[1],
+                    )
+                    .squeeze(1)
+                    .to(torch.bool)
+                )
+                input += einops.rearrange(cond, "b d t -> b t d") * cond_mask[..., None]
+                # input_padding_mask = input_padding_mask
+                # & cond_mask
 
             elif op == "prepend":
                 if len(cond.shape) == 2:
@@ -704,15 +713,25 @@ class ConditionFuserStreamer(nn.Module):
         for cond_type, (cond, cond_mask) in conditions.items():
             op = self.cond2fuse[cond_type]
             if op == "sum":
-                input += cond
-                input_padding_mask = input_padding_mask & cond_mask
+                input[:, 1:] += cond * cond_mask[..., None]
+                # input_padding_mask[:, 1:] = input_padding_mask[:, 1:] & cond_mask
 
             elif op == "input_interpolate":
                 cond = einops.rearrange(cond, "b t d -> b d t")
-                cond = F.interpolate(cond, size=input.shape[1])
-                cond_mask = F.interpolate(cond_mask, size=input.shape[1])
-                input += einops.rearrange(cond, "b d t -> b t d")
-                input_padding_mask = input_padding_mask & cond_mask
+                cond_downsampled_size = T - 1
+                cond = F.interpolate(cond, size=cond_downsampled_size)
+                cond_mask = (
+                    F.interpolate(
+                        cond_mask.unsqueeze(1).to(torch.float),
+                        size=cond_downsampled_size,
+                    )
+                    .squeeze(1)
+                    .to(torch.bool)
+                )
+                input[:, 1:] += (
+                    einops.rearrange(cond, "b d t -> b t d") * cond_mask[..., None]
+                )
+                # input_padding_mask[:, 1:] = input_padding_mask[:, 1:] & cond_mask
 
             elif op == "prepend":
                 if len(cond.shape) == 2:

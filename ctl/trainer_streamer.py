@@ -28,9 +28,8 @@ from transformers import AdamW, get_scheduler
 from utils.motion_processing.hml_process import recover_from_ric, recover_root_rot_pos
 from yacs.config import CfgNode
 
-from configs.config import cfg, vqvae_get_cfg_defaults
-from configs.config_streaming import get_cfg_defaults as strm_get_cfg_defaults
-from core.models.generation.lm import LMModel, MotionGen
+from configs.config import get_cfg_defaults as vqvae_get_cfg_defaults
+from core.models.generation.lm import MotionGen
 
 
 def cycle(dl):
@@ -76,9 +75,9 @@ class MotionStreamerTrainer(nn.Module):
         #     self.nb_joints = 30
 
         target = self.model_args.pop("target")
-        fuse_config = self.model_args.fuser
-        pattern_args = self.model_args.codebooks_pattern
-        vqvae_args = self.model_args.vqvae
+        fuse_config = self.args.fuser
+        pattern_args = self.args.codebooks_pattern
+        vqvae_args = self.args.vqvae
 
         self.motion_streamer = MotionGen(self.model_args, fuse_config, pattern_args).to(
             self.device
@@ -103,7 +102,7 @@ class MotionStreamerTrainer(nn.Module):
         )
 
         dataset_names = {
-            "animation": 1.0,
+            "animation": 0.7,
             "humanml": 3.5,
             "perform": 0.6,
             "GRAB": 1.0,
@@ -163,7 +162,9 @@ class MotionStreamerTrainer(nn.Module):
             batch_size=self.training_args.train_bs,
             sampler=sampler_train,
             shuffle=False if sampler_train else True,
-            collate_fn=partial(simple_collate, conditioner=condition_provider),
+            collate_fn=partial(
+                simple_collate, conditioner=condition_provider, permute=True
+            ),
             drop_last=True,
             # pin_memory=False,
             # num_workers=2,
@@ -172,7 +173,9 @@ class MotionStreamerTrainer(nn.Module):
             test_ds,
             batch_size=self.training_args.eval_bs,
             shuffle=False,
-            collate_fn=partial(simple_collate, conditioner=condition_provider),
+            collate_fn=partial(
+                simple_collate, conditioner=condition_provider, permute=True
+            ),
             drop_last=True,
             # pin_memory=False,
             # num_workers=2,
@@ -182,7 +185,9 @@ class MotionStreamerTrainer(nn.Module):
             self.render_ds,
             batch_size=1,
             shuffle=False,
-            collate_fn=partial(simple_collate, conditioner=condition_provider),
+            collate_fn=partial(
+                simple_collate, conditioner=condition_provider, permute=True
+            ),
         )
 
         self.dl_iter = cycle(self.dl)
@@ -387,7 +392,7 @@ class MotionStreamerTrainer(nn.Module):
                     else:
                         val_loss_ae[key] = value
 
-                    cnt += 1
+                cnt += 1
 
         for key in val_loss_ae.keys():
             val_loss_ae[key] = val_loss_ae[key] / cnt
@@ -403,9 +408,9 @@ class MotionStreamerTrainer(nn.Module):
         body_inds = codes[:, 0]
         left_inds = codes[:, 1]
         right_inds = codes[:, 2]
-        body_motion = self.body_model.decode(body_inds[0:1]).detach()
-        left_motion = self.left_hand_model.decode(left_inds[0:1]).detach()
-        right_motion = self.right_hand_model.decode(right_inds[0:1]).detach()
+        body_motion = self.body_model.decode(body_inds[0:1]).detach().cpu()
+        left_motion = self.left_hand_model.decode(left_inds[0:1]).detach().cpu()
+        right_motion = self.right_hand_model.decode(right_inds[0:1]).detach().cpu()
         body_M = dset.toMotion(
             body_motion[0],
             motion_rep=MotionRep(self.body_cfg.dataset.motion_rep),
@@ -447,14 +452,19 @@ class MotionStreamerTrainer(nn.Module):
 
                 motions = inputs["motion"][0].squeeze().to(torch.long)[None]  ###  1 k n
                 motion_mask = inputs["motion"][1]  # 1 n
+
                 gt_len = int(sum(motion_mask[0]))
 
                 gen_ids = self.motion_streamer.model.generate(
-                    conditions, max_gen_len=gt_len, two_step_cfg=True
+                    conditions=conditions, max_gen_len=gt_len, two_step_cfg=True
                 )  ## 1 k n
 
-                gt_motion = self.bkn_to_motion(motions[...:gt_len], dset)
-                pred_motion = self.bkn_to_motion(gen_ids[...:gt_len], dset)
+                # gen_ids_no_cond = self.motion_streamer.model.generate(
+                #     conditions=None, max_gen_len=gt_len, two_step_cfg=True
+                # )
+
+                gt_motion = self.bkn_to_motion(motions[..., :gt_len], dset)
+                pred_motion = self.bkn_to_motion(gen_ids[..., :gt_len], dset)
 
                 dset.render_hml(
                     gt_motion,

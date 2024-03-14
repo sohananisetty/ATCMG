@@ -642,10 +642,9 @@ class LMModel(StreamingModule):
     @torch.no_grad()
     def generate(
         self,
-        prompt: tp.Optional[torch.Tensor] = None,
-        # conditions: tp.List[ConditioningAttributes] = [],
         conditions: tp.Optional[ConditionTensors] = None,
         neg_conditions: tp.Optional[ConditionTensors] = None,
+        prompt: tp.Optional[torch.Tensor] = None,
         num_samples: tp.Optional[int] = None,
         max_gen_len: int = 225,
         use_sampling: bool = True,
