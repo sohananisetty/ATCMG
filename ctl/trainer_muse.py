@@ -12,9 +12,7 @@ import torch
 import transformers
 import utils.vis_utils.plot_3d_global as plot_3d
 import wandb
-
-# from configs.config import get_cfg_defaults as get_cfg_defaults3
-# from configs.config_t2m import cfg, get_cfg_defaults
+from configs.config_t2m import get_cfg_defaults as muse_get_cfg_defaults
 from core import AudioRep, MotionRep, TextRep
 from core.datasets.conditioner import ConditionProvider
 from core.datasets.multimodal_dataset import load_dataset_gen, simple_collate
@@ -27,9 +25,9 @@ from tqdm import tqdm
 from transformers import AdamW, get_scheduler
 from utils.motion_processing.hml_process import recover_from_ric, recover_root_rot_pos
 from yacs.config import CfgNode
+from core.models.generation.muse import MLMModel, MotionMuse
 
 from configs.config import get_cfg_defaults as vqvae_get_cfg_defaults
-from core.models.generation.lm import MotionGen
 
 
 def cycle(dl):
@@ -48,7 +46,7 @@ def accum_log(log, new_logs):
 # main trainer class
 
 
-class MotionStreamerTrainer(nn.Module):
+class MotionMuseTrainer(nn.Module):
     def __init__(
         self,
         args: CfgNode,
@@ -61,7 +59,7 @@ class MotionStreamerTrainer(nn.Module):
         self.args = args
         self.training_args = args.train
         self.dataset_args = args.dataset
-        self.model_args = args.transformer_lm
+        self.model_args = args.motion_generator
 
         self.num_train_steps = self.training_args.num_train_iters
         self.output_dir = Path(self.args.output_dir)
@@ -69,20 +67,20 @@ class MotionStreamerTrainer(nn.Module):
 
         target = self.model_args.pop("target")
         fuse_config = self.args.fuser
-        pattern_args = self.args.codebooks_pattern
-        vqvae_args = self.args.vqvae
+        pattern_config = self.args.codebooks_pattern
+        vqvae_config = self.args.vqvae
 
-        self.motion_streamer = MotionGen(self.model_args, fuse_config, pattern_args).to(
+        self.motion_muse = MotionMuse(self.model_args, fuse_config, pattern_config).to(
             self.device
         )
-        self.load_vqvae(vqvae_args)
+        self.load_vqvae(vqvae_config)
 
         self.register_buffer("steps", torch.Tensor([0]))
 
         self.grad_accum_every = self.training_args.gradient_accumulation_steps
 
         self.optim = get_optimizer(
-            self.motion_streamer.parameters(),
+            self.motion_muse.parameters(),
             lr=self.training_args.learning_rate,
             wd=self.training_args.weight_decay,
         )
@@ -95,22 +93,22 @@ class MotionStreamerTrainer(nn.Module):
         )
 
         dataset_names = {
-            "animation": 0.7,
-            "humanml": 3.0,
-            "perform": 0.6,
-            "GRAB": 1.0,
-            "idea400": 1.5,
-            "humman": 0.5,
-            "beat": 2.0,
-            "game_motion": 0.8,
-            "music": 0.5,
-            "aist": 1.5,
-            "fitness": 1.0,
-            "moyo": 1.0,
+            "animation": 0.8,
+            # "humanml": 3.5,
+            # "perform": 0.6,
+            # "GRAB": 1.0,
+            # "idea400": 1.5,
+            # "humman": 0.5,
+            # "beat": 2.0,
+            # "game_motion": 0.8,
+            # "music": 0.5,
+            # "aist": 1.5,
+            # "fitness": 1.0,
+            # "moyo": 1.0,
             "choreomaster": 2.0,
-            "dance": 1.0,
-            "kungfu": 1.0,
-            "EgoBody": 0.5,
+            # "dance": 1.0,
+            # "kungfu": 1.0,
+            # "EgoBody": 0.5,
             # "HAA500": 1.0,
         }
 
@@ -145,9 +143,8 @@ class MotionStreamerTrainer(nn.Module):
             motion_padding=self.dataset_args.motion_padding,
             audio_padding=self.dataset_args.audio_padding,
             motion_max_length_s=self.dataset_args.motion_max_length_s,
-            motion_min_length_s=self.dataset_args.motion_min_length_s,
             audio_max_length_s=self.dataset_args.motion_max_length_s,
-            pad_id=self.motion_streamer.model.pad_token_id,
+            pad_id=self.motion_muse.model.pad_token_id,
             fps=self.dataset_args.fps / self.dataset_args.down_sampling_ratio,
         )
 
@@ -165,8 +162,7 @@ class MotionStreamerTrainer(nn.Module):
         )
         self.valid_dl = DataLoader(
             test_ds,
-            batch_size=1,
-            # self.training_args.eval_bs,
+            batch_size=self.training_args.eval_bs,
             shuffle=False,
             collate_fn=partial(
                 simple_collate, conditioner=condition_provider, permute=True
@@ -207,15 +203,15 @@ class MotionStreamerTrainer(nn.Module):
         self.right_cfg = vqvae_get_cfg_defaults()
         self.right_cfg.merge_from_file(vqvae_args.right_hand_config)
 
-        self.left_hand_model = HumanVQVAE(self.left_cfg.vqvae).to(self.device).eval()
-        self.left_hand_model.load(
-            os.path.join(self.left_cfg.output_dir, "vqvae_motion.pt")
-        )
+        # self.left_hand_model = HumanVQVAE(self.left_cfg.vqvae).to(self.device).eval()
+        # self.left_hand_model.load(
+        #     os.path.join(self.left_cfg.output_dir, "vqvae_motion.pt")
+        # )
 
-        self.right_hand_model = HumanVQVAE(self.right_cfg.vqvae).to(self.device).eval()
-        self.right_hand_model.load(
-            os.path.join(self.right_cfg.output_dir, "vqvae_motion.pt")
-        )
+        # self.right_hand_model = HumanVQVAE(self.right_cfg.vqvae).to(self.device).eval()
+        # self.right_hand_model.load(
+        #     os.path.join(self.right_cfg.output_dir, "vqvae_motion.pt")
+        # )
 
         self.body_model = HumanVQVAE(self.body_cfg.vqvae).to(self.device).eval()
         self.body_model.load(os.path.join(self.body_cfg.output_dir, "vqvae_motion.pt"))
@@ -230,7 +226,7 @@ class MotionStreamerTrainer(nn.Module):
 
     def save(self, path, loss=None):
         pkg = dict(
-            model=self.motion_streamer.state_dict(),
+            model=self.motion_muse.state_dict(),
             optim=self.optim.state_dict(),
             steps=self.steps,
             total_loss=self.best_loss if loss is None else loss,
@@ -242,7 +238,7 @@ class MotionStreamerTrainer(nn.Module):
         assert path.exists()
 
         pkg = torch.load(str(path), map_location="cuda")
-        self.motion_streamer.load_state_dict(pkg["model"])
+        self.motion_muse.load_state_dict(pkg["model"])
 
         self.optim.load_state_dict(pkg["optim"])
         self.steps = pkg["steps"]
@@ -260,7 +256,7 @@ class MotionStreamerTrainer(nn.Module):
     def train_step(self):
         steps = int(self.steps.item())
 
-        self.motion_streamer = self.motion_streamer.train()
+        self.motion_muse = self.motion_muse.train()
 
         # logs
 
@@ -274,32 +270,18 @@ class MotionStreamerTrainer(nn.Module):
 
             # inputs["motion"][0] b n 1
 
-            motions = inputs["motion"][0].squeeze().to(torch.long)
+            motions = inputs["motion"][0].to(torch.long)
             motion_mask = inputs["motion"][1]
 
-            out = self.motion_streamer((motions, motion_mask), conditions)
+            loss = self.motion_muse((motions, motion_mask), conditions)
 
-            avg_loss = out.loss / self.grad_accum_every
-            loss_body = out.ce_per_codebook[0] / self.grad_accum_every
-            loss_left = out.ce_per_codebook[1] / self.grad_accum_every
-            loss_right = out.ce_per_codebook[2] / self.grad_accum_every
-
-            loss = (
-                avg_loss
-                + self.training_args.body_loss * loss_body
-                + self.training_args.hand_loss * (loss_left + loss_right)
-            )
+            loss = loss / self.grad_accum_every
 
             loss.backward()
 
             accum_log(
                 logs,
-                dict(
-                    loss=loss.detach().cpu(),
-                    loss_body=loss_body.detach().cpu(),
-                    loss_left=loss_left.detach().cpu(),
-                    loss_right=loss_right.detach().cpu(),
-                ),
+                dict(loss=loss.detach().cpu()),
             )
 
         self.optim.step()
@@ -308,7 +290,7 @@ class MotionStreamerTrainer(nn.Module):
 
         # build pretty printed losses
 
-        losses_str = f"{steps}: model total cross entropy loss: {logs['loss'].float():.3} body ce {logs['loss_body'].float():.3} left ce {logs['loss_left'].float():.3} right ce {logs['loss_right'].float():.3} "
+        losses_str = f"{steps}: model cross entropy loss: {logs['loss'].float():.3} "
 
         # log
         if steps % self.wandb_every == 0:
@@ -321,13 +303,13 @@ class MotionStreamerTrainer(nn.Module):
         if not (steps % self.save_model_every):
             os.makedirs(os.path.join(self.output_dir, "checkpoints"), exist_ok=True)
             model_path = os.path.join(
-                self.output_dir, "checkpoints", f"motion_streamer.{steps}.pt"
+                self.output_dir, "checkpoints", f"motion_muse.{steps}.pt"
             )
             self.save(model_path)
             print(float(logs["loss"]), self.best_loss)
 
             if float(logs["loss"]) <= self.best_loss:
-                model_path = os.path.join(self.output_dir, f"motion_streamer.pt")
+                model_path = os.path.join(self.output_dir, f"motion_muse.pt")
                 self.save(model_path)
                 self.best_loss = logs["loss"]
 
@@ -343,7 +325,7 @@ class MotionStreamerTrainer(nn.Module):
         return logs
 
     def validation_step(self):
-        self.motion_streamer.eval()
+        self.motion_muse.eval()
         val_loss_ae = {}
 
         self.print(f"validation start")
@@ -363,23 +345,9 @@ class MotionStreamerTrainer(nn.Module):
                 motions = inputs["motion"][0].to(torch.long)
                 motion_mask = inputs["motion"][1]
 
-                out = self.motion_streamer((motions, motion_mask), conditions)
-
-                avg_loss = out.loss / self.grad_accum_every
-                loss_body = out.ce_per_codebook[0] / self.grad_accum_every
-                loss_left = out.ce_per_codebook[1] / self.grad_accum_every
-                loss_right = out.ce_per_codebook[2] / self.grad_accum_every
-
-                loss = (
-                    avg_loss
-                    + self.training_args.body_loss * loss_body
-                    + self.training_args.hand_loss * (loss_left + loss_right)
-                )
+                loss = self.motion_muse((motions, motion_mask), conditions)
 
                 loss_dict["loss"] = loss.detach().cpu()
-                loss_dict["loss_body"] = loss_body.detach().cpu()
-                loss_dict["loss_left"] = loss_left.detach().cpu()
-                loss_dict["loss_right"] = loss_right.detach().cpu()
 
                 for key, value in loss_dict.items():
                     if key in val_loss_ae:
@@ -387,43 +355,47 @@ class MotionStreamerTrainer(nn.Module):
                     else:
                         val_loss_ae[key] = value
 
-                cnt += 1
+                    cnt += 1
 
         for key in val_loss_ae.keys():
             val_loss_ae[key] = val_loss_ae[key] / cnt
 
         for key, value in val_loss_ae.items():
-            print(f"val_loss/{key}", value)
-            wandb.log({f"val_loss/{key}": value})
+            wandb.log({f"val_ce_loss/{key}": value})
 
-        self.motion_streamer.train()
+        print(
+            "val/ce_loss",
+            val_loss_ae["loss"],
+        )
+
+        self.motion_muse.train()
 
     def bkn_to_motion(self, codes, dset):
         # codes b k n
         body_inds = codes[:, 0]
-        left_inds = codes[:, 1]
-        right_inds = codes[:, 2]
+        # left_inds = codes[:, 1]
+        # right_inds = codes[:, 2]
         body_motion = self.body_model.decode(body_inds[0:1]).detach().cpu()
-        left_motion = self.left_hand_model.decode(left_inds[0:1]).detach().cpu()
-        right_motion = self.right_hand_model.decode(right_inds[0:1]).detach().cpu()
+        # left_motion = self.left_hand_model.decode(left_inds[0:1]).detach().cpu()
+        # right_motion = self.right_hand_model.decode(right_inds[0:1]).detach().cpu()
         body_M = dset.toMotion(
             body_motion[0],
             motion_rep=MotionRep(self.body_cfg.dataset.motion_rep),
             hml_rep=self.body_cfg.dataset.hml_rep,
         )
-        left_M = dset.toMotion(
-            left_motion[0],
-            motion_rep=MotionRep(self.left_cfg.dataset.motion_rep),
-            hml_rep=self.left_cfg.dataset.hml_rep,
-        )
-        right_M = dset.toMotion(
-            right_motion[0],
-            motion_rep=MotionRep(self.right_cfg.dataset.motion_rep),
-            hml_rep=self.right_cfg.dataset.hml_rep,
-        )
-        full_M = dset.to_full_joint_representation(body_M, left_M, right_M)
+        # left_M = dset.toMotion(
+        #     left_motion[0],
+        #     motion_rep=MotionRep(self.left_cfg.dataset.motion_rep),
+        #     hml_rep=self.left_cfg.dataset.hml_rep,
+        # )
+        # right_M = dset.toMotion(
+        #     right_motion[0],
+        #     motion_rep=MotionRep(self.right_cfg.dataset.motion_rep),
+        #     hml_rep=self.right_cfg.dataset.hml_rep,
+        # )
+        # full_M = dset.to_full_joint_representation(body_M, left_M, right_M)
 
-        return full_M
+        return body_M
 
     def sample_render_hmlvec(self, save_path):
         save_file = os.path.join(save_path, f"{int(self.steps.item())}")
@@ -432,7 +404,7 @@ class MotionStreamerTrainer(nn.Module):
         # assert self.render_dl.batch_size == 1 , "Batch size for rendering should be 1!"
 
         dataset_lens = self.render_ds.cumulative_sizes
-        self.motion_streamer.eval()
+        self.motion_muse.eval()
         print(f"render start")
         with torch.no_grad():
             for idx, (inputs, conditions) in tqdm(
@@ -446,20 +418,14 @@ class MotionStreamerTrainer(nn.Module):
                 conditions = self.to_device(conditions)
 
                 motions = inputs["motion"][0].to(torch.long)  ###  1 k n
-                motion_mask = inputs["motion"][1]  # 1 n
-
+                motion_mask = inputs["motion"][1]
                 gt_len = int(sum(motion_mask[0]))
 
-                gen_ids = self.motion_streamer.model.generate(
-                    conditions=conditions, max_gen_len=gt_len, two_step_cfg=True
-                )  ## 1 k n
+                gt_motion = self.bkn_to_motion(motions[:, :gt_len], dset)
 
-                # gen_ids_no_cond = self.motion_streamer.model.generate(
-                #     conditions=None, max_gen_len=gt_len, two_step_cfg=True
-                # )
+                gen_ids = self.motion_muse.generate(conditions, duration=gt_len)
 
-                gt_motion = self.bkn_to_motion(motions[..., :gt_len], dset)
-                pred_motion = self.bkn_to_motion(gen_ids[..., :gt_len], dset)
+                gen_motion = self.bkn_to_motion(gen_ids, dset)
 
                 dset.render_hml(
                     gt_motion,
@@ -468,14 +434,21 @@ class MotionStreamerTrainer(nn.Module):
                     ),
                 )
 
+                # dset.render_hml(
+                #     vqvae_output.decoded_motion.squeeze().cpu(),
+                #     os.path.join(
+                #         save_file, os.path.basename(name).split(".")[0] + "_pred.gif"
+                #     ),
+                # )
+
                 dset.render_hml(
-                    pred_motion,
+                    gen_motion,
                     os.path.join(
                         save_file, os.path.basename(name).split(".")[0] + "_gen.gif"
                     ),
                 )
 
-        self.motion_streamer.train()
+        self.motion_muse.train()
 
     def train(self, resume=False):
         self.best_loss = float("inf")
@@ -483,7 +456,7 @@ class MotionStreamerTrainer(nn.Module):
 
         if resume:
             save_dir = self.args.output_dir
-            save_path = os.path.join(save_dir, "motion_streamer.pt")
+            save_path = os.path.join(save_dir, "motion_muse.pt")
             print("resuming from ", save_path)
             self.load(save_path)
 

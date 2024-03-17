@@ -1,8 +1,8 @@
-from configs.config_t2m import cfg, get_cfg_defaults
-from ctl.trainer_generator import MotionMuseTrainer
+from configs.config_t2m import get_cfg_defaults
+from ctl.trainer_muse import MotionMuseTrainer
 
 if __name__ == "__main__":
-    nme = "motion_generation"
+    nme = "motion_muse"
     path = f"/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/{nme}/{nme}.yaml"
     cfg = get_cfg_defaults()
     print("loading config from:", path)

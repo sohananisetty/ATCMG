@@ -89,8 +89,28 @@ cfg.translation_transformer.positional_embedding_type = "SINE"
 
 # cfg.translation_transformer.nb_joints = 52
 
+
+cfg.codebooks_pattern = CN()
+cfg.codebooks_pattern.modeling = "parallel"  ## delay parralel unroll coarse_first
+cfg.codebooks_pattern.delays = [0, 1, 2]
+cfg.codebooks_pattern.flatten_first = 0
+cfg.codebooks_pattern.empty_initial = 0
+
+cfg.fuser = CN()
+cfg.fuser.fuse_method = [{"cross": ["audio"], "prepend": ["text"]}]
+cfg.fuser.cross_attention_pos_emb = False
+cfg.fuser.cross_attention_pos_emb_scale = 1.0
+
+
+cfg.vqvae = CN()
+cfg.vqvae.body_config = "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_rv/vqvae_rv.yaml"
+cfg.vqvae.left_hand_config = "/srv/hays-lab/scratch/sanisetty3/music_motion/ACMG/checkpoints/smplx_resnet_left/smplx_resnet_left.yaml"
+cfg.vqvae.right_hand_config = "/srv/hays-lab/scratch/sanisetty3/music_motion/ACMG/checkpoints/smplx_resnet_right/smplx_resnet_right.yaml"
+
+
 cfg.motion_generator = CN()
 cfg.motion_generator.target = "core.models.generation.motion_generator.MotionMuse"
+cfg.motion_generator.n_q = 3  # number of streams to model
 
 cfg.motion_generator.dim = 256
 cfg.motion_generator.depth = 8
@@ -105,7 +125,7 @@ cfg.motion_generator.post_emb_norm = False
 cfg.motion_generator.positional_embedding_type = "SINE"
 
 ## Conditional
-cfg.motion_generator.fuse_method = [{"cross": ["audio"], "prepend": ["text"]}]
+# cfg.motion_generator.fuse_method = [{"cross": ["audio"], "prepend": ["text"]}]
 cfg.motion_generator.audio_input_dim = 128
 cfg.motion_generator.text_input_dim = 768
 

@@ -305,7 +305,7 @@ class StreamingMultiheadAttention(StreamingModule):
             valid,
             torch.zeros([], device=device, dtype=dtype),
             torch.full([], float("-inf"), device=device, dtype=dtype),
-        )
+        )  ## -inf where upper triangle
 
     def _complete_kv(self, k, v):
         time_dim = _get_attention_time_dimension(self.memory_efficient)
@@ -414,12 +414,14 @@ class StreamingMultiheadAttention(StreamingModule):
 
             # print(query.shape, key.shape, value.shape, key_padding_mask.shape)
 
+            attn_mask = torch.where(attn_mask == 0, False, True)  ## padding True
+
             x = self.mha(
                 query,
                 key,
                 value,
-                key_padding_mask,
-                attn_mask,
+                ~key_padding_mask,  ## mask from padding True to padding False
+                ~attn_mask,  ## mask from padding True to padding False
             )
             x = x.to(dtype)
         else:
@@ -598,10 +600,10 @@ class StreamingTransformerLayer(nn.TransformerEncoderLayer):
             v = torch.cat((nv, cross_attention_src), dim=-2)
 
             kv_mask = F.pad(cross_key_padding_mask, (1, 0), value=False)
-            # if kv_mask.shape[-1] == 2:
-            #     kv_mask = kv_mask[..., :1]
-            #     k = k[..., :1, :]
-            #     v = v[..., :1, :]
+            if kv_mask.shape[-1] == 2:
+                kv_mask = kv_mask[..., :1]
+                k = k[..., :1, :]
+                v = v[..., :1, :]
 
             x = self.cross_attention(
                 query=src,

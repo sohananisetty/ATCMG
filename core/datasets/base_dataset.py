@@ -29,10 +29,11 @@ from .kinematics import getSkeleton
 class Motion2Positions:
 
     def __init__(self, data_root: str, motion_rep: MotionRep):
-        self.skeleton = getSkeleton(
-            os.path.join(data_root, "motion_data/000021_pos.npy"),
-            motion_rep=motion_rep.value,
-        )
+        # self.skeleton = getSkeleton(
+        #     os.path.join(data_root, "motion_data/000021_pos.npy"),
+        #     motion_rep=motion_rep.value,
+        # )
+        self.data_root = data_root
 
     def recover_root_rot_pos(self, data: Motion) -> Tuple[torch.Tensor, torch.Tensor]:
 
@@ -58,6 +59,11 @@ class Motion2Positions:
 
     def recover_from_rot(self, data: Motion) -> torch.Tensor:
 
+        skeleton = getSkeleton(
+            os.path.join(self.data_root, "motion_data/000021_pos.npy"),
+            motion_rep=data.motion_rep.value,
+        )
+
         data.tensor()
 
         if data.root_params is None:
@@ -72,11 +78,12 @@ class Motion2Positions:
         cont6d_params = torch.cat([r_rot_cont6d, cont6d_params], dim=-1)
         cont6d_params = cont6d_params.view(-1, joints_num, 6)
 
-        positions = self.skeleton.forward_kinematics_cont6d(cont6d_params, r_pos)
+        positions = skeleton.forward_kinematics_cont6d(cont6d_params, r_pos)
 
         return positions
 
     def recover_from_ric(self, data: Motion) -> torch.Tensor:
+
         data.tensor()
 
         if data.root_params is None:
@@ -497,6 +504,7 @@ class BaseMotionDataset(ABC, data.Dataset):
         self,
         motion: Union[np.ndarray, torch.Tensor, Motion],
         save_path: str = "motion",
+        # hml_rep=None,
         from_rotation=False,
     ):
 

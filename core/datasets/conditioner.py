@@ -54,6 +54,7 @@ class ConditionProvider(nn.Module):
         audio_padding: str = "longest",
         motion_padding: str = "longest",
         motion_max_length_s: int = 10,
+        motion_min_length_s: int = 3,
         fps: int = 30,
         motion_rep: MotionRep = MotionRep.FULL,
         pad_id: int = 0,
@@ -81,27 +82,32 @@ class ConditionProvider(nn.Module):
         self.motion_padding = motion_padding
 
         self.motion_max_length_s = motion_max_length_s
+        self.motion_min_length_s = motion_min_length_s
         self.motion_max_length = motion_max_length_s * fps
+        self.motion_min_length = motion_min_length_s * fps
         self.pad_id = pad_id
 
         if audio_rep == AudioRep.ENCODEC:
             self.audio_encoder = EncodecConditioner(device=device)
-            self.audio_dim = self.audio_encoder.dim
+            self.audio_dim = 128
         elif audio_rep == AudioRep.LIBROSA:
             self.audio_encoder = LibrosaConditioner(device=device)
-            self.audio_dim = self.audio_encoder.dim
+            self.audio_dim = 35
 
-        # self.audio_dim = 128 if audio_rep == AudioRep.ENCODEC else 35
+        self.audio_dim = 128 if audio_rep == AudioRep.ENCODEC else 35
 
         if "t5" in text_conditioner_name:
 
             self.text_encoder = T5Conditioner(text_conditioner_name, device="cuda")
+            self.text_dim = self.text_encoder.dim
 
         elif "bert" in text_conditioner_name:
             self.text_encoder = BERTConditioner(text_conditioner_name, device="cuda")
+            self.text_dim = self.text_encoder.dim
 
         else:
             self.text_encoder = ClipConditioner(text_conditioner_name, device="cuda")
+            self.text_dim = self.text_encoder.dim
 
     def _select_common_start_idx(self, motion, audio, max_length_s):
         motion_s = motion.shape[0] // self.fps

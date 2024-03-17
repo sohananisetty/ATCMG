@@ -1,0 +1,235 @@
+loading config from: /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_streaming/motion_streaming.yaml
+output_dir:  /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_streaming
+Total number of motions animation: 194 and texts 194
+Total number of motions humanml: 55446 and texts 55446
+Total number of motions perform: 369 and texts 369
+Total number of motions GRAB: 1268 and texts 1268
+Total number of motions idea400: 11142 and texts 11142
+Total number of motions humman: 399 and texts 399
+Total number of motions beat: 1458 and texts 1458
+Total number of motions game_motion: 4012 and texts 4012
+Total number of motions music: 2997 and texts 2997
+Total number of motions aist: 1149 and texts 1149
+Total number of motions fitness: 12552 and texts 12552
+Total number of motions moyo: 161 and texts 161
+Total number of motions choreomaster: 34 and texts 34
+Total number of motions dance: 101 and texts 101
+Total number of motions kungfu: 855 and texts 855
+Total number of motions EgoBody: 913 and texts 913
+Total number of motions animation: 8 and texts 8
+Total number of motions humanml: 9852 and texts 9852
+Total number of motions perform: 17 and texts 17
+Total number of motions GRAB: 67 and texts 67
+Total number of motions idea400: 579 and texts 579
+Total number of motions humman: 23 and texts 23
+Total number of motions beat: 162 and texts 162
+Total number of motions game_motion: 203 and texts 203
+Total number of motions music: 153 and texts 153
+Total number of motions aist: 61 and texts 61
+Total number of motions fitness: 651 and texts 651
+Total number of motions moyo: 9 and texts 9
+Total number of motions choreomaster: 2 and texts 2
+Total number of motions dance: 7 and texts 7
+Total number of motions kungfu: 45 and texts 45
+Total number of motions EgoBody: 49 and texts 49
+Total number of motions animation: 2 and texts 2
+Total number of motions humanml: 6 and texts 6
+Total number of motions perform: 2 and texts 2
+Total number of motions GRAB: 2 and texts 2
+Total number of motions idea400: 2 and texts 2
+Total number of motions humman: 1 and texts 1
+Total number of motions beat: 1 and texts 1
+Total number of motions game_motion: 2 and texts 2
+Total number of motions music: 2 and texts 2
+Total number of motions aist: 1 and texts 1
+Total number of motions fitness: 2 and texts 2
+Total number of motions moyo: 2 and texts 2
+Total number of motions choreomaster: 2 and texts 2
+Total number of motions dance: 1 and texts 1
+Total number of motions kungfu: 2 and texts 2
+Total number of motions EgoBody: 2 and texts 2
+training with training 93050 and test dataset of 11888 and render 32 samples
+/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_streaming
+0: model total cross entropy loss: 22.8 body ce 6.72 left ce 6.75 right ce 6.66 
+22.819114685058594 inf
+0: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_streaming/checkpoints
+validation start
+val_loss/loss tensor(11.4276)
+val_loss/loss_body tensor(3.3546)
+val_loss/loss_left tensor(3.3806)
+val_loss/loss_right tensor(3.3521)
+render start
+200: model total cross entropy loss: 20.5 body ce 5.98 left ce 6.04 right ce 6.05 
+400: model total cross entropy loss: 20.0 body ce 5.83 left ce 5.91 right ce 5.92 
+600: model total cross entropy loss: 18.3 body ce 5.24 left ce 5.48 right ce 5.53 
+800: model total cross entropy loss: 15.7 body ce 4.25 left ce 4.89 right ce 4.92 
+1000: model total cross entropy loss: 14.6 body ce 3.95 left ce 4.56 right ce 4.62 
+1200: model total cross entropy loss: 13.7 body ce 3.59 left ce 4.37 right ce 4.37 
+1400: model total cross entropy loss: 12.4 body ce 3.28 left ce 3.96 right ce 3.98 
+1600: model total cross entropy loss: 12.0 body ce 3.16 left ce 3.82 right ce 3.88 
+1800: model total cross entropy loss: 10.8 body ce 2.83 left ce 3.47 right ce 3.47 
+2000: model total cross entropy loss: 9.89 body ce 2.62 left ce 3.1 right ce 3.19 
+2200: model total cross entropy loss: 10.5 body ce 2.75 left ce 3.31 right ce 3.37 
+2400: model total cross entropy loss: 9.43 body ce 2.49 left ce 2.98 right ce 3.03 
+2600: model total cross entropy loss: 9.21 body ce 2.41 left ce 2.94 right ce 2.97 
+2800: model total cross entropy loss: 9.02 body ce 2.41 left ce 2.81 right ce 2.9 
+3000: model total cross entropy loss: 9.29 body ce 2.47 left ce 2.92 right ce 2.98 
+3200: model total cross entropy loss: 8.45 body ce 2.26 left ce 2.63 right ce 2.71 
+3400: model total cross entropy loss: 8.54 body ce 2.28 left ce 2.69 right ce 2.72 
+3600: model total cross entropy loss: 7.5 body ce 2.0 left ce 2.34 right ce 2.41 
+3800: model total cross entropy loss: 7.66 body ce 2.05 left ce 2.39 right ce 2.44 
+4000: model total cross entropy loss: 8.64 body ce 2.33 left ce 2.69 right ce 2.73 
+4200: model total cross entropy loss: 7.1 body ce 1.89 left ce 2.24 right ce 2.28 
+4400: model total cross entropy loss: 7.79 body ce 2.09 left ce 2.45 right ce 2.46 
+4600: model total cross entropy loss: 7.3 body ce 1.95 left ce 2.3 right ce 2.32 
+4800: model total cross entropy loss: 6.95 body ce 1.88 left ce 2.17 right ce 2.19 
+5000: model total cross entropy loss: 6.82 body ce 1.83 left ce 2.12 right ce 2.19 
+5200: model total cross entropy loss: 6.49 body ce 1.75 left ce 2.02 right ce 2.06 
+5400: model total cross entropy loss: 5.98 body ce 1.62 left ce 1.84 right ce 1.91 
+5600: model total cross entropy loss: 5.53 body ce 1.5 left ce 1.7 right ce 1.76 
+5800: model total cross entropy loss: 4.9 body ce 1.34 left ce 1.52 right ce 1.53 
+6000: model total cross entropy loss: 5.11 body ce 1.4 left ce 1.58 right ce 1.6 
+6200: model total cross entropy loss: 4.87 body ce 1.36 left ce 1.47 right ce 1.51 
+6400: model total cross entropy loss: 4.19 body ce 1.17 left ce 1.27 right ce 1.3 
+6600: model total cross entropy loss: 4.46 body ce 1.22 left ce 1.37 right ce 1.4 
+6800: model total cross entropy loss: 3.64 body ce 1.02 left ce 1.1 right ce 1.12 
+7000: model total cross entropy loss: 4.01 body ce 1.1 left ce 1.24 right ce 1.25 
+7200: model total cross entropy loss: 3.5 body ce 0.968 left ce 1.07 right ce 1.09 
+7400: model total cross entropy loss: 3.53 body ce 0.981 left ce 1.06 right ce 1.1 
+7600: model total cross entropy loss: 3.71 body ce 1.03 left ce 1.14 right ce 1.15 
+7800: model total cross entropy loss: 3.23 body ce 0.893 left ce 0.994 right ce 1.01 
+8000: model total cross entropy loss: 3.05 body ce 0.839 left ce 0.945 right ce 0.944 
+8200: model total cross entropy loss: 3.01 body ce 0.834 left ce 0.917 right ce 0.939 
+8400: model total cross entropy loss: 3.11 body ce 0.854 left ce 0.97 right ce 0.958 
+8600: model total cross entropy loss: 3.17 body ce 0.873 left ce 0.978 right ce 0.99 
+8800: model total cross entropy loss: 3.17 body ce 0.862 left ce 0.992 right ce 0.985 
+9000: model total cross entropy loss: 2.99 body ce 0.828 left ce 0.906 right ce 0.934 
+9200: model total cross entropy loss: 3.36 body ce 0.928 left ce 1.02 right ce 1.05 
+9400: model total cross entropy loss: 3.1 body ce 0.856 left ce 0.951 right ce 0.962 
+9600: model total cross entropy loss: 3.19 body ce 0.874 left ce 0.973 right ce 1.0 
+9800: model total cross entropy loss: 2.8 body ce 0.769 left ce 0.875 right ce 0.867 
+10000: model total cross entropy loss: 2.77 body ce 0.752 left ce 0.865 right ce 0.863 
+2.765986919403076 tensor(22.8191)
+10000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_streaming/checkpoints
+validation start
+val_loss/loss tensor(5.7835)
+val_loss/loss_body tensor(1.5984)
+val_loss/loss_left tensor(1.7733)
+val_loss/loss_right tensor(1.7974)
+render start
+10200: model total cross entropy loss: 2.55 body ce 0.711 left ce 0.779 right ce 0.788 
+10400: model total cross entropy loss: 2.28 body ce 0.636 left ce 0.699 right ce 0.7 
+10600: model total cross entropy loss: 2.84 body ce 0.776 left ce 0.876 right ce 0.893 
+10800: model total cross entropy loss: 2.92 body ce 0.795 left ce 0.915 right ce 0.905 
+11000: model total cross entropy loss: 2.5 body ce 0.701 left ce 0.759 right ce 0.769 
+11200: model total cross entropy loss: 2.62 body ce 0.722 left ce 0.799 right ce 0.819 
+11400: model total cross entropy loss: 2.62 body ce 0.735 left ce 0.809 right ce 0.796 
+11600: model total cross entropy loss: 2.44 body ce 0.67 left ce 0.742 right ce 0.767 
+11800: model total cross entropy loss: 2.67 body ce 0.735 left ce 0.812 right ce 0.843 
+12000: model total cross entropy loss: 2.64 body ce 0.718 left ce 0.813 right ce 0.836 
+12200: model total cross entropy loss: 2.36 body ce 0.665 left ce 0.715 right ce 0.723 
+12400: model total cross entropy loss: 2.4 body ce 0.675 left ce 0.72 right ce 0.741 
+12600: model total cross entropy loss: 2.89 body ce 0.799 left ce 0.877 right ce 0.911 
+12800: model total cross entropy loss: 2.59 body ce 0.707 left ce 0.794 right ce 0.816 
+13000: model total cross entropy loss: 2.18 body ce 0.601 left ce 0.664 right ce 0.686 
+13200: model total cross entropy loss: 2.78 body ce 0.757 left ce 0.856 right ce 0.877 
+13400: model total cross entropy loss: 2.23 body ce 0.632 left ce 0.675 right ce 0.681 
+13600: model total cross entropy loss: 2.37 body ce 0.638 left ce 0.735 right ce 0.752 
+13800: model total cross entropy loss: 2.36 body ce 0.657 left ce 0.714 right ce 0.732 
+14000: model total cross entropy loss: 2.32 body ce 0.632 left ce 0.72 right ce 0.723 
+14200: model total cross entropy loss: 2.29 body ce 0.636 left ce 0.703 right ce 0.708 
+14400: model total cross entropy loss: 2.34 body ce 0.638 left ce 0.726 right ce 0.729 
+14600: model total cross entropy loss: 2.29 body ce 0.642 left ce 0.691 right ce 0.703 
+14800: model total cross entropy loss: 2.5 body ce 0.695 left ce 0.763 right ce 0.772 
+15000: model total cross entropy loss: 2.13 body ce 0.599 left ce 0.642 right ce 0.657 
+15200: model total cross entropy loss: 2.2 body ce 0.609 left ce 0.675 right ce 0.678 
+15400: model total cross entropy loss: 2.1 body ce 0.583 left ce 0.634 right ce 0.657 
+15600: model total cross entropy loss: 2.18 body ce 0.595 left ce 0.668 right ce 0.686 
+15800: model total cross entropy loss: 2.37 body ce 0.648 left ce 0.729 right ce 0.744 
+16000: model total cross entropy loss: 2.07 body ce 0.582 left ce 0.631 right ce 0.627 
+16200: model total cross entropy loss: 2.36 body ce 0.657 left ce 0.719 right ce 0.735 
+16400: model total cross entropy loss: 2.39 body ce 0.656 left ce 0.741 right ce 0.744 
+16600: model total cross entropy loss: 2.16 body ce 0.593 left ce 0.646 right ce 0.695 
+16800: model total cross entropy loss: 2.5 body ce 0.701 left ce 0.755 right ce 0.777 
+17000: model total cross entropy loss: 2.25 body ce 0.634 left ce 0.67 right ce 0.703 
+17200: model total cross entropy loss: 2.03 body ce 0.551 left ce 0.624 right ce 0.646 
+17400: model total cross entropy loss: 2.03 body ce 0.566 left ce 0.615 right ce 0.627 
+17600: model total cross entropy loss: 1.98 body ce 0.567 left ce 0.588 right ce 0.604 
+17800: model total cross entropy loss: 1.83 body ce 0.51 left ce 0.555 right ce 0.562 
+18000: model total cross entropy loss: 1.99 body ce 0.546 left ce 0.615 right ce 0.623 
+18200: model total cross entropy loss: 2.05 body ce 0.556 left ce 0.642 right ce 0.64 
+18400: model total cross entropy loss: 2.05 body ce 0.575 left ce 0.611 right ce 0.64 
+18600: model total cross entropy loss: 1.9 body ce 0.533 left ce 0.577 right ce 0.586 
+18800: model total cross entropy loss: 1.76 body ce 0.496 left ce 0.533 right ce 0.538 
+19000: model total cross entropy loss: 2.07 body ce 0.573 left ce 0.627 right ce 0.645 
+19200: model total cross entropy loss: 1.98 body ce 0.546 left ce 0.612 right ce 0.608 
+19400: model total cross entropy loss: 1.91 body ce 0.523 left ce 0.589 right ce 0.596 
+19600: model total cross entropy loss: 1.89 body ce 0.513 left ce 0.595 right ce 0.587 
+19800: model total cross entropy loss: 1.79 body ce 0.5 left ce 0.54 right ce 0.554 
+20000: model total cross entropy loss: 1.89 body ce 0.518 left ce 0.584 right ce 0.585 
+1.8853113651275635 tensor(2.7660)
+20000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_streaming/checkpoints
+validation start
+val_loss/loss tensor(7.7914)
+val_loss/loss_body tensor(2.1296)
+val_loss/loss_left tensor(2.4081)
+val_loss/loss_right tensor(2.4412)
+render start
+20200: model total cross entropy loss: 1.93 body ce 0.537 left ce 0.585 right ce 0.601 
+20400: model total cross entropy loss: 1.85 body ce 0.504 left ce 0.576 right ce 0.576 
+20600: model total cross entropy loss: 1.72 body ce 0.482 left ce 0.524 right ce 0.531 
+20800: model total cross entropy loss: 1.88 body ce 0.521 left ce 0.565 right ce 0.597 
+21000: model total cross entropy loss: 1.81 body ce 0.487 left ce 0.564 right ce 0.572 
+21200: model total cross entropy loss: 1.59 body ce 0.438 left ce 0.489 right ce 0.49 
+21400: model total cross entropy loss: 1.82 body ce 0.497 left ce 0.564 right ce 0.57 
+21600: model total cross entropy loss: 1.69 body ce 0.464 left ce 0.522 right ce 0.529 
+21800: model total cross entropy loss: 1.88 body ce 0.503 left ce 0.583 right ce 0.603 
+22000: model total cross entropy loss: 1.71 body ce 0.468 left ce 0.529 right ce 0.533 
+22200: model total cross entropy loss: 1.61 body ce 0.448 left ce 0.495 right ce 0.493 
+22400: model total cross entropy loss: 1.62 body ce 0.432 left ce 0.513 right ce 0.512 
+22600: model total cross entropy loss: 1.69 body ce 0.462 left ce 0.528 right ce 0.525 
+22800: model total cross entropy loss: 1.54 body ce 0.424 left ce 0.461 right ce 0.487 
+23000: model total cross entropy loss: 1.69 body ce 0.455 left ce 0.529 right ce 0.532 
+23200: model total cross entropy loss: 1.65 body ce 0.464 left ce 0.501 right ce 0.5 
+23400: model total cross entropy loss: 1.48 body ce 0.405 left ce 0.452 right ce 0.466 
+23600: model total cross entropy loss: 1.52 body ce 0.424 left ce 0.46 right ce 0.47 
+23800: model total cross entropy loss: 1.76 body ce 0.492 left ce 0.531 right ce 0.541 
+24000: model total cross entropy loss: 1.77 body ce 0.494 left ce 0.542 right ce 0.542 
+24200: model total cross entropy loss: 1.68 body ce 0.468 left ce 0.514 right ce 0.516 
+24400: model total cross entropy loss: 1.79 body ce 0.506 left ce 0.53 right ce 0.553 
+24600: model total cross entropy loss: 1.5 body ce 0.419 left ce 0.463 right ce 0.458 
+24800: model total cross entropy loss: 1.43 body ce 0.394 left ce 0.438 right ce 0.447 
+25000: model total cross entropy loss: 1.55 body ce 0.431 left ce 0.476 right ce 0.48 
+25200: model total cross entropy loss: 1.58 body ce 0.438 left ce 0.485 right ce 0.493 
+25400: model total cross entropy loss: 1.48 body ce 0.415 left ce 0.451 right ce 0.448 
+25600: model total cross entropy loss: 1.54 body ce 0.435 left ce 0.47 right ce 0.467 
+25800: model total cross entropy loss: 1.35 body ce 0.376 left ce 0.413 right ce 0.418 
+26000: model total cross entropy loss: 1.55 body ce 0.433 left ce 0.47 right ce 0.482 
+26200: model total cross entropy loss: 1.71 body ce 0.462 left ce 0.531 right ce 0.537 
+26400: model total cross entropy loss: 1.48 body ce 0.41 left ce 0.462 right ce 0.454 
+26600: model total cross entropy loss: 1.41 body ce 0.397 left ce 0.428 right ce 0.432 
+26800: model total cross entropy loss: 1.34 body ce 0.365 left ce 0.426 right ce 0.413 
+27000: model total cross entropy loss: 1.21 body ce 0.346 left ce 0.353 right ce 0.372 
+27200: model total cross entropy loss: 1.4 body ce 0.384 left ce 0.426 right ce 0.441 
+27400: model total cross entropy loss: 1.48 body ce 0.418 left ce 0.445 right ce 0.45 
+27600: model total cross entropy loss: 1.38 body ce 0.379 left ce 0.432 right ce 0.426 
+27800: model total cross entropy loss: 1.38 body ce 0.383 left ce 0.414 right ce 0.431 
+28000: model total cross entropy loss: 1.37 body ce 0.387 left ce 0.406 right ce 0.423 
+28200: model total cross entropy loss: 1.26 body ce 0.345 left ce 0.387 right ce 0.392 
+28400: model total cross entropy loss: 1.48 body ce 0.412 left ce 0.457 right ce 0.452 
+28600: model total cross entropy loss: 1.41 body ce 0.383 left ce 0.429 right ce 0.447 
+28800: model total cross entropy loss: 1.43 body ce 0.396 left ce 0.432 right ce 0.45 
+29000: model total cross entropy loss: 1.6 body ce 0.437 left ce 0.506 right ce 0.489 
+29200: model total cross entropy loss: 1.51 body ce 0.413 left ce 0.459 right ce 0.477 
+29400: model total cross entropy loss: 1.48 body ce 0.411 left ce 0.456 right ce 0.454 
+29600: model total cross entropy loss: 1.27 body ce 0.357 left ce 0.386 right ce 0.387 
+29800: model total cross entropy loss: 1.37 body ce 0.387 left ce 0.413 right ce 0.424 
+30000: model total cross entropy loss: 1.38 body ce 0.384 left ce 0.416 right ce 0.431 
+1.3805177211761475 tensor(1.8853)
+30000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_streaming/checkpoints
+validation start
+val_loss/loss tensor(11.0980)
+val_loss/loss_body tensor(3.0289)
+val_loss/loss_left tensor(3.4294)
+val_loss/loss_right tensor(3.4852)
+render start

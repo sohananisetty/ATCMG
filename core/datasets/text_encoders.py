@@ -7,9 +7,17 @@ import clip
 import torch
 import torch.nn as nn
 from core.models.utils import TorchAutocast
-from transformers import (AutoTokenizer, BertConfig, BertForMaskedLM,
-                          BertModel, CLIPTextModelWithProjection,
-                          CLIPTokenizer, T5Config, T5EncoderModel, T5Tokenizer)
+from transformers import (
+    AutoTokenizer,
+    BertConfig,
+    BertForMaskedLM,
+    BertModel,
+    CLIPTextModelWithProjection,
+    CLIPTokenizer,
+    T5Config,
+    T5EncoderModel,
+    T5Tokenizer,
+)
 
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
 
@@ -148,6 +156,7 @@ class ClipConditioner(nn.Module):
         super().__init__()
         self.tokenizer = CLIPTokenizer.from_pretrained(version)
         self.transformer = CLIPTextModelWithProjection.from_pretrained(version)
+        self.dim = self.transformer.config.projection_dim
         self.device = device
         self.max_length = max_length
         self.freeze()
@@ -272,6 +281,7 @@ class BERTConditioner(nn.Module):
         self.freeze()
 
         self.encoder = self.encoder.eval()
+        self.dim = self.config.hidden_size
 
     # @property
     # def device(self):

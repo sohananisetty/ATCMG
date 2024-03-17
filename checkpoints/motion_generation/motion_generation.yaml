@@ -35,8 +35,3 @@ motion_generator:
   fuse_method: [{"cross": ["audio"], "prepend": ["text"]}]
   causal: True
   flash: True
-
-
-  
-  
-

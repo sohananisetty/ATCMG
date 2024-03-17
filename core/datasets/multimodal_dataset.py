@@ -360,8 +360,8 @@ class MotionAudioTextDataset(BaseMotionDataset):
         except:
             audio_data = None
 
-        if to_ * self.fps - f_ * self.fps > self.min_motion_length:
-            motion = motion[f_ * self.fps : to_ * self.fps]
+        if to_ - f_ > self.min_motion_length:
+            motion = motion[f_:to_]
 
         processed_motion = self.get_processed_motion(
             motion, motion_rep=self.motion_rep, hml_rep=self.hml_rep
@@ -383,7 +383,7 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         audio_rep: str = "encodec",
         motion_rep: str = "full",
         hml_rep: str = "gprvc",
-        motion_min_length_s=2,
+        motion_min_length_s=3,
         motion_max_length_s=10,
         window_size=None,
         sampling_rate: int = 16000,
@@ -446,8 +446,8 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
                                     line.strip(),
                                 )
                             ).squeeze()
-                        if motion.shape[0] < default(
-                            self.window_size, self.min_motion_length
+                        if motion.shape[0] < math.ceil(
+                            default(self.window_size, self.min_motion_length)
                         ):
                             continue
 
@@ -545,7 +545,6 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         return name_list, txt_list
 
     def __getitem__(self, item: int) -> Tuple[torch.Tensor, str]:
-        # print(self.id_list[item])
 
         name, ind, f_, to_ = self.id_list[item].rsplit("_", 3)
         f_, to_ = int(f_), int(to_)
@@ -602,14 +601,10 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         except:
             audio_data = None
 
-        if to_ * self.fps - f_ * self.fps > self.min_motion_length:
-            motion = motion[int(f_ * self.fps) : math.ceil(to_ * self.fps)]
-            left_hand_motion = left_hand_motion[
-                int(f_ * self.fps) : math.ceil(to_ * self.fps)
-            ]
-            right_hand_motion = right_hand_motion[
-                int(f_ * self.fps) : math.ceil(to_ * self.fps)
-            ]
+        if (math.ceil(to_) - int(f_)) > self.min_motion_length:
+            motion = motion[int(f_) : math.ceil(to_)]
+            left_hand_motion = left_hand_motion[int(f_) : math.ceil(to_)]
+            right_hand_motion = right_hand_motion[int(f_) : math.ceil(to_)]
 
         if self.motion_rep == "full":
             final_motion = [

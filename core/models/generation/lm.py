@@ -422,11 +422,11 @@ class LMModel(StreamingModule):
         )
 
         x_ = input_[0]
-        x_padding_mask = ~input_[1]
+        x_padding_mask = ~input_[1]  ## mask from padding False to padding True
 
         if cross_attention_input is not None:
             context = cross_attention_input[0]
-            context_padding_mask = ~cross_attention_input[1]
+            context_padding_mask = ~cross_attention_input[1] ## mask from padding False to padding True
         else:
             context, context_padding_mask = self.get_null_context(x_)
 

@@ -210,6 +210,8 @@ class Attend(nn.Module):
         h - heads
         n, i, j - sequence length (base sequence length, source, target)
         d - feature dimension
+
+        mask: True for places to attend to, False for padding
         """
 
         n, heads, kv_heads, device = q.shape[-2], q.shape[1], k.shape[1], q.device
@@ -236,7 +238,7 @@ class Attend(nn.Module):
 
         dots = einsum(f"b h i d, {kv_einsum_eq} -> b h i j", q, k) * scale
 
-        qk_similarities = dots.clone()
+        # qk_similarities = dots.clone()
 
         if exists(attn_bias):
             dots = dots + attn_bias
@@ -251,15 +253,15 @@ class Attend(nn.Module):
 
         if self.causal and not is_causal:
 
-            causal_mask = self.create_causal_mask(i, j, device=device)
+            causal_mask = self.create_causal_mask(i, j, device=device)  ##padding True
             dots = dots.masked_fill(causal_mask, mask_value)
 
-        pre_softmax_attn = dots.clone()
+        # pre_softmax_attn = dots.clone()
 
         attn = self.attn_fn(dots, dim=-1)
         attn = attn.type(dtype)
 
-        post_softmax_attn = attn.clone()
+        # post_softmax_attn = attn.clone()
 
         attn = self.attn_dropout(attn)
 
@@ -320,6 +322,14 @@ class CustomMHA(nn.Module):
         self.to_out = nn.Linear(inner_dim, self.dim, bias=bias_att)
 
     def forward(self, q, k, v, key_padding_mask=None, attn_mask=None, rel_pos=None):
+        """
+        q,k,v: b n d
+
+        key_padding_mask: False for padding
+        attn_mask: False for padding
+
+        """
+
         n = q.shape[-2]
         h = self.heads
 
@@ -337,9 +347,9 @@ class CustomMHA(nn.Module):
             attn_mask = attn_mask.to(torch.bool)
 
             if exists(mask):
-                mask = mask & ~attn_mask
+                mask = mask & attn_mask
             else:
-                mask = ~attn_mask
+                mask = attn_mask
 
         q = self.norm(q)
 
@@ -360,11 +370,11 @@ class CustomMHA(nn.Module):
 
             mask = F.pad(mask, (1, 0), value=True)
 
-            ## When no context
-            # if key_padding_mask.shape[-1] == 2:
-            #     key_padding_mask = key_padding_mask[..., :1]
-            #     k = k[..., :1, :]
-            #     v = v[..., :1, :]
+            # When no context
+            if key_padding_mask.shape[-1] == 2:
+                key_padding_mask = key_padding_mask[..., :1]
+                k = k[..., :1, :]
+                v = v[..., :1, :]
 
         if self.qk_norm:
             q, k = map(l2norm, (q, k))

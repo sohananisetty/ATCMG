@@ -9,15 +9,17 @@ from typing import Callable, Dict, List, Optional, Tuple
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
-from core import (AttentionParams, MotionTokenizerParams,
-                  PositionalEmbeddingParams, PositionalEmbeddingType,
-                  TranslationTransformerParams)
-from core.datasets.conditioner import (ClassifierFreeGuidanceDropout,
-                                       ConditionFuser)
+from core import (
+    AttentionParams,
+    MotionTokenizerParams,
+    PositionalEmbeddingParams,
+    PositionalEmbeddingType,
+    TranslationTransformerParams,
+)
+from core.datasets.conditioner import ClassifierFreeGuidanceDropout, ConditionFuser
 from core.models.attend2 import Attend, Attention
 from core.models.resnetVQ.vqvae import HumanVQVAE
-from core.models.utils import (FeedForward, LayerNorm, default, exists,
-                               get_obj_from_str)
+from core.models.utils import FeedForward, LayerNorm, default, exists, get_obj_from_str
 from einops import rearrange, repeat
 from torch import einsum, nn
 from tqdm.auto import tqdm
@@ -244,6 +246,7 @@ class Transformer(nn.Module):
         self,
         num_tokens,
         dim,
+        n_q=3,
         positional_embedding_type="SINE",
         emb_dropout=0.0,
         cond_dropout=0.0,
@@ -255,6 +258,7 @@ class Transformer(nn.Module):
     ):
         super().__init__()
         self.dim = dim
+        self.n_q = n_q
         self.audio_input_dim = audio_input_dim
         self.text_input_dim = text_input_dim
         self.cond_dropout = cond_dropout

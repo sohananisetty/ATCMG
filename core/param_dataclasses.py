@@ -5,8 +5,12 @@ from typing import Dict, List, Optional
 
 import torch
 from core.models.generation.streaming_transformer.codebooks_patterns import (
-    CoarseFirstPattern, DelayedPatternProvider, MusicLMPattern,
-    ParallelPatternProvider, UnrolledPatternProvider)
+    CoarseFirstPattern,
+    DelayedPatternProvider,
+    MusicLMPattern,
+    ParallelPatternProvider,
+    UnrolledPatternProvider,
+)
 
 
 class PositionalEmbeddingType(Enum):
@@ -144,6 +148,7 @@ class TranslationTransformerParams(TransformerParams):
 @dataclass
 class MotionTokenizerParams:
     num_tokens: int = 1024
+    add_additional_id: bool = False
 
     @property
     def pad_token_id(self):
@@ -151,8 +156,14 @@ class MotionTokenizerParams:
 
     @property
     def mask_token_id(self):
-        return self.num_tokens + 1
+        return self.pad_token_id + 1
+
+    @property
+    def special_token_id(self):
+        return self.mask_token_id + 1
 
     @property
     def vocab_size(self):
+        if self.add_additional_id:
+            return self.num_tokens + 3
         return self.num_tokens + 2
