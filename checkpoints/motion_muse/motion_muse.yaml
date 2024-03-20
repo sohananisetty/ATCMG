@@ -4,7 +4,7 @@ dataset:
   dataset_name: "mix"
   dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
   motion_rep: "body"
-  text_rep: "pooled_text_embed"
+  text_rep: "full_text_embed"
   audio_rep: "encodec"
   hml_rep: "rv"
   motion_min_length_s: 3
@@ -16,9 +16,9 @@ train:
   logging_steps : 10
   wandb_every : 200
   evaluate_every : 10000
-  eval_bs : 4
-  train_bs : 4
-  gradient_accumulation_steps : 2
+  eval_bs : 200
+  train_bs : 200
+  gradient_accumulation_steps : 1
   learning_rate : 2e-4
   weight_decay : 1e-3
   warmup_steps : 4000
@@ -34,13 +34,14 @@ codebooks_pattern:
   modeling: "parallel"
 
 fuser:
-  fuse_method: [{"cross": ["audio"], "prepend": ["text"]}]
+  fuse_method: [{"cross": ["text"], "input_interpolate": ["audio"]}]
+  #[{"cross": ["audio"], "prepend": ["text"]}]
 
 motion_generator:
   target: "core.models.generation.motion_generator.MotionMuse"
   n_q : 1
   dim : 512
-  depth: 6
+  depth: 8
   cond_dropout: 0.4
   no_mask_token_prob: 0.4
   emb_dropout: 0.1

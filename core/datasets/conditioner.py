@@ -347,6 +347,32 @@ class ConditionProvider(nn.Module):
         if not is_batched(raw_text):
             raw_text = [raw_text]
 
+        if raw_motion[0] is None:
+            padded_text, text_mask = self._get_text_features(raw_text)
+            if raw_audio is not None:
+
+                for i in range(len(raw_audio)):
+                    if isinstance(raw_audio[i], str):
+                        raw_audio[i] = self.audio_encoder(raw_audio[i]).cpu().numpy()
+
+                padded_audio, audio_mask = self._get_audio_features(
+                    max_length=float("inf"),
+                    audio_list=raw_audio,
+                    padding=audio_padding,
+                )
+
+        condition_features["audio"] = (
+            torch.Tensor(padded_audio).to(self.device),
+            torch.BoolTensor(audio_mask).to(self.device),
+        )
+
+        condition_features["text"] = (
+            padded_text.to(self.device),
+            text_mask.to(dtype=torch.bool, device=self.device),
+        )
+
+        return None, BatchFeature(condition_features)
+
         assert len(raw_audio) == len(
             raw_motion
         ), "mismatch in number of audio and motions"

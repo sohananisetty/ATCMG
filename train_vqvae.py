@@ -16,12 +16,15 @@ def nb_joints(motion_rep):
         return 15
 
 
-def motion_dim(hml_rep, motion_rep):
+def motion_dim(hml_rep, motion_rep, remove_trans = False):
     dim = 0
     joints = nb_joints(motion_rep)
 
     if "g" in hml_rep:
-        dim += 4
+        if remove_trans:
+            dim+=2
+        else:
+            dim += 4
     if "p" in hml_rep:
         if motion_rep == MotionRep.BODY or motion_rep == MotionRep.FULL:
             dim += (joints - 1) * 3
@@ -49,7 +52,7 @@ def main(cfg):
 
 
 if __name__ == "__main__":
-    nme = "vqvae_rv"
+    nme = "vqvae_body_gprvc"
     path = f"/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/{nme}/{nme}.yaml"
     cfg = get_cfg_defaults()
     print("loading config from:", path)
@@ -57,7 +60,7 @@ if __name__ == "__main__":
 
     cfg.vqvae.nb_joints = nb_joints(MotionRep(cfg.dataset.motion_rep))
     cfg.vqvae.motion_dim = motion_dim(
-        cfg.dataset.hml_rep, MotionRep(cfg.dataset.motion_rep)
+        cfg.dataset.hml_rep, MotionRep(cfg.dataset.motion_rep), True
     )
 
     cfg.freeze()

@@ -273,6 +273,12 @@ class VQVAEMotionTrainer(nn.Module):
             batch = next(self.dl_iter)
 
             gt_motion = batch["motion"][0].to(self.device)
+            
+            
+            if "g" in self.dataset_args.hml_rep:
+                l = list(range(0,gt_motion.shape[-1]))
+                ohprvc = l[:1] + l[3:]
+                gt_motion = gt_motion[...,ohprvc]
             # mask = batch["motion"][1].to(self.device)
 
             if self.dataset_args.use_motion_augmentation:
@@ -366,6 +372,10 @@ class VQVAEMotionTrainer(nn.Module):
                 # disable=not self.accelerator.is_main_process,
             ):
                 gt_motion = batch["motion"][0].to(self.device)
+                if "g" in self.dataset_args.hml_rep:
+                    l = list(range(0,gt_motion.shape[-1]))
+                    ohprvc = l[:1] + l[3:]
+                    gt_motion = gt_motion[...,ohprvc]
                 # mask = batch["motion"][1].to(self.device)
 
                 vqvae_output = self.vqvae_model(
@@ -435,6 +445,11 @@ class VQVAEMotionTrainer(nn.Module):
             ):
 
                 gt_motion = batch["motion"][0].to(self.device)
+                
+                if "g" in self.dataset_args.hml_rep:
+                    l = list(range(0,gt_motion.shape[-1]))
+                    ohprvc = l[:1] + l[3:]
+                    gt_motion = gt_motion[...,ohprvc]
 
                 name = str(batch["names"][0])
 
@@ -442,6 +457,16 @@ class VQVAEMotionTrainer(nn.Module):
                 dset = self.render_ds.datasets[curr_dataset_idx]
 
                 vqvae_output = self.vqvae_model(gt_motion)
+                
+                pred_motion =vqvae_output.decoded_motion.squeeze().cpu()
+                gt_motion = gt_motion.squeeze().cpu()
+                
+                z = torch.zeros(gt_motion.shape[:-1] + (2,) , dtype = gt_motion.dtype ,device = gt_motion.device)
+                
+                pred_motion = torch.cat([pred_motion[...,0:1] , z , pred_motion[...,1:]] ,-1)
+                gt_motion = torch.cat([gt_motion[...,0:1] , z , gt_motion[...,1:]] ,-1)
+                
+                
 
                 dset.render_hml(
                     gt_motion.squeeze().cpu(),
@@ -451,7 +476,7 @@ class VQVAEMotionTrainer(nn.Module):
                 )
 
                 dset.render_hml(
-                    vqvae_output.decoded_motion.squeeze().cpu(),
+                    pred_motion,
                     os.path.join(
                         save_file, os.path.basename(name).split(".")[0] + "_pred.gif"
                     ),

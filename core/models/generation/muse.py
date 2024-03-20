@@ -753,31 +753,20 @@ class MotionMuse(nn.Module):
         return code_ids, labels
 
     def get_null_context(self, B, device, dtype=torch.float):
-        cross_cond = self.model.fuser.fuse2cond.get("cross", None)
-        if cross_cond is not None:
-            if cross_cond[0] == "audio":
-                cc = torch.zeros(
+        cond_list = list(self.model.condition_fuser.cond2fuse.keys())
+        
+        
+        conditions = {}
+        for cond_type in cond_list:
+            cond = torch.zeros(
                     (B, 1, self.model.audio_input_dim),
                     device=device,
                     dtype=dtype,
                 )
+            cond_mask = torch.zeros((B, 1), dtype=torch.bool, device=device)
+            conditions[cond_type] = (cond , cond_mask)
 
-                cc = self.model.project_audio(cc)
-
-            elif cross_cond[0] == "text":
-                cc = torch.zeros(
-                    (B, 1, self.model.text_input_dim),
-                    device=device,
-                    dtype=dtype,
-                )
-
-                cc = self.model.project_text(cc)
-
-            cm = torch.zeros((B, 1), dtype=torch.bool, device=device)
-
-            return (cc, cm)
-
-        return (None, None)
+        return conditions
 
     @torch.no_grad()
     @eval_decorator

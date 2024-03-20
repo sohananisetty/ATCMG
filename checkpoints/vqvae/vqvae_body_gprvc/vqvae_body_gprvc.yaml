@@ -12,7 +12,7 @@ train:
   save_steps : 10000
   logging_steps : 50
   wandb_every : 200
-  evaluate_every : 5000
+  evaluate_every : 10000
   eval_bs : 400
   train_bs : 400
   gradient_accumulation_steps : 1
@@ -24,10 +24,10 @@ train:
 vqvae:
   target: "core.models.resnetVQ.vqvae.HumanVQVAE"
   dim : 768
-  depth: 6
-  codebook_size : 1024
-  codebook_dim : 512
-  commit : 0.25
+  depth: 8
+  codebook_size : 512
+  codebook_dim : 768
+  commit : 0.5
   loss_motion: 2.0
   recons_loss : "l1_smooth"
   use_geodesic_loss: False

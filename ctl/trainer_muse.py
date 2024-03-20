@@ -94,21 +94,21 @@ class MotionMuseTrainer(nn.Module):
 
         dataset_names = {
             "animation": 0.8,
-            # "humanml": 3.5,
-            # "perform": 0.6,
-            # "GRAB": 1.0,
-            # "idea400": 1.5,
-            # "humman": 0.5,
-            # "beat": 2.0,
-            # "game_motion": 0.8,
-            # "music": 0.5,
-            # "aist": 1.5,
-            # "fitness": 1.0,
-            # "moyo": 1.0,
+            "humanml": 3.5,
+            "perform": 0.6,
+            "GRAB": 1.0,
+            "idea400": 1.5,
+            "humman": 0.5,
+            "beat": 2.0,
+            "game_motion": 0.8,
+            "music": 0.5,
+            "aist": 1.5,
+            "fitness": 1.0,
+            "moyo": 1.0,
             "choreomaster": 2.0,
-            # "dance": 1.0,
-            # "kungfu": 1.0,
-            # "EgoBody": 0.5,
+            "dance": 1.0,
+            "kungfu": 1.0,
+            "EgoBody": 0.5,
             # "HAA500": 1.0,
         }
 
@@ -198,10 +198,10 @@ class MotionMuseTrainer(nn.Module):
 
         self.body_cfg = vqvae_get_cfg_defaults()
         self.body_cfg.merge_from_file(vqvae_args.body_config)
-        self.left_cfg = vqvae_get_cfg_defaults()
-        self.left_cfg.merge_from_file(vqvae_args.left_hand_config)
-        self.right_cfg = vqvae_get_cfg_defaults()
-        self.right_cfg.merge_from_file(vqvae_args.right_hand_config)
+        # self.left_cfg = vqvae_get_cfg_defaults()
+        # self.left_cfg.merge_from_file(vqvae_args.left_hand_config)
+        # self.right_cfg = vqvae_get_cfg_defaults()
+        # self.right_cfg.merge_from_file(vqvae_args.right_hand_config)
 
         # self.left_hand_model = HumanVQVAE(self.left_cfg.vqvae).to(self.device).eval()
         # self.left_hand_model.load(

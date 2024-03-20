@@ -603,8 +603,9 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
 
         if (math.ceil(to_) - int(f_)) > self.min_motion_length:
             motion = motion[int(f_) : math.ceil(to_)]
-            left_hand_motion = left_hand_motion[int(f_) : math.ceil(to_)]
-            right_hand_motion = right_hand_motion[int(f_) : math.ceil(to_)]
+            if self.motion_rep == "full":
+                left_hand_motion = left_hand_motion[int(f_) : math.ceil(to_)]
+                right_hand_motion = right_hand_motion[int(f_) : math.ceil(to_)]
 
         if self.motion_rep == "full":
             final_motion = [
