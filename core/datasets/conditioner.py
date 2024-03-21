@@ -10,8 +10,13 @@ from core.param_dataclasses import AudioRep, MotionRep, TextRep
 from torch import nn
 from transformers.feature_extraction_utils import BatchFeature
 
-from .text_encoders import BERTConditioner, ClipConditioner, T5Conditioner
-from .audio_encoders import EncodecConditioner, LibrosaConditioner
+from .text_encoders import (
+    BERTConditioner,
+    ClipConditioner,
+    T5Conditioner,
+    getTextConditioner,
+)
+from .audio_encoders import EncodecConditioner, LibrosaConditioner, getAudioConditioner
 
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
 
@@ -87,27 +92,30 @@ class ConditionProvider(nn.Module):
         self.motion_min_length = motion_min_length_s * fps
         self.pad_id = pad_id
 
-        if audio_rep == AudioRep.ENCODEC:
-            self.audio_encoder = EncodecConditioner(device=device)
-            self.audio_dim = 128
-        elif audio_rep == AudioRep.LIBROSA:
-            self.audio_encoder = LibrosaConditioner(device=device)
-            self.audio_dim = 35
+        # if audio_rep == AudioRep.ENCODEC:
+        #     self.audio_encoder = EncodecConditioner(device=device)
+        #     self.audio_dim = 128
+        # elif audio_rep == AudioRep.LIBROSA:
+        #     self.audio_encoder = LibrosaConditioner(device=device)
+        #     self.audio_dim = 35
 
-        self.audio_dim = 128 if audio_rep == AudioRep.ENCODEC else 35
+        # self.audio_dim = 128 if audio_rep == AudioRep.ENCODEC else 35
 
-        if "t5" in text_conditioner_name:
+        self.audio_encoder, self.audio_dim = getAudioConditioner(audio_rep.value)
+        self.text_encoder, self.text_dim = getTextConditioner(text_conditioner_name)
 
-            self.text_encoder = T5Conditioner(text_conditioner_name, device="cuda")
-            self.text_dim = self.text_encoder.dim
+        # if "t5" in text_conditioner_name:
 
-        elif "bert" in text_conditioner_name:
-            self.text_encoder = BERTConditioner(text_conditioner_name, device="cuda")
-            self.text_dim = self.text_encoder.dim
+        #     self.text_encoder = T5Conditioner(text_conditioner_name, device="cuda")
+        #     self.text_dim = self.text_encoder.dim
 
-        else:
-            self.text_encoder = ClipConditioner(text_conditioner_name, device="cuda")
-            self.text_dim = self.text_encoder.dim
+        # elif "bert" in text_conditioner_name:
+        #     self.text_encoder = BERTConditioner(text_conditioner_name, device="cuda")
+        #     self.text_dim = self.text_encoder.dim
+
+        # else:
+        #     self.text_encoder = ClipConditioner(text_conditioner_name, device="cuda")
+        #     self.text_dim = self.text_encoder.dim
 
     def _select_common_start_idx(self, motion, audio, max_length_s):
         motion_s = motion.shape[0] // self.fps
@@ -361,17 +369,17 @@ class ConditionProvider(nn.Module):
                     padding=audio_padding,
                 )
 
-        condition_features["audio"] = (
-            torch.Tensor(padded_audio).to(self.device),
-            torch.BoolTensor(audio_mask).to(self.device),
-        )
+            condition_features["audio"] = (
+                torch.Tensor(padded_audio).to(self.device),
+                torch.BoolTensor(audio_mask).to(self.device),
+            )
 
-        condition_features["text"] = (
-            padded_text.to(self.device),
-            text_mask.to(dtype=torch.bool, device=self.device),
-        )
+            condition_features["text"] = (
+                padded_text.to(self.device),
+                text_mask.to(dtype=torch.bool, device=self.device),
+            )
 
-        return None, BatchFeature(condition_features)
+            return None, BatchFeature(condition_features)
 
         assert len(raw_audio) == len(
             raw_motion

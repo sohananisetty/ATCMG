@@ -17,7 +17,9 @@ from transformers import (
     T5Config,
     T5EncoderModel,
     T5Tokenizer,
+    ClapTextModelWithProjection,
 )
+import re
 
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
 
@@ -93,9 +95,11 @@ class T5Conditioner(nn.Module):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             try:
-                self.t5_tokenizer = T5Tokenizer.from_pretrained(name, cache_dir="./")
+                self.t5_tokenizer = T5Tokenizer.from_pretrained(
+                    name, cache_dir="./pretrained/"
+                )
                 self.t5 = (
-                    T5EncoderModel.from_pretrained(name, cache_dir="./")
+                    T5EncoderModel.from_pretrained(name, cache_dir="./pretrained/")
                     .eval()
                     .to(device)
                 )
@@ -150,15 +154,20 @@ class T5Conditioner(nn.Module):
 class ClipConditioner(nn.Module):
     """Uses the CLIP transformer encoder for text (from Hugging Face)"""
 
-    def __init__(
-        self, version="openai/clip-vit-large-patch14", device="cuda", max_length=77
-    ):
+    def __init__(self, version="openai/clip-vit-large-patch14", device="cuda"):
         super().__init__()
-        self.tokenizer = CLIPTokenizer.from_pretrained(version)
-        self.transformer = CLIPTextModelWithProjection.from_pretrained(version)
+        self.tokenizer = CLIPTokenizer.from_pretrained(
+            version, cache_dir="./pretrained/"
+        )
+        self.transformer = (
+            CLIPTextModelWithProjection.from_pretrained(
+                version, cache_dir="./pretrained/"
+            )
+            .to(device)
+            .eval()
+        )
         self.dim = self.transformer.config.projection_dim
         self.device = device
-        self.max_length = max_length
         self.freeze()
 
     def freeze(self):
@@ -173,19 +182,11 @@ class ClipConditioner(nn.Module):
 
         empty_idx = torch.LongTensor([i for i, xi in enumerate(entries) if xi == ""])
 
-        # inputs = {}
-
-        # inputs["input_ids"] = clip.tokenize(entries, truncate=True).to(self.device)
         inputs = self.tokenizer(
             entries,
-            truncation=True,
-            max_length=self.max_length,
-            return_length=True,
-            return_overflowing_tokens=False,
-            padding="max_length",
+            padding=True,
             return_tensors="pt",
         )
-        # inputs["attention_mask"] = torch.ones(len(inputs)).to(self.device)  ## B
 
         inputs["attention_mask"][empty_idx, :] = 0
 
@@ -206,7 +207,7 @@ class ClipConditioner(nn.Module):
         with torch.no_grad():
             embeds = self.transformer(**inputs).text_embeds
 
-        encoding = embeds * mask.unsqueeze(-1)
+        encoding = embeds * mask
 
         return encoding, mask
 
@@ -274,13 +275,13 @@ class BERTConditioner(nn.Module):
         super().__init__()
         self.device = device
 
-        self.config = BertConfig.from_pretrained(name)
+        self.config = BertConfig.from_pretrained(name, cache_dir="./pretrained/")
         self.tokenizer = AutoTokenizer.from_pretrained(name)
-        self.encoder = BertModel.from_pretrained(name)
+        self.encoder = (
+            BertModel.from_pretrained(name, cache_dir="./pretrained/").to(device).eval()
+        )
 
         self.freeze()
-
-        self.encoder = self.encoder.eval()
         self.dim = self.config.hidden_size
 
     # @property
@@ -331,3 +332,159 @@ class BERTConditioner(nn.Module):
         encoding = embeds[:, 0] * mask.unsqueeze(-1)
 
         return encoding, mask
+
+
+class ClapTextConditioner(nn.Module):
+    """Uses the CLAP transformer encoder for text (from Hugging Face)"""
+
+    def __init__(self, version="laion/larger_clap_music_and_speech", device="cuda"):
+        super().__init__()
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            version, cache_dir="./pretrained/"
+        )
+        self.transformer = (
+            ClapTextModelWithProjection.from_pretrained(
+                version, cache_dir="./pretrained/"
+            )
+            .to(device)
+            .eval()
+        )
+        self.dim = self.transformer.config.projection_dim
+        self.device = device
+        self.freeze()
+
+    def freeze(self):
+        self.transformer = self.transformer.eval()
+        for param in self.parameters():
+            param.requires_grad = False
+
+    def tokenize(self, x: tp.List[tp.Optional[str]]) -> tp.Dict[str, torch.Tensor]:
+        if x is not None and isinstance(x, str):
+            x = [x]
+        entries = [xi if xi is not None else "" for xi in x]
+
+        empty_idx = torch.LongTensor([i for i, xi in enumerate(entries) if xi == ""])
+
+        inputs = self.tokenizer(
+            entries,
+            padding=True,
+            return_tensors="pt",
+        )
+
+        inputs["attention_mask"][empty_idx, :] = 0
+
+        return inputs
+
+    def forward(self, inputs: tp.Dict[str, torch.Tensor]) -> ConditionType:
+        mask = inputs["attention_mask"]
+        with torch.no_grad():
+            embeds = self.transformer(**inputs).last_hidden_state
+        embeds = embeds * mask.unsqueeze(-1)
+        return embeds, mask
+
+    def get_text_embedding(self, inputs: tp.Dict[str, torch.Tensor]) -> ConditionType:
+
+        mask = inputs["attention_mask"]
+        mask = mask[:, 0:1]
+
+        with torch.no_grad():
+            embeds = self.transformer(**inputs).text_embeds
+
+        encoding = embeds * mask
+
+        return encoding, mask
+
+
+def getTextConditioner(text_conditioner_name, device="cuda"):
+    if "t5" in text_conditioner_name:
+
+        text_encoder = T5Conditioner(text_conditioner_name, device=device)
+        text_dim = text_encoder.dim
+
+    elif "bert" in text_conditioner_name:
+        text_encoder = BERTConditioner(text_conditioner_name, device=device)
+        text_dim = text_encoder.dim
+
+    elif "clip" in text_conditioner_name:
+        text_encoder = ClipConditioner(text_conditioner_name, device=device)
+        text_dim = text_encoder.dim
+
+    else:
+        text_encoder = ClapTextConditioner(text_conditioner_name, device=device)
+        text_dim = text_encoder.dim
+
+    return text_encoder, text_dim
+
+
+def parse_prompt_attention(text):
+    """
+    Parses a string with attention tokens and returns a list of pairs: text and its associated weight.
+    Accepted tokens are:
+      (abc) - increases attention to abc by a multiplier of 1.1
+      (abc:3.12) - increases attention to abc by a multiplier of 3.12
+      [abc] - decreases attention to abc by a multiplier of 1.1
+
+    """
+    re_attention = re.compile(
+        r"""
+    \(|
+    \[|
+    :\s*([+-]?[.\d]+[\.]*)\s*\)|
+    \)|
+    ]|
+    [^\\()\[\]:]+|
+    """,
+        re.X,
+    )
+
+    weight_pattern = r"[+-]?\d*\.?\d+"
+
+    res = []
+    round_brackets = []
+    square_brackets = []
+
+    round_bracket_multiplier = 1.1
+    square_bracket_multiplier = 1 / 1.1
+
+    def multiply_range(start_position, multiplier):
+        for p in range(start_position, len(res)):
+            res[p][1] *= multiplier
+
+    for m in re_attention.finditer(text):
+        text = m.group(0)
+        weight = m.group(1)
+
+        if text == "(":
+            round_brackets.append(len(res))
+        elif text == "[":
+            square_brackets.append(len(res))
+        elif weight is not None and round_brackets:
+            weight = re.findall(weight_pattern, weight)[0]
+            multiply_range(round_brackets.pop(), float(weight))
+        elif text == ")" and round_brackets:
+            multiply_range(round_brackets.pop(), round_bracket_multiplier)
+        elif text == "]" and square_brackets:
+            multiply_range(square_brackets.pop(), square_bracket_multiplier)
+        else:
+
+            res.append([text, 1.0])
+
+    for pos in round_brackets:
+        multiply_range(pos, round_bracket_multiplier)
+
+    for pos in square_brackets:
+        multiply_range(pos, square_bracket_multiplier)
+
+    if len(res) == 0:
+        res = [["", 1.0]]
+
+    # merge runs of identical weights
+    i = 0
+    while i + 1 < len(res):
+        if res[i][1] == res[i + 1][1]:
+            res[i][0] += res[i + 1][0]
+            res.pop(i + 1)
+        else:
+            i += 1
+
+    return res

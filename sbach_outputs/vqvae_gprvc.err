@@ -1,14 +1,0 @@
-/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/utils/weight_norm.py:28: UserWarning: torch.nn.utils.weight_norm is deprecated in favor of torch.nn.utils.parametrizations.weight_norm.
-  warnings.warn("torch.nn.utils.weight_norm is deprecated in favor of torch.nn.utils.parametrizations.weight_norm.")
-Could not find image processor class in the image processor config or the model config. Loading based on pattern matching with the model's feature extractor configuration. Please open a PR/issue to update `preprocessor_config.json` to use `image_processor_type` instead of `feature_extractor_type`. This warning will be removed in v4.40.
-wandb: Currently logged in as: sohananisetty (ai-choreo). Use `wandb login --relogin` to force relogin
-wandb: wandb version 0.16.4 is available!  To upgrade, please run:
-wandb:  $ pip install wandb --upgrade
-wandb: Tracking run with wandb version 0.16.2
-wandb: Run data is saved locally in /coc/scratch/sanisetty3/music_motion/ATCMG/wandb/run-20240320_095003-lo94jihk
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run electric-smoke-5
-wandb:  View project at https://wandb.ai/ai-choreo/vqvae_body_gprvc
-wandb:  View run at https://wandb.ai/ai-choreo/vqvae_body_gprvc/runs/lo94jihk
-  0%|          | 0/13 [00:00<?, ?it/s]  8%|7         | 1/13 [00:00<00:04,  2.41it/s] 15%|#5        | 2/13 [00:00<00:04,  2.42it/s] 23%|##3       | 3/13 [00:01<00:04,  2.43it/s] 31%|###       | 4/13 [00:01<00:03,  2.45it/s] 38%|###8      | 5/13 [00:02<00:03,  2.48it/s] 46%|####6     | 6/13 [00:02<00:02,  2.50it/s] 54%|#####3    | 7/13 [00:02<00:02,  2.52it/s] 62%|######1   | 8/13 [00:03<00:01,  2.53it/s] 69%|######9   | 9/13 [00:03<00:01,  2.54it/s] 77%|#######6  | 10/13 [00:04<00:01,  2.46it/s] 85%|########4 | 11/13 [00:04<00:00,  2.73it/s] 92%|#########2| 12/13 [00:04<00:00,  2.94it/s]100%|##########| 13/13 [00:04<00:00,  2.80it/s]
-0it [00:00, ?it/s]1it [00:13, 13.62s/it]2it [00:27, 13.57s/it]3it [00:40, 13.46s/it]4it [00:53, 13.42s/it]5it [01:07, 13.39s/it]6it [01:20, 13.37s/it]7it [01:33, 13.36s/it]8it [01:47, 13.37s/it]9it [02:00, 13.37s/it]10it [02:13, 13.35s/it]11it [02:27, 13.31s/it]12it [02:40, 13.37s/it]13it [02:53, 13.34s/it]14it [03:07, 13.39s/it]15it [03:20, 13.36s/it]16it [03:33, 13.32s/it]17it [03:47, 13.35s/it]18it [04:00, 13.35s/it]19it [04:14, 13.40s/it]20it [04:27, 13.33s/it]21it [04:40, 13.35s/it]22it [04:54, 13.41s/it]23it [05:07, 13.38s/it]24it [05:20, 13.36s/it]25it [05:34, 13.44s/it]25it [05:34, 13.38s/it]

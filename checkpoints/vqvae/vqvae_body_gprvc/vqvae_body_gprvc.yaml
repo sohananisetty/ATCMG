@@ -7,7 +7,7 @@ dataset:
   hml_rep: "gprvc"
   window_size: 120
 train:
-  resume: False
+  resume: True
   num_train_iters : 110001 #'Number of training steps
   save_steps : 10000
   logging_steps : 50

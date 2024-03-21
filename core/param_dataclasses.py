@@ -38,6 +38,7 @@ class AudioRep(Enum):
     ENCODEC = "encodec"
     LIBROSA = "librosa"
     WAV = "wav"
+    CLAP = "clap"
 
 
 pattern_providers = {

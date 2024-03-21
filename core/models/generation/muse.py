@@ -754,17 +754,16 @@ class MotionMuse(nn.Module):
 
     def get_null_context(self, B, device, dtype=torch.float):
         cond_list = list(self.model.condition_fuser.cond2fuse.keys())
-        
-        
+
         conditions = {}
         for cond_type in cond_list:
             cond = torch.zeros(
-                    (B, 1, self.model.audio_input_dim),
-                    device=device,
-                    dtype=dtype,
-                )
+                (B, 1, self.model.audio_input_dim),
+                device=device,
+                dtype=dtype,
+            )
             cond_mask = torch.zeros((B, 1), dtype=torch.bool, device=device)
-            conditions[cond_type] = (cond , cond_mask)
+            conditions[cond_type] = (cond, cond_mask)
 
         return conditions
 
@@ -774,7 +773,7 @@ class MotionMuse(nn.Module):
         self,
         conditions: Dict[str, ConditionType],
         neg_conditions: Optional[Dict[str, ConditionType]] = None,
-        duration: int = 75,
+        duration_s: int = 10,
         temperature=1.0,
         topk_filter_thres=0.9,
         can_remask_prev_masked=False,
@@ -787,6 +786,7 @@ class MotionMuse(nn.Module):
         assert self.num_codeboks == 1, "only 1 codebook supported  for now"
 
         device = next(self.parameters()).device
+        duration = int(duration_s * (30 / 4))
 
         seq_len = duration
         try:

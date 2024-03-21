@@ -71,7 +71,7 @@ class Motion2Positions:
 
         joints_num = data.nb_joints
         r_rot_quat, r_pos = self.recover_root_rot_pos(data)
-        
+
         r_pos[:] = 0
 
         r_rot_cont6d = quaternion_to_cont6d(r_rot_quat)
@@ -79,9 +79,8 @@ class Motion2Positions:
         cont6d_params = data.rotations
         cont6d_params = torch.cat([r_rot_cont6d, cont6d_params], dim=-1)
         cont6d_params = cont6d_params.view(-1, joints_num, 6)
-        
 
-        positions = skeleton.forward_kinematics_cont6d(cont6d_params, r_pos )
+        positions = skeleton.forward_kinematics_cont6d(cont6d_params, r_pos)
 
         return positions
 
@@ -534,10 +533,10 @@ class BaseMotionDataset(ABC, data.Dataset):
                 file_path.append(fullname)
         return file_path
 
-    @abstractmethod
-    def __len__(self):
-        raise NotImplementedError("not implemented")
+    # @abstractmethod
+    # def __len__(self):
+    #     raise NotImplementedError("not implemented")
 
-    @abstractmethod
-    def __getitem__(self, item):
-        raise NotImplementedError("not implemented")
+    # @abstractmethod
+    # def __getitem__(self, item):
+    #     raise NotImplementedError("not implemented")

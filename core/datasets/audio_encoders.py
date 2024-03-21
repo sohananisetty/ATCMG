@@ -7,8 +7,16 @@ import torch.nn as nn
 import torchaudio
 
 
-from transformers import AutoProcessor, EncodecModel
+from transformers import (
+    AutoProcessor,
+    EncodecModel,
+    ClapAudioModelWithProjection,
+    ClapProcessor,
+)
+
 import librosa
+
+ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
 
 
 def convert_audio(wav: torch.Tensor, sr: int, target_sr: int, target_channels: int):
@@ -33,12 +41,14 @@ class EncodecConditioner(nn.Module):
     def __init__(self, target_bandwidth=6, target_sr=16000, device="cuda"):
         super().__init__()
         self.encoder = (
-            EncodecModel.from_pretrained("facebook/encodec_24khz", cache_dir="./")
+            EncodecModel.from_pretrained(
+                "facebook/encodec_24khz", cache_dir="./pretrained/"
+            )
             .to(device)
             .eval()
         )
         self.processor = AutoProcessor.from_pretrained(
-            "facebook/encodec_24khz", cache_dir="./"
+            "facebook/encodec_24khz", cache_dir="./pretrained/"
         )
         self.target_sr = target_sr
         self.device = device
@@ -234,4 +244,87 @@ class LibrosaConditioner(nn.Module):
         return audio_features  ## B N d
 
 
-# HB2Ev297GQ4
+class ClapAudioConditioner(nn.Module):
+    """Uses the CLAP transformer encoder for text (from Hugging Face)"""
+
+    def __init__(
+        self,
+        version="laion/larger_clap_music_and_speech",
+        target_sr=16000,
+        device="cuda",
+    ):
+        super().__init__()
+        self.processor = ClapProcessor.from_pretrained(
+            version, cache_dir="./pretrained/"
+        )
+        self.encoder = (
+            ClapAudioModelWithProjection.from_pretrained(
+                version, cache_dir="./pretrained/"
+            )
+            .to(device)
+            .eval()
+        )
+        self.dim = self.encoder.audio_config.projection_dim  ##512
+        self.device = device
+        self.target_sr = target_sr
+        self.freeze()
+
+    def freeze(self):
+        self.encoder = self.encoder.eval()
+        for param in self.parameters():
+            param.requires_grad = False
+
+    def forward(
+        self,
+        path_or_wav: tp.Union[str, tp.List[str], np.ndarray, tp.List[np.ndarray]],
+    ) -> Union[List[torch.Tensor], torch.Tensor]:
+        if not isinstance(path_or_wav, list):
+            path_or_wav = [path_or_wav]
+
+        if not isinstance(path_or_wav[0], np.ndarray):
+            wavs = []
+            for pth in path_or_wav:
+                wav, sr = torchaudio.load(pth)
+                audio_sample = convert_audio(
+                    wav, sr, self.target_sr, 1
+                )  ## channel time
+                wavs.append(audio_sample[0].numpy())
+            inputs = self.processor(
+                audios=wavs,
+                sampling_rate=self.processor.feature_extractor.sampling_rate,
+                return_tensors="pt",
+            )  ## B chn T
+
+        else:
+            wavs = []
+            for wav in path_or_wav:
+                assert len(wav.shape) == 2, "should be chn T"
+                wavs.append(wav[0])
+            inputs = self.processor(
+                audios=wavs,
+                sampling_rate=self.processor.feature_extractor.sampling_rate,
+                return_tensors="pt",
+            )  ## B chn T
+
+        with torch.no_grad():
+            encoder_outputs = self.encoder(**inputs)
+            out_embs = encoder_outputs.audio_embeds
+
+        if len(out_embs) == 1:
+            return out_embs[0]
+
+        return out_embs  ## B N d
+
+
+def getAudioConditioner(audio_rep, device="cuda"):
+    if audio_rep == "encodec":
+        audio_encoder = EncodecConditioner(device=device)
+        audio_dim = audio_encoder.dim
+    elif audio_rep == "librosa":
+        audio_encoder = LibrosaConditioner(device=device)
+        audio_dim = audio_encoder.dim
+    elif audio_rep == "clap":
+        audio_encoder = ClapAudioConditioner(device=device)
+        audio_dim = audio_encoder.dim
+
+    return audio_encoder, audio_dim
