@@ -371,10 +371,10 @@ class CustomMHA(nn.Module):
             mask = F.pad(mask, (1, 0), value=True)
 
             # When no context
-            if key_padding_mask.shape[-1] == 2:
-                key_padding_mask = key_padding_mask[..., :1]
-                k = k[..., :1, :]
-                v = v[..., :1, :]
+            # if key_padding_mask.shape[-1] == 2:
+            #     key_padding_mask = key_padding_mask[..., :1]
+            #     k = k[..., :1, :]
+            #     v = v[..., :1, :]
 
         if self.qk_norm:
             q, k = map(l2norm, (q, k))

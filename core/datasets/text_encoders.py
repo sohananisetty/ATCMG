@@ -186,7 +186,7 @@ class ClipConditioner(nn.Module):
             entries,
             padding=True,
             return_tensors="pt",
-        )
+        ).to(self.device)
 
         inputs["attention_mask"][empty_idx, :] = 0
 
@@ -349,7 +349,7 @@ class ClapTextConditioner(nn.Module):
             .to(device)
             .eval()
         )
-        self.dim = self.transformer.config.projection_dim
+        self.dim = self.transformer.config.projection_dim  ##512
         self.device = device
         self.freeze()
 
@@ -369,7 +369,7 @@ class ClapTextConditioner(nn.Module):
             entries,
             padding=True,
             return_tensors="pt",
-        )
+        ).to(self.device)
 
         inputs["attention_mask"][empty_idx, :] = 0
 
@@ -409,7 +409,7 @@ def getTextConditioner(text_conditioner_name, device="cuda"):
         text_encoder = ClipConditioner(text_conditioner_name, device=device)
         text_dim = text_encoder.dim
 
-    else:
+    elif "clap" in text_conditioner_name:
         text_encoder = ClapTextConditioner(text_conditioner_name, device=device)
         text_dim = text_encoder.dim
 

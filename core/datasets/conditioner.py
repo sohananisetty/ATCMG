@@ -59,7 +59,6 @@ class ConditionProvider(nn.Module):
         audio_padding: str = "longest",
         motion_padding: str = "longest",
         motion_max_length_s: int = 10,
-        motion_min_length_s: int = 3,
         fps: int = 30,
         motion_rep: MotionRep = MotionRep.FULL,
         pad_id: int = 0,
@@ -73,6 +72,8 @@ class ConditionProvider(nn.Module):
             self.sampling_rate = 30
         elif audio_rep == AudioRep.LIBROSA:
             self.sampling_rate = 30
+        elif audio_rep == AudioRep.CLAP:
+            self.sampling_rate = 48000
         else:
             self.sampling_rate = sampling_rate
 
@@ -87,35 +88,11 @@ class ConditionProvider(nn.Module):
         self.motion_padding = motion_padding
 
         self.motion_max_length_s = motion_max_length_s
-        self.motion_min_length_s = motion_min_length_s
         self.motion_max_length = motion_max_length_s * fps
-        self.motion_min_length = motion_min_length_s * fps
         self.pad_id = pad_id
-
-        # if audio_rep == AudioRep.ENCODEC:
-        #     self.audio_encoder = EncodecConditioner(device=device)
-        #     self.audio_dim = 128
-        # elif audio_rep == AudioRep.LIBROSA:
-        #     self.audio_encoder = LibrosaConditioner(device=device)
-        #     self.audio_dim = 35
-
-        # self.audio_dim = 128 if audio_rep == AudioRep.ENCODEC else 35
 
         self.audio_encoder, self.audio_dim = getAudioConditioner(audio_rep.value)
         self.text_encoder, self.text_dim = getTextConditioner(text_conditioner_name)
-
-        # if "t5" in text_conditioner_name:
-
-        #     self.text_encoder = T5Conditioner(text_conditioner_name, device="cuda")
-        #     self.text_dim = self.text_encoder.dim
-
-        # elif "bert" in text_conditioner_name:
-        #     self.text_encoder = BERTConditioner(text_conditioner_name, device="cuda")
-        #     self.text_dim = self.text_encoder.dim
-
-        # else:
-        #     self.text_encoder = ClipConditioner(text_conditioner_name, device="cuda")
-        #     self.text_dim = self.text_encoder.dim
 
     def _select_common_start_idx(self, motion, audio, max_length_s):
         motion_s = motion.shape[0] // self.fps
@@ -154,17 +131,26 @@ class ConditionProvider(nn.Module):
             )
             max_length = min(max_length_, self.audio_max_length)
 
+        if self.audio_rep == AudioRep.CLAP:
+            max_length = 1
+
         for idx, audio_feature in enumerate(audio_list):
 
             if audio_feature is None:
-                audios.append(np.zeros((1, max_length, self.audio_dim)))
-                masks.append(np.array([0] * max_length)[None, ...])
+                audios.append(np.zeros((max_length, self.audio_dim)))
+                masks.append(np.array([0] * max_length))
 
                 continue
 
             seq_len = audio_feature.shape[0]
 
-            if seq_len > max_length:
+            if padding == "max_length":
+                mask = np.array([1] * seq_len)
+                audios.append(audio_feature)
+                masks.append(mask)
+                continue
+
+            if seq_len >= max_length:
 
                 overflow = seq_len - max_length
                 start_idx = (
@@ -174,8 +160,8 @@ class ConditionProvider(nn.Module):
                 )
                 audio_feature = audio_feature[start_idx : start_idx + max_length]
                 mask = np.array([1] * max_length)
-                audios.append(audio_feature[None, ...])
-                masks.append(mask[None, ...])
+                audios.append(audio_feature)
+                masks.append(mask)
 
             else:
 
@@ -188,7 +174,7 @@ class ConditionProvider(nn.Module):
                     n_repeat = int(max_length / seq_len)
                     audio_feature = np.stack(np.tile(audio_feature, n_repeat))
 
-                pad_motion = np.concatenate(
+                pad_audio = np.concatenate(
                     [
                         audio_feature,
                         np.zeros(
@@ -204,11 +190,11 @@ class ConditionProvider(nn.Module):
                     + [0] * (max_length - audio_feature.shape[0])
                 )
 
-                audios.append(pad_motion[None, ...])
-                masks.append(mask[None, ...])
+                audios.append(pad_audio)
+                masks.append(mask)
 
-        padded_audio = np.concatenate(audios, 0)
-        attention_mask = np.concatenate(masks, 0)
+        padded_audio = np.stack(audios, axis=0)
+        attention_mask = np.stack(masks, axis=0)
 
         return padded_audio, attention_mask
 
@@ -225,8 +211,8 @@ class ConditionProvider(nn.Module):
 
         padding = padding if padding is not None else self.motion_padding
 
-        if padding == "max_length":
-            assert len(motion_list) == 1, "if using max length batch size should be 1"
+        # if padding == "max_length":
+        #     assert len(motion_list) == 1, "if using max length batch size should be 1"
 
         if padding == "longest" or max_length is None:
             max_length_ = (
@@ -402,8 +388,8 @@ class ConditionProvider(nn.Module):
 
             if audio is not None:
 
-                if isinstance(audio, str):
-                    audio = self.audio_encoder(audio)
+                if isinstance(audio, str) or self.audio_rep == AudioRep.CLAP:
+                    audio = self.audio_encoder(audio).cpu().numpy()
 
                 subset_idx_audio, subset_idx_motion = self._select_common_start_idx(
                     motion=motion, audio=audio, max_length_s=max_length_s

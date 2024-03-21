@@ -38,7 +38,7 @@ def convert_audio(wav: torch.Tensor, sr: int, target_sr: int, target_channels: i
 
 
 class EncodecConditioner(nn.Module):
-    def __init__(self, target_bandwidth=6, target_sr=16000, device="cuda"):
+    def __init__(self, target_bandwidth=6, target_sr=9600, device="cuda"):
         super().__init__()
         self.encoder = (
             EncodecModel.from_pretrained(
@@ -59,6 +59,13 @@ class EncodecConditioner(nn.Module):
     def freeze(self):
         for p in self.encoder.parameters():
             p.requires_grad = False
+
+    def _load_wav(self, pth: str, target_sr: Optional[int] = None):
+        target_sr = target_sr if target_sr is not None else self.target_sr
+        wav, sr = torchaudio.load(pth)
+        audio_sample = convert_audio(wav, sr, target_sr, 1)  ## channel time
+
+        return audio_sample
 
     def _decode(
         self,
@@ -124,10 +131,7 @@ class EncodecConditioner(nn.Module):
         if not isinstance(path_or_wav[0], np.ndarray):
             wavs = []
             for pth in path_or_wav:
-                wav, sr = torchaudio.load(pth)
-                audio_sample = convert_audio(
-                    wav, sr, self.target_sr, 1
-                )  ## channel time
+                audio_sample = self._load_wav(pth)
                 wavs.append(audio_sample[0].numpy())
             inputs = self.processor(
                 raw_audio=wavs,
@@ -216,6 +220,11 @@ class LibrosaConditioner(nn.Module):
 
         return audio_feature
 
+    def _load_wav(self, pth: str, target_sr: Optional[int] = None):
+        target_sr = target_sr if target_sr is not None else self.SR
+        audio_sample, _ = librosa.load(pth, sr=target_sr)
+        return audio_sample
+
     def forward(
         self,
         path_or_wav: tp.Union[str, tp.List[str], np.ndarray, tp.List[np.ndarray]],
@@ -226,14 +235,16 @@ class LibrosaConditioner(nn.Module):
         audio_features = []
         if not isinstance(path_or_wav[0], torch.Tensor):
             for path in path_or_wav:
-                data, _ = librosa.load(path, sr=self.SR)
-                audio_features.append(self.get_audio_feat(data))
+                data = self._load_wav(path)
+                audio_features.append(
+                    torch.Tensor(self.get_audio_feat(data)).to(self.device)
+                )
 
         else:
             for wav in path_or_wav:
-                assert len(wav.shape) == 1, "should be T"
+                assert len(wav.shape) == 2, "should be chn T"
                 audio_features.append(
-                    torch.Tensor(self.get_audio_feat(data)).to(self.device)
+                    torch.Tensor(self.get_audio_feat(wav[0])).to(self.device)
                 )
 
         # embs = np.stack(audio_features, 0)
@@ -250,7 +261,7 @@ class ClapAudioConditioner(nn.Module):
     def __init__(
         self,
         version="laion/larger_clap_music_and_speech",
-        target_sr=16000,
+        target_sr=9600,
         device="cuda",
     ):
         super().__init__()
@@ -264,15 +275,22 @@ class ClapAudioConditioner(nn.Module):
             .to(device)
             .eval()
         )
-        self.dim = self.encoder.audio_config.projection_dim  ##512
+        self.dim = self.encoder.config.projection_dim  ##512
         self.device = device
-        self.target_sr = target_sr
+        self.target_sr = self.processor.feature_extractor.sampling_rate
         self.freeze()
 
     def freeze(self):
         self.encoder = self.encoder.eval()
         for param in self.parameters():
             param.requires_grad = False
+
+    def _load_wav(self, pth: str, target_sr: Optional[int] = None):
+        target_sr = target_sr if target_sr is not None else self.target_sr
+        wav, sr = torchaudio.load(pth)
+        audio_sample = convert_audio(wav, sr, target_sr, 1)  ## channel time
+
+        return audio_sample
 
     def forward(
         self,
@@ -284,36 +302,35 @@ class ClapAudioConditioner(nn.Module):
         if not isinstance(path_or_wav[0], np.ndarray):
             wavs = []
             for pth in path_or_wav:
-                wav, sr = torchaudio.load(pth)
-                audio_sample = convert_audio(
-                    wav, sr, self.target_sr, 1
-                )  ## channel time
+                audio_sample = self._load_wav(pth)
+
                 wavs.append(audio_sample[0].numpy())
             inputs = self.processor(
                 audios=wavs,
                 sampling_rate=self.processor.feature_extractor.sampling_rate,
                 return_tensors="pt",
-            )  ## B chn T
+            ).to(self.device)
 
         else:
             wavs = []
             for wav in path_or_wav:
                 assert len(wav.shape) == 2, "should be chn T"
+
                 wavs.append(wav[0])
             inputs = self.processor(
                 audios=wavs,
                 sampling_rate=self.processor.feature_extractor.sampling_rate,
                 return_tensors="pt",
-            )  ## B chn T
+            ).to(self.device)
 
         with torch.no_grad():
             encoder_outputs = self.encoder(**inputs)
             out_embs = encoder_outputs.audio_embeds
 
         if len(out_embs) == 1:
-            return out_embs[0]
+            return out_embs[0][None]
 
-        return out_embs  ## B N d
+        return out_embs[:, None, :]  ## B d
 
 
 def getAudioConditioner(audio_rep, device="cuda"):

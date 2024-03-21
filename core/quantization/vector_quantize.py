@@ -492,8 +492,6 @@ class EuclideanCodebook(nn.Module):
 
         x = x.float()
 
-        print(x.shape)
-
         if needs_codebook_dim:
             x = rearrange(x, "... -> 1 ...")
 

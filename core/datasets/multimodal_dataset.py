@@ -125,6 +125,7 @@ def load_dataset_gen(
                 audio_rep=dataset_args.audio_rep,
                 motion_rep=dataset_args.motion_rep,
                 fps=dataset_args.fps / dataset_args.down_sampling_ratio,
+                window_size_s=dataset_args.window_size_s,
                 hml_rep=dataset_args.hml_rep,
             )
         )
@@ -203,9 +204,7 @@ class MotionAudioTextDataset(BaseMotionDataset):
         self.motion_dir = os.path.join(data_root, "motion_data/new_joint_vecs")
         self.audio_dir = os.path.join(data_root, "audio")
 
-        if self.audio_rep == "encodec":
-            self.sampling_rate = 30
-        elif self.audio_rep == "librosa":
+        if self.audio_rep in ["encodec", "librosa", "clap"]:
             self.sampling_rate = 30
         else:
             self.sampling_rate = sampling_rate
@@ -339,13 +338,13 @@ class MotionAudioTextDataset(BaseMotionDataset):
         text = self.text_list[item]
         try:
 
-            if self.audio_rep == "wav":
+            if self.audio_rep in ["wav", "clap"]:
 
                 wav, sr = torchaudio.load(
                     os.path.join(self.audio_dir, self.audio_rep, name + ".wav")
                 )
                 audio_data = np.array(convert_audio(wav, sr, self.sampling_rate, 1))
-            elif self.audio_rep == "encodec" or self.audio_rep == "librosa":
+            elif self.audio_rep in ["encodec", "librosa"]:
                 audio_data = np.load(
                     os.path.join(self.audio_dir, self.audio_rep, name + ".npy")
                 )
@@ -385,7 +384,7 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         hml_rep: str = "gprvc",
         motion_min_length_s=3,
         motion_max_length_s=10,
-        window_size=None,
+        window_size_s=None,
         sampling_rate: int = 16000,
         downsample_ratio=4,
         fps: int = 30,
@@ -400,7 +399,7 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         self.downsample_ratio = downsample_ratio
         self.motion_rep = motion_rep
 
-        self.window_size = window_size
+        self.window_size = int(window_size_s * self.fps)
 
         self.min_motion_length = motion_min_length_s * fps
         self.max_motion_length = motion_max_length_s * fps
@@ -415,12 +414,12 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
             self.motion_dir = os.path.join(data_root, f"indices/{motion_rep}")
         self.audio_dir = os.path.join(data_root, "audio")
 
-        if self.audio_rep == "encodec":
+        if self.audio_rep in ["encodec", "librosa"]:
             self.sampling_rate = 30
-        elif self.audio_rep == "librosa":
-            self.sampling_rate = 30
+        elif self.audio_rep == "clap":
+            self.sampling_rate = 48000
         else:
-            self.sampling_rate = sampling_rate
+            self.sampling_rate = int(sampling_rate)
 
         split_file = os.path.join(data_root, f"motion_data/{split}.txt")
 
@@ -544,6 +543,27 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
 
         return name_list, txt_list
 
+    def _select_common_start_idx(self, motion, audio, max_length_s):
+        motion_s = motion.shape[0] // self.fps
+        audio_s = audio.shape[0] // self.sampling_rate
+
+        common_len_seconds = min(motion_s, audio_s)
+        motion = motion[: int(common_len_seconds * self.fps)]
+        audio = motion[: int(common_len_seconds * self.sampling_rate)]
+
+        if common_len_seconds > max_length_s:
+            subset_idx_motion = np.random.randint(
+                0, motion.shape[0] - int(max_length_s * self.fps) + 1
+            )
+
+            mot_start_s = subset_idx_motion // self.fps
+            subset_idx_audio = int(mot_start_s * self.sampling_rate)
+
+        else:
+            return 0, 0
+
+        return subset_idx_audio, subset_idx_motion
+
     def __getitem__(self, item: int) -> Tuple[torch.Tensor, str]:
 
         name, ind, f_, to_ = self.id_list[item].rsplit("_", 3)
@@ -572,13 +592,18 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         text = self.text_list[item]
         try:
 
-            if self.audio_rep == "wav":
+            if self.audio_rep in ["wav", "clap"]:
 
-                wav, sr = torchaudio.load(
-                    os.path.join(self.audio_dir, self.audio_rep, name + ".wav")
-                )
-                audio_data = np.array(convert_audio(wav, sr, self.sampling_rate, 1))
-            elif self.audio_rep == "encodec" or self.audio_rep == "librosa":
+                # wav, sr = torchaudio.load(
+                #     os.path.join(self.audio_dir, self.audio_rep, name + ".wav")
+                # )
+                # audio_data = np.array(convert_audio(wav, sr, self.sampling_rate, 1))
+                audio_data, _ = librosa.load(
+                    os.path.join(self.audio_dir, "wav", name + ".wav"),
+                    sr=self.sampling_rate,
+                )  # sample rate should be 48000
+                audio_data = audio_data.reshape(-1, 1)  ## T 1
+            elif self.audio_rep in ["encodec", "librosa"]:
                 audio_data = np.load(
                     os.path.join(self.audio_dir, self.audio_rep, name + ".npy")
                 )
@@ -615,6 +640,38 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
             ]
         else:
             final_motion = motion.reshape(-1, 1)
+
+        if self.window_size is not None:
+
+            if self.window_size == -1:
+                mot_len_s = int(final_motion.shape[0] // self.fps)
+                audio_len_s = mot_len_s
+
+            else:
+                mot_len_s = int(self.window_size // self.fps)
+                audio_len_s = mot_len_s
+
+            if audio_data is None:
+
+                subset_idx_motion = np.random.randint(
+                    0, final_motion.shape[0] - int(mot_len_s * self.fps) + 1
+                )
+                final_motion = final_motion[
+                    subset_idx_motion : subset_idx_motion + self.window_size
+                ]
+            else:
+                subset_idx_audio, subset_idx_motion = self._select_common_start_idx(
+                    final_motion, audio_data, mot_len_s
+                )
+
+                final_motion = final_motion[
+                    subset_idx_motion : subset_idx_motion + self.window_size
+                ]
+
+                audio_data = audio_data[
+                    subset_idx_audio : subset_idx_audio
+                    + audio_len_s * self.sampling_rate
+                ]
 
         return {
             "name": name,
