@@ -366,9 +366,10 @@ class CustomMHA(nn.Module):
             k = torch.cat((nk, k), dim=-2)
             v = torch.cat((nv, v), dim=-2)
 
-            mask = repeat(mask, "b 1 1 j -> b h i j", h=h, i=n)
+            if exists(mask):
 
-            mask = F.pad(mask, (1, 0), value=True)
+                mask = repeat(mask, "b 1 1 j -> b h i j", h=h, i=n)
+                mask = F.pad(mask, (1, 0), value=True)
 
             # When no context
             # if key_padding_mask.shape[-1] == 2:

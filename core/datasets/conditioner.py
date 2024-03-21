@@ -350,9 +350,8 @@ class ConditionProvider(nn.Module):
                         raw_audio[i] = self.audio_encoder(raw_audio[i]).cpu().numpy()
 
                 padded_audio, audio_mask = self._get_audio_features(
-                    max_length=float("inf"),
                     audio_list=raw_audio,
-                    padding=audio_padding,
+                    padding="longest",
                 )
 
             condition_features["audio"] = (

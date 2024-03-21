@@ -344,4 +344,4 @@ def getAudioConditioner(audio_rep, device="cuda"):
         audio_encoder = ClapAudioConditioner(device=device)
         audio_dim = audio_encoder.dim
 
-    return audio_encoder, audio_dim
+    return audio_encoder, int(audio_dim)

@@ -141,70 +141,6 @@ class ScaledEmbedding(nn.Embedding):
         return group
 
 
-# class TransformerBlockMuse(nn.Module):
-#     def __init__(
-#         self,
-#         dim: int = 768,
-#         heads: int = 8,
-#         attn_dropout: float = 0.0,
-#         cross_attn_tokens_dropout: float = 0.0,
-#         flash: bool = False,
-#         causal: bool = True,
-#         depth: int = 1,
-#         ff_mult: int = 4,
-#     ):
-#         super().__init__()
-#         self.layers = nn.ModuleList([])
-#         self.do_cross = causal
-
-#         for _ in range(depth):
-#             self.layers.append(
-#                 nn.ModuleList(
-#                     [
-#                         Attention(
-#                             dim=dim,
-#                             heads=heads,
-#                             dropout=attn_dropout,
-#                             cross_attn_tokens_dropout=cross_attn_tokens_dropout,
-#                             add_null_kv=False,
-#                             flash=flash,
-#                         ),
-#                         (
-#                             Attention(
-#                                 dim=dim,
-#                                 heads=heads,
-#                                 dropout=attn_dropout,
-#                                 cross_attn_tokens_dropout=cross_attn_tokens_dropout,
-#                                 add_null_kv=True,
-#                                 flash=flash,
-#                                 causal=False,
-#                             )
-#                             if self.do_cross
-#                             else nn.Identity()
-#                         ),
-#                         FeedForward(dim=dim, mult=ff_mult),
-#                     ]
-#                 )
-#             )
-
-#         self.norm = LayerNorm(dim)
-
-#     def forward(self, x, mask=None, context=None, context_mask=None, rel_pos=None):
-#         for attn, cross_attn, ff1 in self.layers:
-#             x = attn(x, mask=mask, rel_pos=rel_pos) + x
-
-#             if self.do_cross:
-
-#                 x = (
-#                     cross_attn(x, mask=mask, context=context, context_mask=context_mask)
-#                     + x
-#                 )
-
-#             x = ff1(x) + x
-
-#         return self.norm(x)
-
-
 class TransformerBlockMuse(nn.Module):
     def __init__(
         self,
@@ -274,6 +210,8 @@ class MLMModel(nn.Module):
         dim,
         n_q=3,
         positional_embedding_type="SINE",
+        var_len=True,
+        quality_emb=False,
         emb_lr: tp.Optional[float] = None,
         bias_proj=False,
         emb_dropout=0.0,
@@ -292,12 +230,18 @@ class MLMModel(nn.Module):
         self.text_input_dim = text_input_dim
         self.cond_dropout = cond_dropout
         self.pattern_provider = pattern_provider
+        self.var_len = var_len
+        self.quality_emb = quality_emb
 
         self.set_token_ids(num_tokens, False)
 
         self.token_emb = nn.ModuleList(
-            [ScaledEmbedding(self.vocab_size, dim, lr=emb_lr) for _ in range(n_q)]
+            [ScaledEmbedding(self.vocab_size, self.dim, lr=emb_lr) for _ in range(n_q)]
         )
+
+        if quality_emb:
+
+            self.qual_emb = nn.Embedding(2, self.dim)
 
         self.pos_emb = ScaledSinusoidalEmbedding(
             PositionalEmbeddingParams(dim=self.dim)
@@ -509,11 +453,16 @@ class MLMModel(nn.Module):
         labels: Optional[torch.IntTensor] = None,
         cond_drop_prob: float = None,
         ignore_index: int = -100,
+        quality_list=None,
     ):
 
         sequence = inputs[0]
         sequence_mask = inputs[1]
         B, K, S = sequence.shape
+
+        if self.quality_emb is True and quality_list is None:
+            quality_list = torch.ones(B, dtype=torch.long, device=sequence.device)
+
         assert (
             K == self.num_codebooks
         ), "Sequence shape must match the specified number of codebooks"
@@ -555,17 +504,24 @@ class MLMModel(nn.Module):
         x_ = self.post_emb_norm(x_)
         x_ = self.emb_dropout(x_)
 
+        if quality_list is not None and self.quality_emb == True:
+            x_ = torch.cat([self.qual_emb(quality_list).unsqueeze(1), x_], dim=-2)
+            x_padding_mask = F.pad(x_padding_mask, (1, 0), value=True)
+
         embed = self.transformer_blocks(
             x=x_,
-            mask=x_padding_mask,
+            mask=x_padding_mask if self.var_len else None,
             context=context,
-            context_mask=context_padding_mask,
+            context_mask=context_padding_mask if self.var_len else None,
         )
         if self.out_norm:
             embed = self.out_norm(embed)
         logits = torch.stack([self.linears[k](embed) for k in range(K)], dim=1)
 
-        if len(self.condition_fuser.fuse2cond.get("prepend", [])) > 0:
+        if (
+            len(self.condition_fuser.fuse2cond.get("prepend", [])) > 0
+            or self.quality_emb
+        ):
             logits = logits[:, :, -S:]
 
         if return_embed:
@@ -773,7 +729,7 @@ class MotionMuse(nn.Module):
         self,
         conditions: Dict[str, ConditionType],
         neg_conditions: Optional[Dict[str, ConditionType]] = None,
-        duration_s: int = 10,
+        duration_s: int = 8,
         temperature=1.0,
         topk_filter_thres=0.9,
         can_remask_prev_masked=False,
@@ -905,6 +861,7 @@ class MotionMuse(nn.Module):
         ignore_index: int = -100,
         cond_drop_prob=None,
         return_logits=False,
+        quality_list=None,
     ):
         # tokenize if needed
 
@@ -923,6 +880,7 @@ class MotionMuse(nn.Module):
             cond_drop_prob=cond_drop_prob,
             ignore_index=ignore_index,
             return_logits=True,
+            quality_list=quality_list,
         )
 
         if not return_logits:

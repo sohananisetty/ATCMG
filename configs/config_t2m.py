@@ -111,7 +111,8 @@ cfg.vqvae.right_hand_config = "/srv/hays-lab/scratch/sanisetty3/music_motion/ACM
 cfg.motion_generator = CN()
 cfg.motion_generator.target = "core.models.generation.motion_generator.MotionMuse"
 cfg.motion_generator.n_q = 3  # number of streams to model
-
+cfg.motion_generator.var_len = True
+cfg.motion_generator.quality_emb = False
 cfg.motion_generator.dim = 256
 cfg.motion_generator.depth = 8
 cfg.motion_generator.heads = 8

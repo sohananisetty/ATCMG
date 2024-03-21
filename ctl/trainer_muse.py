@@ -43,6 +43,27 @@ def accum_log(log, new_logs):
     return log
 
 
+dataset_qualities = {
+    "animation": 0,
+    "humanml": 1,
+    "perform": 0,
+    "GRAB": 1,
+    "idea400": 1,
+    "humman": 0,
+    "beat": 1,
+    "game_motion": 0,
+    "music": 0,
+    "aist": 1,
+    "fitness": 0,
+    "moyo": 1,
+    "choreomaster": 1,
+    "dance": 0,
+    "kungfu": 0,
+    "EgoBody": 0,
+    # "HAA500": 1.0,
+}
+
+
 # main trainer class
 
 
@@ -272,8 +293,13 @@ class MotionMuseTrainer(nn.Module):
 
             motions = inputs["motion"][0].to(torch.long)
             motion_mask = inputs["motion"][1]
+            quality_list = torch.LongTensor(
+                [dataset_qualities[nm.split("/")[0]] for nm in inputs["names"]]
+            ).to(motions.device)
 
-            loss = self.motion_muse((motions, motion_mask), conditions)
+            loss = self.motion_muse(
+                (motions, motion_mask), conditions, quality_list=quality_list
+            )
 
             loss = loss / self.grad_accum_every
 

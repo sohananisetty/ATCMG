@@ -166,7 +166,7 @@ class ClipConditioner(nn.Module):
             .to(device)
             .eval()
         )
-        self.dim = self.transformer.config.projection_dim
+        self.dim = self.transformer.config.projection_dim  ##768
         self.device = device
         self.freeze()
 
@@ -413,7 +413,7 @@ def getTextConditioner(text_conditioner_name, device="cuda"):
         text_encoder = ClapTextConditioner(text_conditioner_name, device=device)
         text_dim = text_encoder.dim
 
-    return text_encoder, text_dim
+    return text_encoder, int(text_dim)
 
 
 def parse_prompt_attention(text):

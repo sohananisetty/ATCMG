@@ -4,9 +4,9 @@ dataset:
   dataset_name: "mix"
   dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
   motion_rep: "body"
-  text_conditioner_name: "laion/larger_clap_music_and_speech"
+  text_conditioner_name: "openai/clip-vit-large-patch14" #"laion/larger_clap_music_and_speech"
   text_rep: "pooled_text_embed"
-  audio_rep: "clap"
+  audio_rep: "encodec"
   hml_rep: "rv"
   window_size_s: 4
   motion_max_length_s: 4
@@ -20,8 +20,8 @@ train:
   logging_steps : 10
   wandb_every : 200
   evaluate_every : 10000
-  eval_bs : 200
-  train_bs : 200
+  eval_bs : 400
+  train_bs : 400
   gradient_accumulation_steps : 1
   learning_rate : 2e-4
   weight_decay : 1e-3
@@ -52,6 +52,9 @@ motion_generator:
   num_tokens: 512
   causal: True
   flash: True
+  var_len: False
+  quality_emb: False
+  
 
 
 
