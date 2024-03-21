@@ -432,6 +432,7 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
                         motion = np.load(
                             os.path.join(self.motion_dir, line.strip())
                         ).squeeze()
+                        seq_len = motion.shape[0]
                         if self.motion_rep == "full":
                             left_hand_motion = np.load(
                                 os.path.join(
@@ -445,7 +446,14 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
                                     line.strip(),
                                 )
                             ).squeeze()
-                        if motion.shape[0] < math.ceil(
+
+                            seq_len = min(
+                                motion.shape[0],
+                                left_hand_motion.shape[0],
+                                right_hand_motion.shape[0],
+                            )
+
+                        if seq_len < round(
                             default(self.window_size, self.min_motion_length)
                         ):
                             continue
@@ -626,20 +634,13 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         except:
             audio_data = None
 
-        if (math.ceil(to_) - int(f_)) > self.min_motion_length:
+        if (math.ceil(to_) - int(f_)) > default(
+            self.window_size, self.min_motion_length
+        ):
             motion = motion[int(f_) : math.ceil(to_)]
             if self.motion_rep == "full":
                 left_hand_motion = left_hand_motion[int(f_) : math.ceil(to_)]
                 right_hand_motion = right_hand_motion[int(f_) : math.ceil(to_)]
-
-        if self.motion_rep == "full":
-            final_motion = [
-                motion.reshape(-1, 1),
-                left_hand_motion.reshape(-1, 1),
-                right_hand_motion.reshape(-1, 1),
-            ]
-        else:
-            final_motion = motion.reshape(-1, 1)
 
         if self.window_size is not None:
 
@@ -653,25 +654,53 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
 
             if audio_data is None:
 
-                subset_idx_motion = np.random.randint(
-                    0, final_motion.shape[0] - int(mot_len_s * self.fps) + 1
+                subset_idx_motion = random.randint(
+                    0, motion.shape[0] - int(mot_len_s * self.fps)
                 )
-                final_motion = final_motion[
-                    subset_idx_motion : subset_idx_motion + self.window_size
+                motion = motion[
+                    subset_idx_motion : subset_idx_motion + int(mot_len_s * self.fps)
                 ]
+                if self.motion_rep == "full":
+                    left_hand_motion = left_hand_motion[
+                        subset_idx_motion : subset_idx_motion
+                        + int(mot_len_s * self.fps)
+                    ]
+                    right_hand_motion = right_hand_motion[
+                        subset_idx_motion : subset_idx_motion
+                        + int(mot_len_s * self.fps)
+                    ]
+
             else:
                 subset_idx_audio, subset_idx_motion = self._select_common_start_idx(
-                    final_motion, audio_data, mot_len_s
+                    motion, audio_data, mot_len_s
                 )
 
-                final_motion = final_motion[
-                    subset_idx_motion : subset_idx_motion + self.window_size
+                motion = motion[
+                    subset_idx_motion : subset_idx_motion + int(mot_len_s * self.fps)
                 ]
+                if self.motion_rep == "full":
+                    left_hand_motion = left_hand_motion[
+                        subset_idx_motion : subset_idx_motion
+                        + int(mot_len_s * self.fps)
+                    ]
+                    right_hand_motion = right_hand_motion[
+                        subset_idx_motion : subset_idx_motion
+                        + int(mot_len_s * self.fps)
+                    ]
 
                 audio_data = audio_data[
                     subset_idx_audio : subset_idx_audio
-                    + audio_len_s * self.sampling_rate
+                    + int(audio_len_s * self.sampling_rate)
                 ]
+
+        if self.motion_rep == "full":
+            final_motion = [
+                motion.reshape(-1, 1),
+                left_hand_motion.reshape(-1, 1),
+                right_hand_motion.reshape(-1, 1),
+            ]
+        else:
+            final_motion = motion.reshape(-1, 1)
 
         return {
             "name": name,
