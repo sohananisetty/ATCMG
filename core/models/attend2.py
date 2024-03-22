@@ -6,15 +6,8 @@ from functools import partial, wraps
 import torch
 import torch.nn.functional as F
 from core import AttentionParams
-from core.models.utils import (
-    LayerNorm,
-    create_causal_mask,
-    default,
-    dropout_seq,
-    exists,
-    l2norm,
-    print_once,
-)
+from core.models.utils import (LayerNorm, create_causal_mask, default,
+                               dropout_seq, exists, l2norm, print_once)
 from einops import rearrange, repeat
 from packaging import version
 from torch import einsum, nn
@@ -325,6 +318,8 @@ class CustomMHA(nn.Module):
         """
         q,k,v: b n d
 
+        make sure to do the norm first/last stuff before entering this function
+
         key_padding_mask: False for padding
         attn_mask: False for padding
 
@@ -351,8 +346,6 @@ class CustomMHA(nn.Module):
             else:
                 mask = attn_mask
 
-        q = self.norm(q)
-
         q, k, v = (self.to_q(q), *self.to_kv(k).chunk(2, dim=-1))
 
         q, k, v = map(lambda t: rearrange(t, "b n (h d) -> b h n d", h=h), (q, k, v))
@@ -371,12 +364,6 @@ class CustomMHA(nn.Module):
                 mask = repeat(mask, "b 1 1 j -> b h i j", h=h, i=n)
                 mask = F.pad(mask, (1, 0), value=True)
 
-            # When no context
-            # if key_padding_mask.shape[-1] == 2:
-            #     key_padding_mask = key_padding_mask[..., :1]
-            #     k = k[..., :1, :]
-            #     v = v[..., :1, :]
-
         if self.qk_norm:
             q, k = map(l2norm, (q, k))
             q = q * self.q_scale
@@ -386,10 +373,6 @@ class CustomMHA(nn.Module):
         attn_bias = None
         if exists(rel_pos):
             attn_bias = rel_pos(i, j)
-
-        # print(q.shape, k.shape, v.shape, input_mask.shape)
-
-        # print("in custom", q.shape, k.shape, v.shape, mask.shape)
 
         out = self.attend(q, k, v, mask=mask, attn_bias=attn_bias, is_causal=is_causal)
 

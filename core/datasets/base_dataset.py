@@ -533,10 +533,10 @@ class BaseMotionDataset(ABC, data.Dataset):
                 file_path.append(fullname)
         return file_path
 
-    # @abstractmethod
-    # def __len__(self):
-    #     raise NotImplementedError("not implemented")
+    @abstractmethod
+    def __len__(self):
+        raise NotImplementedError("not implemented")
 
-    # @abstractmethod
-    # def __getitem__(self, item):
-    #     raise NotImplementedError("not implemented")
+    @abstractmethod
+    def __getitem__(self, item):
+        raise NotImplementedError("not implemented")

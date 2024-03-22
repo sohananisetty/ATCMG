@@ -12,10 +12,12 @@ import torch
 import transformers
 import utils.vis_utils.plot_3d_global as plot_3d
 import wandb
+from configs.config import get_cfg_defaults as vqvae_get_cfg_defaults
 from configs.config_t2m import get_cfg_defaults as muse_get_cfg_defaults
-from core import AudioRep, MotionRep, TextRep
+from core import AudioRep, MotionRep, MotionTokenizerParams, TextRep
 from core.datasets.conditioner import ConditionProvider
 from core.datasets.multimodal_dataset import load_dataset_gen, simple_collate
+from core.models.generation.muse import MLMModel, MotionMuse
 from core.models.resnetVQ.vqvae import HumanVQVAE
 from core.models.utils import get_obj_from_str, instantiate_from_config
 from core.optimizer import get_optimizer
@@ -23,11 +25,9 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AdamW, get_scheduler
-from utils.motion_processing.hml_process import recover_from_ric, recover_root_rot_pos
+from utils.motion_processing.hml_process import (recover_from_ric,
+                                                 recover_root_rot_pos)
 from yacs.config import CfgNode
-from core.models.generation.muse import MLMModel, MotionMuse
-
-from configs.config import get_cfg_defaults as vqvae_get_cfg_defaults
 
 
 def cycle(dl):
@@ -112,6 +112,17 @@ class MotionMuseTrainer(nn.Module):
             num_warmup_steps=self.training_args.warmup_steps,
             num_training_steps=self.num_train_steps,
         )
+        condition_provider = ConditionProvider(
+            motion_rep=MotionRep(self.dataset_args.motion_rep),
+            audio_rep=AudioRep(self.dataset_args.audio_rep),
+            text_rep=TextRep(self.dataset_args.text_rep),
+            motion_padding=self.dataset_args.motion_padding,
+            audio_padding=self.dataset_args.audio_padding,
+            motion_max_length_s=self.dataset_args.motion_max_length_s,
+            audio_max_length_s=self.dataset_args.motion_max_length_s,
+            pad_id=MotionTokenizerParams(self.model_args.num_tokens).pad_token_id,
+            fps=self.dataset_args.fps / self.dataset_args.down_sampling_ratio,
+        )
 
         dataset_names = {
             "animation": 0.8,
@@ -120,13 +131,13 @@ class MotionMuseTrainer(nn.Module):
             "GRAB": 1.0,
             "idea400": 1.5,
             "humman": 0.5,
-            "beat": 2.0,
+            "beat": 2.5,
             "game_motion": 0.8,
             "music": 0.5,
             "aist": 1.5,
             "fitness": 1.0,
-            "moyo": 1.0,
-            "choreomaster": 2.0,
+            "moyo": 1.5,
+            "choreomaster": 2.5,
             "dance": 1.0,
             "kungfu": 1.0,
             "EgoBody": 0.5,
@@ -156,18 +167,6 @@ class MotionMuseTrainer(nn.Module):
         )
 
         # dataloader
-
-        condition_provider = ConditionProvider(
-            motion_rep=MotionRep(self.dataset_args.motion_rep),
-            audio_rep=AudioRep(self.dataset_args.audio_rep),
-            text_rep=TextRep(self.dataset_args.text_rep),
-            motion_padding=self.dataset_args.motion_padding,
-            audio_padding=self.dataset_args.audio_padding,
-            motion_max_length_s=self.dataset_args.motion_max_length_s,
-            audio_max_length_s=self.dataset_args.motion_max_length_s,
-            pad_id=self.motion_muse.model.pad_token_id,
-            fps=self.dataset_args.fps / self.dataset_args.down_sampling_ratio,
-        )
 
         self.dl = DataLoader(
             train_ds,
@@ -446,10 +445,13 @@ class MotionMuseTrainer(nn.Module):
                 motions = inputs["motion"][0].to(torch.long)  ###  1 k n
                 motion_mask = inputs["motion"][1]
                 gt_len = int(sum(motion_mask[0]))
+                gt_len_s = gt_len // (
+                    self.dataset_args.fps / self.dataset_args.down_sampling_ratio
+                )
 
                 gt_motion = self.bkn_to_motion(motions[:, :gt_len], dset)
 
-                gen_ids = self.motion_muse.generate(conditions, duration=gt_len)
+                gen_ids = self.motion_muse.generate(conditions, duration_s=gt_len_s)
 
                 gen_motion = self.bkn_to_motion(gen_ids, dset)
 
@@ -459,13 +461,6 @@ class MotionMuseTrainer(nn.Module):
                         save_file, os.path.basename(name).split(".")[0] + "_gt.gif"
                     ),
                 )
-
-                # dset.render_hml(
-                #     vqvae_output.decoded_motion.squeeze().cpu(),
-                #     os.path.join(
-                #         save_file, os.path.basename(name).split(".")[0] + "_pred.gif"
-                #     ),
-                # )
 
                 dset.render_hml(
                     gen_motion,

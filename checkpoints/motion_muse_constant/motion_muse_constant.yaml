@@ -8,11 +8,9 @@ dataset:
   text_rep: "pooled_text_embed"
   audio_rep: "encodec"
   hml_rep: "rv"
-  window_size_s: 4
+  motion_min_length_s: 4
   motion_max_length_s: 4
-  audio_max_length_s: 4
-  motion_padding: "max_length"
-  audio_padding: "max_length"
+  window_size_s: 4
 train:
   resume: False
   num_train_iters : 110001 #'Number of training steps
@@ -23,7 +21,7 @@ train:
   eval_bs : 400
   train_bs : 400
   gradient_accumulation_steps : 1
-  learning_rate : 2e-4
+  learning_rate : 1e-4
   weight_decay : 1e-3
   warmup_steps : 4000
   gamma : 0.05
@@ -45,15 +43,18 @@ motion_generator:
   target: "core.models.generation.motion_generator.MotionMuse"
   n_q : 1
   dim : 512
-  depth: 6
+  depth: 12
   cond_dropout: 0.4
   no_mask_token_prob: 0.4
+  audio_input_dim: 128
+  text_input_dim: 768
   emb_dropout: 0.1
   num_tokens: 512
-  causal: True
   flash: True
   var_len: False
   quality_emb: False
+  custom: False
+  attn_dropout: 0.1
   
 
 

@@ -9,17 +9,15 @@ from typing import Callable, Dict, List, Optional, Tuple
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
-from core import (
-    AttentionParams,
-    MotionTokenizerParams,
-    PositionalEmbeddingParams,
-    PositionalEmbeddingType,
-    TranslationTransformerParams,
-)
-from core.datasets.conditioner import ClassifierFreeGuidanceDropout, ConditionFuser
+from core import (AttentionParams, MotionTokenizerParams,
+                  PositionalEmbeddingParams, PositionalEmbeddingType,
+                  TranslationTransformerParams)
+from core.datasets.conditioner import (ClassifierFreeGuidanceDropout,
+                                       ConditionFuser)
 from core.models.attend2 import Attend, Attention
 from core.models.resnetVQ.vqvae import HumanVQVAE
-from core.models.utils import FeedForward, LayerNorm, default, exists, get_obj_from_str
+from core.models.utils import (FeedForward, LayerNorm, default, exists,
+                               get_obj_from_str)
 from einops import rearrange, repeat
 from torch import einsum, nn
 from tqdm.auto import tqdm

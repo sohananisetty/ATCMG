@@ -14,6 +14,7 @@ Unlike regular PyTorch Transformer, we make the hard choice that batches are fir
 """
 
 import typing as tp
+from functools import partial
 
 import torch
 import torch.nn as nn
@@ -22,7 +23,7 @@ from einops import rearrange, repeat
 from torch.nn import functional as F
 from torch.utils.checkpoint import checkpoint as torch_checkpoint
 from xformers import ops
-from functools import partial
+
 from .rope import RotaryEmbedding
 from .streaming import StreamingModule
 
@@ -814,7 +815,8 @@ class StreamingTransformer(StreamingModule):
         elif method == "torch":
             return torch_checkpoint(layer, *args, use_reentrant=False, **kwargs)
         elif method.startswith("xformers"):
-            from xformers.checkpoint_fairinternal import _get_default_policy, checkpoint
+            from xformers.checkpoint_fairinternal import (_get_default_policy,
+                                                          checkpoint)
 
             if method == "xformers_default":
                 # those operations will be saved, and not recomputed.
@@ -879,7 +881,8 @@ class StreamingTransformer(StreamingModule):
 
 def _verify_xformers_memory_efficient_compat():
     try:
-        from xformers.ops import LowerTriangularMask, memory_efficient_attention  # noqa
+        from xformers.ops import (LowerTriangularMask,  # noqa
+                                  memory_efficient_attention)
     except ImportError:
         raise ImportError(
             "xformers is not installed. Please install it and try again.\n"
@@ -895,9 +898,7 @@ def _verify_xformers_memory_efficient_compat():
 def _verify_xformers_internal_compat():
     try:
         from xformers.checkpoint_fairinternal import (  # noqa
-            _get_default_policy,
-            checkpoint,
-        )
+            _get_default_policy, checkpoint)
     except ImportError:
         raise ImportError(
             "Francisco's fairinternal xformers is not installed. Please install it and try again.\n"

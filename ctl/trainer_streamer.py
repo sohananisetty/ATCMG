@@ -12,12 +12,13 @@ import torch
 import transformers
 import utils.vis_utils.plot_3d_global as plot_3d
 import wandb
-
+from configs.config import get_cfg_defaults as vqvae_get_cfg_defaults
 # from configs.config import get_cfg_defaults as get_cfg_defaults3
 # from configs.config_t2m import cfg, get_cfg_defaults
 from core import AudioRep, MotionRep, TextRep
 from core.datasets.conditioner import ConditionProvider
 from core.datasets.multimodal_dataset import load_dataset_gen, simple_collate
+from core.models.generation.lm import MotionGen
 from core.models.resnetVQ.vqvae import HumanVQVAE
 from core.models.utils import get_obj_from_str, instantiate_from_config
 from core.optimizer import get_optimizer
@@ -25,11 +26,9 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AdamW, get_scheduler
-from utils.motion_processing.hml_process import recover_from_ric, recover_root_rot_pos
+from utils.motion_processing.hml_process import (recover_from_ric,
+                                                 recover_root_rot_pos)
 from yacs.config import CfgNode
-
-from configs.config import get_cfg_defaults as vqvae_get_cfg_defaults
-from core.models.generation.lm import MotionGen
 
 
 def cycle(dl):

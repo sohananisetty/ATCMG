@@ -399,7 +399,9 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         self.downsample_ratio = downsample_ratio
         self.motion_rep = motion_rep
 
-        self.window_size = int(window_size_s * self.fps)
+        self.window_size = (
+            int(window_size_s * self.fps) if window_size_s is not None else None
+        )
 
         self.min_motion_length = motion_min_length_s * fps
         self.max_motion_length = motion_max_length_s * fps
@@ -634,7 +636,7 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         except:
             audio_data = None
 
-        if (math.ceil(to_) - int(f_)) > default(
+        if motion[int(f_) : math.ceil(to_)].shape[0] > default(
             self.window_size, self.min_motion_length
         ):
             motion = motion[int(f_) : math.ceil(to_)]
@@ -655,7 +657,7 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
             if audio_data is None:
 
                 subset_idx_motion = random.randint(
-                    0, motion.shape[0] - int(mot_len_s * self.fps)
+                    0, max(0, motion.shape[0] - int(mot_len_s * self.fps))
                 )
                 motion = motion[
                     subset_idx_motion : subset_idx_motion + int(mot_len_s * self.fps)

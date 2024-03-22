@@ -13,18 +13,16 @@ from functools import partial
 import torch
 import torch.nn.functional as F
 from core import MotionTokenizerParams, pattern_providers
-from core.datasets.conditioner import (
-    ClassifierFreeGuidanceDropout,
-    ConditionFuserStreamer,
-    ConditionType,
-)
+from core.datasets.conditioner import (ClassifierFreeGuidanceDropout,
+                                       ConditionFuserStreamer, ConditionType)
 from core.models.utils import TorchAutocast
 from torch import nn
 
 from .streaming_transformer.activations import get_activation_fn
 from .streaming_transformer.codebooks_patterns import CodebooksPatternProvider
 from .streaming_transformer.streaming import State, StreamingModule
-from .streaming_transformer.transformer import StreamingTransformer, create_norm_fn
+from .streaming_transformer.transformer import (StreamingTransformer,
+                                                create_norm_fn)
 
 
 def multinomial(
@@ -426,7 +424,9 @@ class LMModel(StreamingModule):
 
         if cross_attention_input is not None:
             context = cross_attention_input[0]
-            context_padding_mask = ~cross_attention_input[1] ## mask from padding False to padding True
+            context_padding_mask = ~cross_attention_input[
+                1
+            ]  ## mask from padding False to padding True
         else:
             context, context_padding_mask = self.get_null_context(x_)
 

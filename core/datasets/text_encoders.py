@@ -1,30 +1,48 @@
 import logging
+import re
 import typing as tp
 import warnings
+from abc import ABC, abstractmethod
 from typing import List, Union
 
 import clip
 import torch
 import torch.nn as nn
 from core.models.utils import TorchAutocast
-from transformers import (
-    AutoTokenizer,
-    BertConfig,
-    BertForMaskedLM,
-    BertModel,
-    CLIPTextModelWithProjection,
-    CLIPTokenizer,
-    T5Config,
-    T5EncoderModel,
-    T5Tokenizer,
-    ClapTextModelWithProjection,
-)
-import re
+from transformers import (AutoTokenizer, BertConfig, BertForMaskedLM,
+                          BertModel, ClapTextModelWithProjection,
+                          CLIPTextModelWithProjection, CLIPTokenizer, T5Config,
+                          T5EncoderModel, T5Tokenizer)
 
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
 
 
-class T5Conditioner(nn.Module):
+class BaseTextConditioner(ABC, nn.Module):
+    """Base model for all text conditioner modules."""
+
+    def __init__(self):
+        super().__init__()
+
+    @abstractmethod
+    def tokenize(self, *args, **kwargs) -> tp.Dict[str, torch.Tensor]:
+        """Should be any part of the processing that will lead to a synchronization
+        point, e.g. BPE tokenization with transfer to the GPU.
+
+        The returned value will be saved and return later when calling forward().
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def forward(self, inputs: tp.Dict[str, torch.Tensor]) -> ConditionType:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get_text_embedding(self, inputs: tp.Dict[str, torch.Tensor]) -> ConditionType:
+
+        raise NotImplementedError()
+
+
+class T5Conditioner(BaseTextConditioner):
     """T5-based TextConditioner.
 
     Args:
@@ -151,8 +169,14 @@ class T5Conditioner(nn.Module):
         return encoding, mask
 
 
-class ClipConditioner(nn.Module):
+class ClipConditioner(BaseTextConditioner):
     """Uses the CLIP transformer encoder for text (from Hugging Face)"""
+
+    MODELS = ["openai/clip-vit-large-patch14", "openai/clip-vit-base-patch32"]
+    MODELS_DIMS = {
+        "openai/clip-vit-large-patch14": 768,
+        "openai/clip-vit-base-patch32": 512,
+    }
 
     def __init__(self, version="openai/clip-vit-large-patch14", device="cuda"):
         super().__init__()
@@ -166,7 +190,8 @@ class ClipConditioner(nn.Module):
             .to(device)
             .eval()
         )
-        self.dim = self.transformer.config.projection_dim  ##768
+        self.dim = self.MODELS_DIMS[version]
+        # self.transformer.config.projection_dim  ##768
         self.device = device
         self.freeze()
 
@@ -212,61 +237,61 @@ class ClipConditioner(nn.Module):
         return encoding, mask
 
 
-# class ClipConditioner(nn.Module):
-#     def __init__(
-#         self,
-#         device: str = "cuda" if torch.cuda.is_available() else "cpu",
-#         name: str = "ViT-B/32",
-#     ):
-#         super().__init__()
-#         self.device = device
-#         self.encoder, self.preprocess = clip.load(name)
-#         clip.model.convert_weights(self.encoder)
+class ClipConditioner2(nn.Module):
+    def __init__(
+        self,
+        device: str = "cuda" if torch.cuda.is_available() else "cpu",
+        name: str = "ViT-B/32",
+    ):
+        super().__init__()
+        self.device = device
+        self.encoder, self.preprocess = clip.load(name)
+        clip.model.convert_weights(self.encoder)
 
-#         self.encoder = self.encoder.eval()
-#         self.config = {"hidden_size": 512}
-#         self.freeze()
+        self.encoder = self.encoder.eval()
+        self.config = {"hidden_size": 512}
+        self.freeze()
 
-#     # @property
-#     # def device(self):
-#     #     return next(self.encoder.parameters()).device
+    # @property
+    # def device(self):
+    #     return next(self.encoder.parameters()).device
 
-#     def tokenize(self, x: tp.List[tp.Optional[str]]) -> tp.Dict[str, torch.Tensor]:
-#         if x is not None and isinstance(x, str):
-#             x = [x]
-#         entries = [xi if xi is not None else "" for xi in x]
+    def tokenize(self, x: tp.List[tp.Optional[str]]) -> tp.Dict[str, torch.Tensor]:
+        if x is not None and isinstance(x, str):
+            x = [x]
+        entries = [xi if xi is not None else "" for xi in x]
 
-#         empty_idx = torch.LongTensor([i for i, xi in enumerate(entries) if xi == ""])
+        empty_idx = torch.LongTensor([i for i, xi in enumerate(entries) if xi == ""])
 
-#         inputs = {}
+        inputs = {}
 
-#         inputs["input_ids"] = clip.tokenize(entries, truncate=True).to(self.device)
-#         inputs["attention_mask"] = torch.ones(len(inputs)).to(self.device)  ## B
+        inputs["input_ids"] = clip.tokenize(entries, truncate=True).to(self.device)
+        inputs["attention_mask"] = torch.ones(len(inputs)).to(self.device)  ## B
 
-#         inputs["attention_mask"][empty_idx, :] = 0
+        inputs["attention_mask"][empty_idx, :] = 0
 
-#         return inputs
+        return inputs
 
-#     def forward(self, inputs: tp.Dict[str, torch.Tensor]) -> ConditionType:
-#         return self.get_text_embedding(inputs)
+    def forward(self, inputs: tp.Dict[str, torch.Tensor]) -> ConditionType:
+        return self.get_text_embedding(inputs)
 
-#     def get_text_embedding(self, inputs: tp.Dict[str, torch.Tensor]) -> ConditionType:
+    def get_text_embedding(self, inputs: tp.Dict[str, torch.Tensor]) -> ConditionType:
 
-#         mask = inputs["attention_mask"]
+        mask = inputs["attention_mask"]
 
-#         with torch.no_grad():
-#             embeds = self.encoder.encode_text(inputs["input_ids"]).float()
+        with torch.no_grad():
+            embeds = self.encoder.encode_text(inputs["input_ids"]).float()
 
-#         embeds = embeds * mask.unsqueeze(-1)
+        embeds = embeds * mask.unsqueeze(-1)
 
-#         return embeds, mask
+        return embeds, mask
 
-#     def freeze(self):
-#         for p in self.encoder.parameters():
-#             p.requires_grad = False
+    def freeze(self):
+        for p in self.encoder.parameters():
+            p.requires_grad = False
 
 
-class BERTConditioner(nn.Module):
+class BERTConditioner(BaseTextConditioner):
     def __init__(
         self,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
@@ -334,7 +359,7 @@ class BERTConditioner(nn.Module):
         return encoding, mask
 
 
-class ClapTextConditioner(nn.Module):
+class ClapTextConditioner(BaseTextConditioner):
     """Uses the CLAP transformer encoder for text (from Hugging Face)"""
 
     def __init__(self, version="laion/larger_clap_music_and_speech", device="cuda"):

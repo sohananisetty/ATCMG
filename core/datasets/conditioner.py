@@ -10,13 +10,10 @@ from core.param_dataclasses import AudioRep, MotionRep, TextRep
 from torch import nn
 from transformers.feature_extraction_utils import BatchFeature
 
-from .text_encoders import (
-    BERTConditioner,
-    ClipConditioner,
-    T5Conditioner,
-    getTextConditioner,
-)
-from .audio_encoders import EncodecConditioner, LibrosaConditioner, getAudioConditioner
+from .audio_encoders import (EncodecConditioner, LibrosaConditioner,
+                             getAudioConditioner)
+from .text_encoders import (BERTConditioner, ClipConditioner, T5Conditioner,
+                            getTextConditioner)
 
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
 
@@ -55,7 +52,7 @@ class ConditionProvider(nn.Module):
         text_rep: TextRep = TextRep.POOLED_TEXT_EMBED,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
         sampling_rate=16000,
-        audio_max_length_s=10,
+        audio_max_length_s=None,
         audio_padding: str = "longest",
         motion_padding: str = "longest",
         motion_max_length_s: int = 10,
@@ -77,8 +74,12 @@ class ConditionProvider(nn.Module):
         else:
             self.sampling_rate = sampling_rate
 
-        self.audio_max_length_s = audio_max_length_s
-        self.audio_max_length = audio_max_length_s * self.sampling_rate
+        self.audio_max_length_s = (
+            audio_max_length_s
+            if audio_max_length_s is not None
+            else motion_max_length_s
+        )
+        self.audio_max_length = self.audio_max_length_s * self.sampling_rate
 
         self.fps = fps
         self.motion_rep = motion_rep
@@ -211,13 +212,14 @@ class ConditionProvider(nn.Module):
 
         padding = padding if padding is not None else self.motion_padding
 
-        # if padding == "max_length":
-        #     assert len(motion_list) == 1, "if using max length batch size should be 1"
+        if padding == "max_length":
+            assert len(motion_list) == 1, "if using max length batch size should be 1"
 
         if padding == "longest" or max_length is None:
-            max_length_ = (
-                max([motion.shape[0] for motion in motion_list]) // down_sampling_factor
-            ) * down_sampling_factor
+            # max_length_ = (
+            #     max([motion.shape[0] for motion in motion_list]) // down_sampling_factor
+            # ) * down_sampling_factor
+            max_length_ = max([motion.shape[0] for motion in motion_list])
             max_length = int(min(max_length_, self.motion_max_length))
 
         for idx, motion in enumerate(motion_list):

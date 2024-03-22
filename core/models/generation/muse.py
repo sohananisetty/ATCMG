@@ -1,32 +1,32 @@
 import math
 import pathlib
+import typing as tp
 from copy import deepcopy
+from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from random import random
 from typing import Callable, Dict, List, Optional, Tuple
-import typing as tp
+
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
-from core import (
-    AttentionParams,
-    MotionTokenizerParams,
-    PositionalEmbeddingParams,
-    PositionalEmbeddingType,
-    TranslationTransformerParams,
-)
-from .streaming_transformer.codebooks_patterns import CodebooksPatternProvider
-from core.models.positional_embeddings import ScaledSinusoidalEmbedding
-from core.datasets.conditioner import ClassifierFreeGuidanceDropout, ConditionFuser
+from core import (AttentionParams, MotionTokenizerParams,
+                  PositionalEmbeddingParams, PositionalEmbeddingType,
+                  TranslationTransformerParams)
+from core.datasets.conditioner import (ClassifierFreeGuidanceDropout,
+                                       ConditionFuser)
 from core.models.attend2 import Attend, Attention, CustomMHA
+from core.models.positional_embeddings import ScaledSinusoidalEmbedding
 from core.models.resnetVQ.vqvae import HumanVQVAE
-from core.models.utils import FeedForward, LayerNorm, default, exists, get_obj_from_str
+from core.models.utils import (FeedForward, LayerNorm, default, exists,
+                               get_obj_from_str)
 from einops import rearrange, repeat
 from torch import einsum, nn
 from tqdm.auto import tqdm
 from yacs.config import CfgNode as CN
-from dataclasses import dataclass
+
+from .streaming_transformer.codebooks_patterns import CodebooksPatternProvider
 
 ConditionType = Tuple[torch.Tensor, torch.Tensor]
 ConditionTensors = tp.Dict[str, ConditionType]
@@ -106,23 +106,44 @@ class LayerNorm(nn.Module):
         return F.layer_norm(x, x.shape[-1:], self.gamma, self.beta)
 
 
-class GEGLU(nn.Module):
-    """https://arxiv.org/abs/2002.05202"""
+class RMSNorm(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.scale = dim**0.5
+        self.g = nn.Parameter(torch.ones(dim))
 
     def forward(self, x):
-        x, gate = x.chunk(2, dim=-1)
-        return gate * F.gelu(x)
+        return F.normalize(x, dim=-1) * self.scale * self.g
 
 
-def FeedForward(dim, mult=4):
+def FeedForward(
+    dim,
+    mult=4,
+    dropout=0.1,
+):
     """https://arxiv.org/abs/2110.09456"""
 
-    inner_dim = int(dim * mult * 2 / 3)
+    inner_dim = int(dim * mult)
     return nn.Sequential(
-        LayerNorm(dim),
-        nn.Linear(dim, inner_dim * 2, bias=False),
-        GEGLU(),
+        nn.Linear(dim, inner_dim, bias=False),
+        nn.GELU(),
         LayerNorm(inner_dim),
+        nn.Dropout(dropout),
+        nn.Linear(inner_dim, dim, bias=False),
+    )
+
+
+def FeedForward2(
+    dim,
+    mult=4,
+    dropout=0.1,
+):
+
+    inner_dim = int(dim * mult)
+    return nn.Sequential(
+        nn.Linear(dim, inner_dim, bias=False),
+        nn.GELU(),
+        nn.Dropout(dropout),
         nn.Linear(inner_dim, dim, bias=False),
     )
 
@@ -141,14 +162,13 @@ class ScaledEmbedding(nn.Embedding):
         return group
 
 
-class TransformerBlockMuse(nn.Module):
+class TransformerBlockMuseCustom(nn.Module):
     def __init__(
         self,
         dim: int = 768,
         heads: int = 8,
         attn_dropout: float = 0.0,
         flash: bool = False,
-        causal: bool = True,
         depth: int = 1,
         ff_mult: int = 4,
     ):
@@ -164,33 +184,126 @@ class TransformerBlockMuse(nn.Module):
                             heads=heads,
                             dropout=attn_dropout,
                             add_null_kv=False,
-                            causal=causal,
+                            causal=False,
                             flash=flash,
                         ),
                         CustomMHA(
                             dim=dim,
                             heads=heads,
                             dropout=attn_dropout,
-                            add_null_kv=True,
+                            add_null_kv=False,
                             flash=flash,
                             causal=False,
                         ),
-                        FeedForward(dim=dim, mult=ff_mult),
+                        FeedForward(dim=dim, mult=ff_mult, dropout=attn_dropout),
                     ]
                 )
             )
 
-        self.norm = LayerNorm(dim)
+        self.norm_sa = LayerNorm(dim)
+        self.norm_cross = LayerNorm(dim)
+        self.norm_out = LayerNorm(dim)
 
     def forward(self, x, mask=None, context=None, context_mask=None, rel_pos=None):
         for attn, cross_attn, ff1 in self.layers:
-            x = attn(q=x, k=x, v=x, key_padding_mask=mask, rel_pos=rel_pos) + x
 
-            x = cross_attn(q=x, k=context, v=context, key_padding_mask=context_mask) + x
+            x = self.norm_sa(x)
+            x = (
+                attn(
+                    q=x,
+                    k=x,
+                    v=x,
+                    key_padding_mask=mask,
+                    rel_pos=rel_pos,
+                )
+                + x
+            )
 
-            x = ff1(x) + x
+            x = (
+                cross_attn(
+                    q=self.norm_cross(x),
+                    k=context,
+                    v=context,
+                    key_padding_mask=context_mask,
+                )
+                + x
+            )
 
-        return self.norm(x)
+            x = self.norm_out(ff1(x) + x)
+
+        return x
+
+
+class TransformerBlockMuse(nn.Module):
+    def __init__(
+        self,
+        dim: int = 768,
+        heads: int = 8,
+        attn_dropout: float = 0.0,
+        flash: bool = False,
+        depth: int = 1,
+        ff_mult: int = 4,
+    ):
+        super().__init__()
+        self.layers = nn.ModuleList([])
+
+        for _ in range(depth):
+            self.layers.append(
+                nn.ModuleList(
+                    [
+                        nn.MultiheadAttention(
+                            embed_dim=dim,
+                            num_heads=heads,
+                            dropout=attn_dropout,
+                            bias=False,
+                            batch_first=True,
+                        ),
+                        nn.MultiheadAttention(
+                            embed_dim=dim,
+                            num_heads=heads,
+                            dropout=attn_dropout,
+                            bias=False,
+                            batch_first=True,
+                        ),
+                        FeedForward(dim=dim, mult=ff_mult, dropout=attn_dropout),
+                    ]
+                )
+            )
+
+        self.norm_sa = nn.LayerNorm(dim, eps=1e-5, bias=False)
+        self.norm_cross = nn.LayerNorm(dim, eps=1e-5, bias=False)
+        self.norm_out = nn.LayerNorm(dim, eps=1e-5, bias=False)
+
+    def forward(self, x, mask=None, context=None, context_mask=None, rel_pos=None):
+        for attn, cross_attn, ff1 in self.layers:
+
+            x = self.norm_sa(x)
+
+            x = (
+                attn(
+                    query=x,
+                    key=x,
+                    value=x,
+                    key_padding_mask=mask,
+                    need_weights=False,
+                )[0]
+                + x
+            )
+
+            x = (
+                cross_attn(
+                    query=self.norm_cross(x),
+                    key=context,
+                    value=context,
+                    key_padding_mask=context_mask,
+                    need_weights=False,
+                )[0]
+                + x
+            )
+
+            x = self.norm_out(ff1(x) + x)
+
+        return x
 
 
 @dataclass
@@ -211,6 +324,7 @@ class MLMModel(nn.Module):
         n_q=3,
         positional_embedding_type="SINE",
         var_len=True,
+        custom=True,
         quality_emb=False,
         emb_lr: tp.Optional[float] = None,
         bias_proj=False,
@@ -247,7 +361,10 @@ class MLMModel(nn.Module):
             PositionalEmbeddingParams(dim=self.dim)
         )
 
-        self.transformer_blocks = TransformerBlockMuse(dim=dim, **kwargs)
+        if custom:
+            self.transformer_blocks = TransformerBlockMuseCustom(dim=dim, **kwargs)
+        else:
+            self.transformer_blocks = TransformerBlockMuse(dim=dim, **kwargs)
         self.norm = LayerNorm(dim)
         self.post_emb_norm = LayerNorm(dim) if post_emb_norm else nn.Identity()
 
@@ -512,7 +629,8 @@ class MLMModel(nn.Module):
             x=x_,
             mask=x_padding_mask if self.var_len else None,
             context=context,
-            context_mask=context_padding_mask if self.var_len else None,
+            context_mask=None,
+            # =context_padding_mask if self.var_len else None,
         )
         if self.out_norm:
             embed = self.out_norm(embed)

@@ -1,20 +1,13 @@
 import typing as tp
-from typing import Optional, Tuple, Union, List
+from typing import List, Optional, Tuple, Union
 
+import librosa
 import numpy as np
 import torch
 import torch.nn as nn
 import torchaudio
-
-
-from transformers import (
-    AutoProcessor,
-    EncodecModel,
-    ClapAudioModelWithProjection,
-    ClapProcessor,
-)
-
-import librosa
+from transformers import (AutoProcessor, ClapAudioModelWithProjection,
+                          ClapProcessor, EncodecModel)
 
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
 

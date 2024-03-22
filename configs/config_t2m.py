@@ -33,7 +33,7 @@ cfg.dataset.hml_rep = "gprvc"  ## global pos rot6d vel contact
 cfg.dataset.audio_rep = "encodec"
 cfg.dataset.motion_min_length_s = 2
 cfg.dataset.motion_max_length_s = 10
-cfg.dataset.audio_max_length_s = 10
+cfg.dataset.audio_max_length_s = None
 cfg.dataset.window_size_s = None
 cfg.dataset.sampling_rate = 16000
 cfg.dataset.text_conditioner_name = "t5-base"
@@ -116,12 +116,11 @@ cfg.motion_generator.quality_emb = False
 cfg.motion_generator.dim = 256
 cfg.motion_generator.depth = 8
 cfg.motion_generator.heads = 8
-cfg.motion_generator.attn_dropout = 0.1
-cfg.motion_generator.causal = True
+
 cfg.motion_generator.flash = False
+cfg.motion_generator.custom = True
 cfg.motion_generator.num_tokens = 1024
 cfg.motion_generator.ff_mult = 4
-cfg.motion_generator.emb_dropout = 0.1
 cfg.motion_generator.post_emb_norm = False
 cfg.motion_generator.positional_embedding_type = "SINE"
 
@@ -132,6 +131,10 @@ cfg.motion_generator.text_input_dim = 768
 
 cfg.motion_generator.no_mask_token_prob = 0.1
 cfg.motion_generator.cond_dropout = 0.4
+
+##dropouts
+cfg.motion_generator.attn_dropout = 0.0
+cfg.motion_generator.emb_dropout = 0.1
 
 
 cfg.streaming_transformer = CN()

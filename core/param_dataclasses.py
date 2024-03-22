@@ -5,12 +5,8 @@ from typing import Dict, List, Optional
 
 import torch
 from core.models.generation.streaming_transformer.codebooks_patterns import (
-    CoarseFirstPattern,
-    DelayedPatternProvider,
-    MusicLMPattern,
-    ParallelPatternProvider,
-    UnrolledPatternProvider,
-)
+    CoarseFirstPattern, DelayedPatternProvider, MusicLMPattern,
+    ParallelPatternProvider, UnrolledPatternProvider)
 
 
 class PositionalEmbeddingType(Enum):
