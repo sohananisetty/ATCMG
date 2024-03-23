@@ -1,7 +1,5 @@
 import math
-import pathlib
 import typing as tp
-from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -11,20 +9,15 @@ from typing import Callable, Dict, List, Optional, Tuple
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
-from core import (AttentionParams, MotionTokenizerParams,
-                  PositionalEmbeddingParams, PositionalEmbeddingType,
-                  TranslationTransformerParams)
-from core.datasets.conditioner import (ClassifierFreeGuidanceDropout,
-                                       ConditionFuser)
-from core.models.attend2 import Attend, Attention, CustomMHA
+from core import MotionTokenizerParams, PositionalEmbeddingParams
+from core.datasets.conditioner import ClassifierFreeGuidanceDropout, ConditionFuser
+from core.models.attend2 import CustomMHA
 from core.models.positional_embeddings import ScaledSinusoidalEmbedding
 from core.models.resnetVQ.vqvae import HumanVQVAE
-from core.models.utils import (FeedForward, LayerNorm, default, exists,
-                               get_obj_from_str)
+from core.models.utils import FeedForward, LayerNorm, default, exists, get_obj_from_str
 from einops import rearrange, repeat
 from torch import einsum, nn
 from tqdm.auto import tqdm
-from yacs.config import CfgNode as CN
 
 from .streaming_transformer.codebooks_patterns import CodebooksPatternProvider
 

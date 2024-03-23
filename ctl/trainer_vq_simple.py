@@ -476,6 +476,7 @@ class VQVAEMotionTrainer(nn.Module):
                     os.path.join(
                         save_file, os.path.basename(name).split(".")[0] + "_gt.gif"
                     ),
+                    zero_trans=True,
                 )
 
                 dset.render_hml(
@@ -483,6 +484,7 @@ class VQVAEMotionTrainer(nn.Module):
                     os.path.join(
                         save_file, os.path.basename(name).split(".")[0] + "_pred.gif"
                     ),
+                    zero_trans=True,
                 )
 
         self.vqvae_model.train()

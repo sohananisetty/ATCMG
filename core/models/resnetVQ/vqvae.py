@@ -222,7 +222,12 @@ class VQVAE2(nn.Module):
         code_idx = code_idx.view(N, -1)
         return code_idx
 
-    def forward(self, x, mask=None, temperature=0.0):
+    def forward(self, x, mask=None, temperature=None):
+
+        if self.training is False:
+            freeze_codebook = True
+        else:
+            freeze_codebook = False
         x_in = self.preprocess(x)
         # Encode
         x_encoder = self.encoder(x_in)
@@ -237,7 +242,10 @@ class VQVAE2(nn.Module):
 
         ## quantization
         x_quantized, code_idx, loss = self.quantizer(
-            x=x_encoder, mask=mask, sample_codebook_temp=temperature
+            x=x_encoder,
+            mask=mask,
+            sample_codebook_temp=temperature,
+            freeze_codebook=freeze_codebook,
         )
 
         if mask is not None:
@@ -367,9 +375,10 @@ class HumanVQVAE2(nn.Module):
         code_idx = self.vqvae.encode(motion)  # (N, T)
         return code_idx
 
-    def forward(self, motion, mask=None):
-        return self.vqvae(motion, mask)
+    def forward(self, motion, mask=None, temperature=0.0):
+        return self.vqvae(motion, mask, temperature=temperature)
 
     def decode(self, indices, mask=None):
+        ##indices: b n
         x_out = self.vqvae.forward_decoder(indices, mask)
         return x_out

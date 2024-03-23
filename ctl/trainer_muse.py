@@ -25,8 +25,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AdamW, get_scheduler
-from utils.motion_processing.hml_process import (recover_from_ric,
-                                                 recover_root_rot_pos)
+from utils.motion_processing.hml_process import recover_from_ric, recover_root_rot_pos
 from yacs.config import CfgNode
 
 
@@ -403,6 +402,17 @@ class MotionMuseTrainer(nn.Module):
         body_motion = self.body_model.decode(body_inds[0:1]).detach().cpu()
         # left_motion = self.left_hand_model.decode(left_inds[0:1]).detach().cpu()
         # right_motion = self.right_hand_model.decode(right_inds[0:1]).detach().cpu()
+
+        if "g" in self.dataset_args.hml_rep:
+            z = torch.zeros(
+                body_motion.shape[:-1] + (2,),
+                dtype=body_motion.dtype,
+                device=body_motion.device,
+            )
+            body_motion = torch.cat(
+                [body_motion[..., 0:1], z, body_motion[..., 1:]], -1
+            )
+
         body_M = dset.toMotion(
             body_motion[0],
             motion_rep=MotionRep(self.body_cfg.dataset.motion_rep),
@@ -460,6 +470,7 @@ class MotionMuseTrainer(nn.Module):
                     os.path.join(
                         save_file, os.path.basename(name).split(".")[0] + "_gt.gif"
                     ),
+                    zero_trans=True,
                 )
 
                 dset.render_hml(
@@ -467,6 +478,7 @@ class MotionMuseTrainer(nn.Module):
                     os.path.join(
                         save_file, os.path.basename(name).split(".")[0] + "_gen.gif"
                     ),
+                    zero_trans=True,
                 )
 
         self.motion_muse.train()

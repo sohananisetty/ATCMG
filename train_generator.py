@@ -1,3 +1,8 @@
+import torch
+
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+
 from configs.config_t2m import get_cfg_defaults
 from ctl.trainer_muse import MotionMuseTrainer
 

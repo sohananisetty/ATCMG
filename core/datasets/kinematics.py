@@ -1,10 +1,16 @@
 import numpy as np
 import scipy.ndimage.filters as filters
 import torch
-from utils.motion_processing.quaternion import (cont6d_to_matrix,
-                                                cont6d_to_matrix_np,
-                                                qbetween_np, qinv_np, qmul,
-                                                qmul_np, qrot, qrot_np)
+from utils.motion_processing.quaternion import (
+    cont6d_to_matrix,
+    cont6d_to_matrix_np,
+    qbetween_np,
+    qinv_np,
+    qmul,
+    qmul_np,
+    qrot,
+    qrot_np,
+)
 
 hand_joints_id = [i for i in range(22, 52)]
 body_joints_id = [i for i in range(0, 22)]

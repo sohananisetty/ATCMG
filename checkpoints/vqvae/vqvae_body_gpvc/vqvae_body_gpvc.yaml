@@ -32,6 +32,8 @@ vqvae:
   recons_loss : "l1_smooth"
   use_geodesic_loss: False
   down_sampling_ratio: 4
+  motion_dim: 135
+  nb_joints: 22
   
   
 

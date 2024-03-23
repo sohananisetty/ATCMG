@@ -1,3 +1,7 @@
+import torch
+
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
 from configs.config import cfg, get_cfg_defaults
 from core import MotionRep
 from ctl.trainer_vq_simple import VQVAEMotionTrainer

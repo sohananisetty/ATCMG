@@ -486,6 +486,24 @@ class EuclideanCodebook(nn.Module):
         self.replace(batch_samples, batch_mask=expired_codes)
 
     @autocast(enabled=False)
+    def dequantize(self, embed_ind):
+
+        embed_ind = embed_ind[None]
+
+        embed = self.embed if self.learnable_codebook else self.embed.detach()
+
+        if self.affine_param:
+            codebook_std = self.codebook_variance.clamp(min=1e-5).sqrt()
+            batch_std = self.batch_variance.clamp(min=1e-5).sqrt()
+            embed = (embed - self.codebook_mean) * (
+                batch_std / codebook_std
+            ) + self.batch_mean
+
+        quantize = batched_embedding(embed_ind, embed)[0]
+
+        return quantize
+
+    @autocast(enabled=False)
     def forward(self, x, sample_codebook_temp=None, mask=None, freeze_codebook=False):
         needs_codebook_dim = x.ndim < 4
         sample_codebook_temp = default(sample_codebook_temp, self.sample_codebook_temp)
@@ -588,7 +606,7 @@ class VectorQuantize(nn.Module):
         commitment_weight=1.0,
         commitment_use_cross_entropy_loss=False,
         stochastic_sample_codes=False,
-        sample_codebook_temp=1.0,
+        sample_codebook_temp=0.0,
         sync_codebook=False,
         ema_update=True,
         learnable_codebook=False,
@@ -706,7 +724,7 @@ class VectorQuantize(nn.Module):
         codebook = self.codebook
 
         codes = codebook[indices]
-        return rearrange(codes, "... h d -> ... (h d)")
+        return rearrange(codes, "... d -> ... (d)")
 
     @torch.no_grad()
     def compute_perplexity(self, code_idx):
@@ -720,6 +738,12 @@ class VectorQuantize(nn.Module):
         prob = code_count / torch.sum(code_count)
         perplexity = torch.exp(-torch.sum(prob * torch.log(prob + 1e-7)))
         return perplexity
+
+    def dequantize(self, embed_ind):
+        ##embed_ind b n
+        quantize = self._codebook.dequantize(embed_ind)
+        quantize = self.project_out(quantize)
+        return quantize
 
     def forward(
         self,

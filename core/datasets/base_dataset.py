@@ -71,9 +71,7 @@ class Motion2Positions:
 
         joints_num = data.nb_joints
         r_rot_quat, r_pos = self.recover_root_rot_pos(data)
-
-        r_pos[:] = 0
-
+        # print("rpos", r_pos)
         r_rot_cont6d = quaternion_to_cont6d(r_rot_quat)
 
         cont6d_params = data.rotations
@@ -94,6 +92,8 @@ class Motion2Positions:
         joints_num = data.nb_joints
         if joints_num == 22 or joints_num == 52:
             r_rot_quat, r_pos = self.recover_root_rot_pos(data)
+            # print("rpos", r_pos)
+            # r_pos[:, [0, 2]] = 0
             positions = data.positions
             positions = positions.view(positions.shape[:-1] + (-1, 3)).to(torch.float32)
 
@@ -506,7 +506,8 @@ class BaseMotionDataset(ABC, data.Dataset):
         self,
         motion: Union[np.ndarray, torch.Tensor, Motion],
         save_path: str = "motion",
-        # hml_rep=None,
+        zero_trans=False,
+        zero_orient=False,
         from_rotation=False,
     ):
 
@@ -515,10 +516,16 @@ class BaseMotionDataset(ABC, data.Dataset):
 
         motion = self.inv_transform(motion)
         motion.tensor()
+        if zero_trans and motion.root_params is not None:
+            motion.root_params[:, [1, 2]] = 0
+        if zero_orient and motion.root_params is not None:
+            motion.root_params[:, 0] = 0
         xyz = self.to_xyz(motion, from_rotation=from_rotation).cpu()
 
         if len(xyz.shape) > 3:
             xyz = xyz[0]
+
+        # print("xyz", xyz[:, 0])
 
         plot_3d.render(
             np.array(xyz),
