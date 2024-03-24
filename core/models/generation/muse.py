@@ -184,7 +184,7 @@ class TransformerBlockMuseCustom(nn.Module):
                             dim=dim,
                             heads=heads,
                             dropout=attn_dropout,
-                            add_null_kv=False,
+                            add_null_kv=True,
                             flash=flash,
                             causal=False,
                         ),
@@ -362,6 +362,9 @@ class MLMModel(nn.Module):
         self.post_emb_norm = LayerNorm(dim) if post_emb_norm else nn.Identity()
 
         self.condition_fuser = fuser
+        self.translation_present = (
+            self.condition_fuser.cond2fuse.get("translation", None) is not None
+        )
 
         self.cfg_dropout = ClassifierFreeGuidanceDropout(p=self.cond_dropout)
         self.emb_dropout = nn.Dropout(emb_dropout)
@@ -380,6 +383,12 @@ class MLMModel(nn.Module):
         self.project_text = (
             nn.Linear(self.text_input_dim, self.dim, bias=False)
             if self.text_input_dim != self.dim
+            else nn.Identity()
+        )
+
+        self.project_translation = (
+            nn.Linear(2, self.dim, bias=False)
+            if self.translation_present
             else nn.Identity()
         )
 
@@ -404,13 +413,18 @@ class MLMModel(nn.Module):
         audio_embed = self.project_audio(conditions["audio"][0])
         text_embed = self.project_text(conditions["text"][0])
 
-        inputs_, cross_inputs = self.condition_fuser(
-            input,
-            {
-                "text": (text_embed, conditions["text"][1]),
+        new_conditions = {
+            "audio": (audio_embed, conditions["audio"][1]),
+            "text": (text_embed, conditions["text"][1]),
+        }
+        if self.translation_present:
+            translation_embed = self.project_translation(conditions["translation"][0])
+            new_conditions = {
+                "translation": (translation_embed, conditions["translation"][1]),
                 "audio": (audio_embed, conditions["audio"][1]),
-            },
-        )
+                "text": (text_embed, conditions["text"][1]),
+            }
+        inputs_, cross_inputs = self.condition_fuser(input, new_conditions)
 
         return inputs_, cross_inputs
 
@@ -481,79 +495,6 @@ class MLMModel(nn.Module):
 
         return scaled_logits
 
-    def compute_predictions(
-        self,
-        inputs: ConditionTensors,
-        condition_tensors: Optional[ConditionTensors] = None,
-        labels: Optional[torch.IntTensor] = None,
-        keep_only_valid_steps: bool = True,
-        cond_drop_prob: float = None,
-    ) -> LMOutput:
-        """Given an input tensor of codes [B, T, K] and list of conditions, runs the model
-        forward using the specified codes interleaving pattern.
-
-        Args:
-            codes (torch.Tensor): Input codes of shape [B, T, K] with B the batch size,
-                K the number of codebooks and T the number of timesteps.
-            conditions (list of ConditioningAttributes): conditionings to use when modeling
-                the given codes. Note that when evaluating multiple time with the same conditioning
-                you should pre-compute those and pass them as `condition_tensors`.
-            condition_tensors (dict[str, ConditionType], optional): pre-computed conditioning
-                tensors, see `conditions`.
-            stage (int): The codebook level that is being predicted. Relevant for MAGNeT
-                in which prediction is done in a codebook-by-codebook manner.
-                Takes values in range(n_q), and ignored by default.
-            keep_only_valid_steps (bool): Build a sequence from the pattern up to valid (= fully defined) steps.
-                Steps that are beyond valid steps will be replaced by the special_token in that case.
-        Returns:
-            LMOutput: Language model outputs
-                logits (torch.Tensor) of shape [B, K, T, card] corresponding to the provided codes,
-                    i.e. the first item corresponds to logits to predict the first code, meaning that
-                    no additional shifting of codes and logits is required.
-                mask (torch.Tensor) of shape [B, K, T], mask over valid and invalid positions.
-                    Given the specified interleaving strategies, parts of the logits and codes should
-                    not be considered as valid predictions because of invalid context.
-        """
-
-        codes = inputs[0]
-        codes_mask = inputs[1]
-        B, K, T = codes.shape
-        codes = codes.contiguous()
-        # map codes [B, K, T] into pattern sequence [B, K, S] using special_token_id for masked tokens
-        pattern = self.pattern_provider.get_pattern(T)
-        sequence_codes, sequence_indexes, sequence_mask = (
-            pattern.build_pattern_sequence(
-                codes,
-                self.special_token_id,
-                keep_only_valid_steps=keep_only_valid_steps,
-            )
-        )
-        new_codes_mask = torch.ones_like(sequence_mask).repeat(B, 1, 1)
-        for i in range(K):
-            new_codes_mask[:, i, i + 1 :] = codes_mask[:, 0 : T - i]
-
-        new_new_mask = new_codes_mask.sum(1) == K
-
-        # apply model on pattern sequence
-        logits = self(
-            inputs=(sequence_codes, new_new_mask.to(torch.bool)),
-            conditions=condition_tensors,
-            labels=labels,
-            cond_drop_prob=cond_drop_prob,
-        )  # [B, K, S, card]
-        # print(logits)
-        # map back the logits on pattern sequence to logits on original codes: [B, K, S, card] -> [B, K, T, card]
-        # and provide the corresponding mask over invalid positions of tokens
-        logits = logits.permute(0, 3, 1, 2)  # [B, card, K, S]
-        # note: we use nans as special token to make it obvious if we feed unexpected logits
-        logits, logits_indexes, logits_mask = pattern.revert_pattern_logits(
-            logits, float("nan"), keep_only_valid_steps=keep_only_valid_steps
-        )
-        logits = logits.permute(0, 2, 3, 1)  # [B, K, T, card]
-        logits_mask = logits_mask[None, :, :].expand(B, -1, -1)  # [K, T] -> [B, K, T]
-        # mask = new_codes_mask & logits_mask
-        return LMOutput(logits, logits_mask)
-
     def forward(
         self,
         inputs: ConditionTensors,
@@ -623,7 +564,7 @@ class MLMModel(nn.Module):
             mask=x_padding_mask if self.var_len else None,
             context=context,
             context_mask=None,
-            # =context_padding_mask if self.var_len else None,
+            # context_padding_mask,
         )
         if self.out_norm:
             embed = self.out_norm(embed)
@@ -713,6 +654,12 @@ class MotionMuse(nn.Module):
         if isinstance(fuse_method, list):
             fuse_method = fuse_method[0]
         condition_fuser = ConditionFuser(fuse_method, **fuse_config)
+
+        if condition_fuser.cond2fuse["audio"] == "cross":
+            assert (
+                tranformer_config.custom == True
+            ), "when audio is cross attention, you need custom attention"
+
         modeling = pattern_config.pop("modeling")
 
         pattern_provider = pattern_providers[modeling](

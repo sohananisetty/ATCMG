@@ -4,14 +4,17 @@ dataset:
   dataset_name: "mix"
   dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
   motion_rep: "body"
-  text_rep: "pooled_text_embed"
+  text_conditioner_name: "t5-base" #"openai/clip-vit-large-patch14" #"t5-base" #"openai/clip-vit-large-patch14" #"laion/larger_clap_music_and_speech"
+  text_rep: "full_text_embed"
   audio_rep: "encodec"
-  motion_min_length_s: 3
-  motion_max_length_s: 20
+  hml_rep: "g"
+  motion_min_length_s: 4
+  motion_max_length_s: 4
+  window_size_s: 4
 
 train:
   resume: False
-  num_train_iters : 310000 #'Number of training steps
+  num_train_iters : 110001 #'Number of training steps
   save_steps : 10000
   logging_steps : 10
   wandb_every : 200
@@ -24,16 +27,21 @@ train:
   warmup_steps : 4000
   gamma : 0.05
   lr_scheduler_type : "cosine"
+
+fuser:
+  fuse_method: [{"cross": ["text"], "input_interpolate": ["audio"]}]
+
 translation_transformer:
   target: "core.models.generation.translation_transformer.TranslationTransformer"
   dim : 256
   depth: 2
-  cond_dropout: 0.2
-  emb_dropout: 0.1
   dim_out: 4
-  fuse_method: [{"cross": ["audio"], "prepend": ["text"]}]
-  is_self_causal: True
-  is_cross_causal: True
+  cond_dropout: 0.2
+  audio_input_dim: 128
+  text_input_dim: 768
+  flash: True
+  custom: True
+  var_len: False
 
 
   

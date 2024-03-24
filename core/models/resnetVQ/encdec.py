@@ -7,9 +7,9 @@ class Encoder(nn.Module):
         self,
         input_emb_width=3,
         codebook_dim=512,
-        down_t=2,
+        down_t=2,  ## 2 -> 4 downasample
         stride_t=2,
-        width=512,
+        width=None,
         depth=3,
         dilation_growth_rate=3,
         activation="relu",
@@ -19,6 +19,9 @@ class Encoder(nn.Module):
 
         blocks = []
         filter_t, pad_t = stride_t * 2, stride_t // 2
+        if width is None:
+            width = codebook_dim
+
         blocks.append(nn.Conv1d(input_emb_width, width, 3, 1, 1))
         blocks.append(nn.ReLU())
 
@@ -47,7 +50,7 @@ class Decoder(nn.Module):
         codebook_dim=512,
         down_t=2,
         stride_t=2,
-        width=512,
+        width=None,
         depth=3,
         dilation_growth_rate=3,
         activation="relu",
@@ -55,6 +58,9 @@ class Decoder(nn.Module):
     ):
         super().__init__()
         blocks = []
+        if width is None:
+            width = codebook_dim
+
         if codebook_dim != width:
             blocks.append(nn.Conv1d(codebook_dim, width, 3, 1, 1))
         blocks.append(nn.ReLU())

@@ -9,10 +9,18 @@ import clip
 import torch
 import torch.nn as nn
 from core.models.utils import TorchAutocast
-from transformers import (AutoTokenizer, BertConfig, BertForMaskedLM,
-                          BertModel, ClapTextModelWithProjection,
-                          CLIPTextModelWithProjection, CLIPTokenizer, T5Config,
-                          T5EncoderModel, T5Tokenizer)
+from transformers import (
+    AutoTokenizer,
+    BertConfig,
+    BertForMaskedLM,
+    BertModel,
+    ClapTextModelWithProjection,
+    CLIPTextModelWithProjection,
+    CLIPTokenizer,
+    T5Config,
+    T5EncoderModel,
+    T5Tokenizer,
+)
 
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
 
@@ -135,9 +143,13 @@ class T5Conditioner(BaseTextConditioner):
 
         empty_idx = torch.LongTensor([i for i, xi in enumerate(entries) if xi == ""])
 
-        inputs = self.t5_tokenizer(entries, return_tensors="pt", padding=True).to(
-            self.device
-        )
+        inputs = self.t5_tokenizer(
+            entries,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=256,
+        ).to(self.device)
         inputs["attention_mask"][
             empty_idx, :
         ] = 0  # zero-out index where the input is non-existant
@@ -210,6 +222,7 @@ class ClipConditioner(BaseTextConditioner):
         inputs = self.tokenizer(
             entries,
             padding=True,
+            truncation=True,
             return_tensors="pt",
         ).to(self.device)
 
@@ -327,9 +340,9 @@ class BERTConditioner(BaseTextConditioner):
 
         inputs = self.tokenizer(
             entries,
+            truncation=True,
             return_tensors="pt",
             padding=True,
-            truncation=True,
         ).to(self.device)
         inputs["attention_mask"][empty_idx, :] = 0
 
@@ -393,6 +406,7 @@ class ClapTextConditioner(BaseTextConditioner):
         inputs = self.tokenizer(
             entries,
             padding=True,
+            truncation=True,
             return_tensors="pt",
         ).to(self.device)
 

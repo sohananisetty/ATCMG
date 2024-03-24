@@ -414,9 +414,9 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         self.text_dir = os.path.join(data_root, "texts/semantic_labels")
 
         if motion_rep == "full":
-            self.motion_ind_dir = os.path.join(data_root, f"indices/body")
+            self.motion_ind_dir = os.path.join(data_root, f"indices/body_gpvc")
         else:
-            self.motion_ind_dir = os.path.join(data_root, f"indices/{motion_rep}")
+            self.motion_ind_dir = os.path.join(data_root, f"indices/{motion_rep}_gpvc")
 
         self.motion_dir = os.path.join(data_root, "motion_data/new_joint_vecs")
         self.audio_dir = os.path.join(data_root, "audio")
@@ -579,28 +579,86 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
 
         return subset_idx_audio, subset_idx_motion
 
+    def get_windowed_data(
+        self, audio_data, motion, left_hand_motion=None, right_hand_motion=None
+    ):
+        if self.window_size == -1:
+            mot_len_s = int(motion.shape[0] // self.fps)
+            audio_len_s = mot_len_s
+
+        else:
+            mot_len_s = int(self.window_size // self.fps)
+            audio_len_s = mot_len_s
+
+        if audio_data is None:
+
+            subset_idx_motion = random.randint(
+                0, max(0, motion.shape[0] - int(mot_len_s * self.fps))
+            )
+
+        else:
+            subset_idx_audio, subset_idx_motion = self._select_common_start_idx(
+                motion, audio_data, mot_len_s
+            )
+
+            audio_data = audio_data[
+                subset_idx_audio : subset_idx_audio
+                + int(audio_len_s * self.sampling_rate)
+            ]
+
+        motion = motion[
+            subset_idx_motion : subset_idx_motion + int(mot_len_s * self.fps)
+        ]
+        if self.motion_rep == "full":
+            left_hand_motion = left_hand_motion[
+                subset_idx_motion : subset_idx_motion + int(mot_len_s * self.fps)
+            ]
+            right_hand_motion = right_hand_motion[
+                subset_idx_motion : subset_idx_motion + int(mot_len_s * self.fps)
+            ]
+
+            return audio_data, motion, left_hand_motion, right_hand_motion
+
+        return audio_data, motion
+
     def __getitem__(self, item: int) -> Tuple[torch.Tensor, str]:
 
         name, ind, f_, to_ = self.id_list[item].rsplit("_", 3)
         f_, to_ = int(f_), int(to_)
-        motion = np.load(os.path.join(self.motion_ind_dir, name + ".npy")).squeeze()
+        motion = (
+            np.load(os.path.join(self.motion_ind_dir, name + ".npy"))
+            .squeeze()
+            .reshape(-1, 1)
+        )
         if "g" in self.hml_rep:
             vel_xz_ = np.load(os.path.join(self.motion_dir, name + ".npy"))[
-                ..., [1, 2]
+                : int(motion.shape[0] * self.downsample_ratio), [1, 2]
             ]  ## n 2
-            vel_xz = F.interpolate(vel_xz_, size=motion.shape[0])
+            vel_xz = np.array(
+                F.interpolate(torch.Tensor(vel_xz_).T[None], size=motion.shape[0])[0].T
+            )
+
+            motion = np.concatenate([motion, vel_xz], -1)
 
         if self.motion_rep == "full":
-            left_hand_motion = np.load(
-                os.path.join(
-                    self.motion_ind_dir.replace("body", "left_hand"), name + ".npy"
+            left_hand_motion = (
+                np.load(
+                    os.path.join(
+                        self.motion_ind_dir.replace("body", "left_hand"), name + ".npy"
+                    )
                 )
-            ).squeeze()
-            right_hand_motion = np.load(
-                os.path.join(
-                    self.motion_ind_dir.replace("body", "right_hand"), name + ".npy"
+                .squeeze()
+                .reshape(-1, 1)
+            )
+            right_hand_motion = (
+                np.load(
+                    os.path.join(
+                        self.motion_ind_dir.replace("body", "right_hand"), name + ".npy"
+                    )
                 )
-            ).squeeze()
+                .squeeze()
+                .reshape(-1, 1)
+            )
 
             min_length = min(
                 motion.shape[0], left_hand_motion.shape[0], right_hand_motion.shape[0]
@@ -608,8 +666,6 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
             motion = motion[:min_length]
             left_hand_motion = left_hand_motion[:min_length]
             right_hand_motion = right_hand_motion[:min_length]
-            if "g" in self.hml_rep:
-                vel_xz = vel_xz[:min_length]
 
         text = self.text_list[item]
         try:
@@ -656,63 +712,30 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
                 left_hand_motion = left_hand_motion[int(f_) : math.ceil(to_)]
                 right_hand_motion = right_hand_motion[int(f_) : math.ceil(to_)]
 
-            if "g" in self.hml_rep:
-                vel_xz = vel_xz[int(f_) : math.ceil(to_)]
-
         if self.window_size is not None:
 
-            if self.window_size == -1:
-                mot_len_s = int(final_motion.shape[0] // self.fps)
-                audio_len_s = mot_len_s
-
-            else:
-                mot_len_s = int(self.window_size // self.fps)
-                audio_len_s = mot_len_s
-
-            if audio_data is None:
-
-                subset_idx_motion = random.randint(
-                    0, max(0, motion.shape[0] - int(mot_len_s * self.fps))
-                )
-
-            else:
-                subset_idx_audio, subset_idx_motion = self._select_common_start_idx(
-                    motion, audio_data, mot_len_s
-                )
-
-                audio_data = audio_data[
-                    subset_idx_audio : subset_idx_audio
-                    + int(audio_len_s * self.sampling_rate)
-                ]
-
-            motion = motion[
-                subset_idx_motion : subset_idx_motion + int(mot_len_s * self.fps)
-            ]
             if self.motion_rep == "full":
-                left_hand_motion = left_hand_motion[
-                    subset_idx_motion : subset_idx_motion + int(mot_len_s * self.fps)
-                ]
-                right_hand_motion = right_hand_motion[
-                    subset_idx_motion : subset_idx_motion + int(mot_len_s * self.fps)
-                ]
-            if "g" in self.hml_rep:
-                vel_xz = vel_xz[
-                    subset_idx_motion : subset_idx_motion + int(mot_len_s * self.fps)
-                ]
+
+                audio_data, motion, left_hand_motion, right_hand_motion = (
+                    self.get_windowed_data(
+                        audio_data, motion, left_hand_motion, right_hand_motion
+                    )
+                )
+
+            else:
+                audio_data, motion = self.get_windowed_data(audio_data, motion)
 
         if self.motion_rep == "full":
             final_motion = [
-                motion.reshape(-1, 1),
+                motion[..., :1].reshape(-1, 1),
                 left_hand_motion.reshape(-1, 1),
                 right_hand_motion.reshape(-1, 1),
             ]
             if "g" in self.hml_rep:
-                final_motion.append(vel_xz.reshape(-1, 1))
+                final_motion.append(motion[..., 1:].reshape(-1, 2))
         else:
-            if "g" in self.hml_rep:
-                final_motion = [motion.reshape(-1, 1), vel_xz.reshape(-1, 1)]
-            else:
-                final_motion = motion.reshape(-1, 1)
+
+            final_motion = motion  ## n 1/3
 
         return {
             "name": name,
@@ -754,13 +777,13 @@ def simple_collate(
     )
 
     if "g" in hml_rep:
-        translation = inputs["motion"][..., -2:]
+        translation = inputs["motion"][0][..., [1, 2]]
         translation_mask = torch.ones(
             translation.shape[:-1], dtype=torch.long, device=translation.device
         )
 
         conditions["translation"] = (translation, translation_mask)
-        inputs["motion"] = inputs["motion"][..., :-2]
+        inputs["motion"] = (inputs["motion"][0][..., :-2], inputs["motion"][1])
 
     if permute:
         inputs["motion"] = (

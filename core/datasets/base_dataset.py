@@ -92,11 +92,12 @@ class Motion2Positions:
         joints_num = data.nb_joints
         if joints_num == 22 or joints_num == 52:
             r_rot_quat, r_pos = self.recover_root_rot_pos(data)
-            # print("rpos", r_pos)
+            print("rpos", r_pos.shape)
             # r_pos[:, [0, 2]] = 0
             positions = data.positions
             positions = positions.view(positions.shape[:-1] + (-1, 3)).to(torch.float32)
 
+            print(positions.shape)
             """Add Y-axis rotation to local joints"""
             positions = qrot(
                 qinv(r_rot_quat[..., None, :]).expand(positions.shape[:-1] + (4,)),
@@ -499,7 +500,20 @@ class BaseMotionDataset(ABC, data.Dataset):
             else:
                 return right_hand
 
-    def to_xyz(self, motion: Motion, hml_rep=None, from_rotation=False) -> torch.Tensor:
+    def to_xyz(
+        self,
+        motion: Motion,
+        hml_rep=None,
+        from_rotation=False,
+        translation_external=None,
+    ) -> torch.Tensor:
+        if translation_external is not None:
+            positions = self.mot2pos(motion, hml_rep, from_rotation)
+            positions[..., 0] += translation_external[..., 0:1]
+            positions[..., 2] += translation_external[..., 1:2]
+
+            return positions
+
         return self.mot2pos(motion, hml_rep, from_rotation)
 
     def render_hml(
@@ -509,6 +523,7 @@ class BaseMotionDataset(ABC, data.Dataset):
         zero_trans=False,
         zero_orient=False,
         from_rotation=False,
+        translation_external=None,
     ):
 
         if not isinstance(motion, Motion):
@@ -520,7 +535,11 @@ class BaseMotionDataset(ABC, data.Dataset):
             motion.root_params[:, [1, 2]] = 0
         if zero_orient and motion.root_params is not None:
             motion.root_params[:, 0] = 0
-        xyz = self.to_xyz(motion, from_rotation=from_rotation).cpu()
+        xyz = self.to_xyz(
+            motion,
+            from_rotation=from_rotation,
+            translation_external=translation_external,
+        ).cpu()
 
         if len(xyz.shape) > 3:
             xyz = xyz[0]

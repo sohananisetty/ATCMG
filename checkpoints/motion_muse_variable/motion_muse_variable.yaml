@@ -1,16 +1,15 @@
-model_name: "motion_muse_constant"
-output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_constant"
+model_name: "motion_muse_variable"
+output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_variable"
 dataset:
   dataset_name: "mix"
   dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
   motion_rep: "body"
-  text_conditioner_name: "openai/clip-vit-large-patch14" #"t5-base" #"openai/clip-vit-large-patch14" #"t5-base" #"openai/clip-vit-large-patch14" #"laion/larger_clap_music_and_speech"
-  text_rep: "pooled_text_embed"
+  text_conditioner_name: "t5-base" #"openai/clip-vit-large-patch14" #"laion/larger_clap_music_and_speech"
+  text_rep: "full_text_embed"
   audio_rep: "encodec"
   hml_rep: "gpvc"
   motion_min_length_s: 4
-  motion_max_length_s: 4
-  window_size_s: 4
+  motion_max_length_s: 10
 train:
   resume: False
   num_train_iters : 110001 #'Number of training steps
@@ -36,28 +35,21 @@ codebooks_pattern:
   modeling: "parallel"
 
 fuser:
-  fuse_method: [{"cross": ["text"], "input_interpolate": ["audio"]}]
+  fuse_method: [{"cross": ["text"], "input_interpolate": ["audio"] , "sum":[ "translation"]}]
   #[{"cross": ["audio"], "prepend": ["text"]}]
-  # [{"cross": ["text"], "input_interpolate": ["audio"] , "sum":[ "translation"]}]
-  #
 
 motion_generator:
   target: "core.models.generation.motion_generator.MotionMuse"
   n_q : 1
-  dim : 768
+  dim : 512
   depth: 8
   cond_dropout: 0.4
   no_mask_token_prob: 0.4
-  audio_input_dim: 128
-  text_input_dim: 768
   emb_dropout: 0.1
   num_tokens: 512
   flash: True
-  var_len: False
-  quality_emb: False
+  var_len: True
   custom: True
-  attn_dropout: 0.1
-  
 
 
 

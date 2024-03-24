@@ -112,6 +112,7 @@ class MotionMuseTrainer(nn.Module):
             num_training_steps=self.num_train_steps,
         )
         condition_provider = ConditionProvider(
+            text_conditioner_name=self.dataset_args.text_conditioner_name,
             motion_rep=MotionRep(self.dataset_args.motion_rep),
             audio_rep=AudioRep(self.dataset_args.audio_rep),
             text_rep=TextRep(self.dataset_args.text_rep),
@@ -166,7 +167,6 @@ class MotionMuseTrainer(nn.Module):
         )
 
         # dataloader
-
         self.dl = DataLoader(
             train_ds,
             batch_size=self.training_args.train_bs,
@@ -222,17 +222,20 @@ class MotionMuseTrainer(nn.Module):
         # self.right_cfg = vqvae_get_cfg_defaults()
         # self.right_cfg.merge_from_file(vqvae_args.right_hand_config)
 
-        # self.left_hand_model = HumanVQVAE(self.left_cfg.vqvae).to(self.device).eval()
+        # self.left_hand_model = instantiate_from_config(self.left_cfg.vqvae).to(self.device).eval()
         # self.left_hand_model.load(
         #     os.path.join(self.left_cfg.output_dir, "vqvae_motion.pt")
         # )
 
-        # self.right_hand_model = HumanVQVAE(self.right_cfg.vqvae).to(self.device).eval()
+        # self.right_hand_model = instantiate_from_config(self.right_cfg.vqvae).to(self.device).eval()
         # self.right_hand_model.load(
         #     os.path.join(self.right_cfg.output_dir, "vqvae_motion.pt")
         # )
 
-        self.body_model = HumanVQVAE(self.body_cfg.vqvae).to(self.device).eval()
+        self.body_model = (
+            instantiate_from_config(self.body_cfg.vqvae).to(self.device).eval()
+        )
+        # HumanVQVAE(self.body_cfg.vqvae).to(self.device).eval()
         self.body_model.load(os.path.join(self.body_cfg.output_dir, "vqvae_motion.pt"))
 
     def print(self, msg):
@@ -471,6 +474,7 @@ class MotionMuseTrainer(nn.Module):
                         save_file, os.path.basename(name).split(".")[0] + "_gt.gif"
                     ),
                     zero_trans=True,
+                    zero_orient=True,
                 )
 
                 dset.render_hml(
@@ -479,6 +483,7 @@ class MotionMuseTrainer(nn.Module):
                         save_file, os.path.basename(name).split(".")[0] + "_gen.gif"
                     ),
                     zero_trans=True,
+                    zero_orient=True,
                 )
 
         self.motion_muse.train()
