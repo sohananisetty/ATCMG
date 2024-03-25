@@ -27,6 +27,8 @@ from core.datasets.conditioner import ClassifierFreeGuidanceDropout, ConditionFu
 from core.models.attend2 import CustomMHA
 from core.models.positional_embeddings import ScaledSinusoidalEmbedding
 from core.models.resnetVQ.encdec import Encoder, Decoder
+from utils.motion_processing.quaternion import qinv, qrot, quaternion_to_cont6d
+import utils.rotation_conversions as geometry
 
 ConditionType = Tuple[torch.Tensor, torch.Tensor]
 ConditionTensors = tp.Dict[str, ConditionType]
@@ -204,7 +206,7 @@ class TransformerBlock(nn.Module):
         return x
 
 
-class MLMModel(nn.Module):
+class EncTransDec(nn.Module):
     def __init__(
         self,
         fuser: ConditionFuser,
@@ -212,7 +214,8 @@ class MLMModel(nn.Module):
         dim,
         dim_out,
         conv_depth=1,
-        down_sampling_ratio=2,
+        down_sampling_ratio=4,
+        loss_fnc="l1_smooth",
         var_len=True,
         custom=True,
         quality_emb=False,
@@ -242,13 +245,13 @@ class MLMModel(nn.Module):
         self.encoder = Encoder(
             input_dim,
             dim,
-            down_sampling_ratio,
+            down_sampling_ratio // 2,
             depth=conv_depth,
         )
         self.decoder = Decoder(
             dim_out,
             dim,
-            down_sampling_ratio,
+            down_sampling_ratio // 2,
             depth=conv_depth,
         )
 
@@ -276,6 +279,13 @@ class MLMModel(nn.Module):
         )
 
         self.out_norm = LayerNorm(dim)
+
+        if loss_fnc == "l1":
+            self.loss_fnc = torch.nn.L1Loss()
+        elif loss_fnc == "l2":
+            self.loss_fnc = torch.nn.MSELoss()
+        elif loss_fnc == "l1_smooth":
+            self.loss_fnc = torch.nn.SmoothL1Loss()
 
     def _prepare_inputs(self, input, conditions):
         audio_embed = self.project_audio(conditions["audio"][0])
@@ -362,8 +372,7 @@ class MLMModel(nn.Module):
         inputs: ConditionTensors,
         conditions: ConditionTensors,
         return_embed: bool = False,
-        return_logits: bool = False,
-        labels: Optional[torch.IntTensor] = None,
+        labels: Optional[torch.Tensor] = None,
         cond_drop_prob: float = None,
         quality_list=None,
     ):
@@ -379,41 +388,43 @@ class MLMModel(nn.Module):
         cond_drop_prob = default(cond_drop_prob, self.cond_dropout)
         if cond_drop_prob > 0.0:
             conditions = self.cfg_dropout(conditions, cond_drop_prob)
-        # fuse conditions
+
+        x_ = sequence.contiguous().permute(0, 2, 1)  ## b n d -> b d n
+        x_ = self.encoder(x_)
+        x_ = x_.permute(0, 2, 1)
+        sequence_mask = torch.nn.functional.interpolate(
+            sequence_mask[None].float(), scale_factor=(1 / self.down_sampling_ratio)
+        )[0].to(torch.bool)
 
         input_, cross_attention_input = self._prepare_inputs(
-            (sequence, sequence_mask), conditions
+            (x_, sequence_mask), conditions
         )
 
-        x_ = input_[0]
+        x_trans = input_[0]
         x_padding_mask = input_[1]
         context = cross_attention_input[0]
         context_padding_mask = cross_attention_input[1]
 
-        # print(x_.shape, x_padding_mask.shape)
-        # print(context.shape, context_padding_mask.shape)
-        x_ = x_.contiguous().view(0, 2, 1)  ## b n d -> b d n
-        x_ = self.encoder(x_)
-        x_ = x_.view(0, 2, 1)
-
-        x_ = x_ + self.pos_emb(x_)
-        x_ = self.post_emb_norm(x_)
-        x_ = self.emb_dropout(x_)
+        x_trans = x_trans + self.pos_emb(x_trans)
+        x_trans = self.post_emb_norm(x_trans)
+        x_trans = self.emb_dropout(x_trans)
 
         if quality_list is not None and self.quality_emb == True:
-            x_ = torch.cat([self.qual_emb(quality_list).unsqueeze(1), x_], dim=-2)
+            x_trans = torch.cat(
+                [self.qual_emb(quality_list).unsqueeze(1), x_trans], dim=-2
+            )
             x_padding_mask = F.pad(x_padding_mask, (1, 0), value=True)
 
         embed = self.transformer_blocks(
-            x=x_,
+            x=x_trans,
             mask=x_padding_mask if self.var_len else None,
             context=context,
             context_mask=context_padding_mask,
         )
 
-        embed = embed.view(0, 2, 1)
+        embed = embed.permute(0, 2, 1)
         embed = self.decoder(embed)
-        embed = embed.view(0, 2, 1)
+        embed = embed.permute(0, 2, 1)
 
         if (
             len(self.condition_fuser.fuse2cond.get("prepend", [])) > 0
@@ -422,173 +433,266 @@ class MLMModel(nn.Module):
             logits = logits[:, :, -S:]
 
         if return_embed:
-            return logits, embed
+            return embed
 
-        if not exists(labels):
-            return logits  ## B K N num_tokens
+        if exists(labels):
+            loss = self.loss_fnc(embed, labels)
+
+            return loss, embed
 
 
 class TranslationTransformer(nn.Module):
-    def __init__(self, config: CN):
+    def __init__(
+        self,
+        tranformer_config,
+        fuse_config,
+    ):
         super().__init__()
 
-        self_attention_params = AttentionParams(
-            dim=config.dim, causal=config.is_self_causal
-        )
-        cross_attention_params = AttentionParams(
-            dim=config.dim,
-            causal=config.is_cross_causal,
-            add_null_kv=True,
-        )
-        # transformer_params = TranslationTransformerParams(
-        #     self_attention_params=sap,
-        #     cross_attention_params=cap,
-        #     depth=config.depth,
-        #     positional_embedding_params=PositionalEmbeddingParams(dim=config.dim),
-        #     positional_embedding=PositionalEmbeddingType.SINE,
-        #     fuse_method=config.fuse_method[0],
-        #     cond_dropout=config.cond_dropout,
-        #     audio_input_dim=config.audio_input_dim,
-        #     text_input_dim=config.text_input_dim,
-        #     dim_out=config.dim_out,
-        #     loss_fnc=config.loss_fnc,
-        # )
+        fuse_method = fuse_config.pop("fuse_method")
+        if isinstance(fuse_method, list):
+            fuse_method = fuse_method[0]
+        condition_fuser = ConditionFuser(fuse_method, **fuse_config)
 
-        self.dim = config.dim
-        self.dim_out = config.dim_out
-        self.audio_input_dim = config.audio_input_dim
-        self.text_input_dim = config.text_input_dim
+        if condition_fuser.cond2fuse["audio"] == "cross":
+            assert (
+                tranformer_config.custom == True
+            ), "when audio is cross attention, you need custom attention"
 
-        fuse_method = config.fuse_method[0]
-
-        self.cfg_dropout = ClassifierFreeGuidanceDropout(config.cond_dropout)
-
-        if config.loss_fnc == "l1":
-            self.loss_fnc = torch.nn.L1Loss()
-        elif config.loss_fnc == "l2":
-            self.loss_fnc = torch.nn.MSELoss()
-        elif config.loss_fnc == "l1_smooth":
-            self.loss_fnc = torch.nn.SmoothL1Loss()
-
-        if self.dim_out == 8:
-            self.contact_loss_func = torch.nn.BCEWithLogitsLoss()
-
-        self.project_audio = (
-            nn.Linear(self.audio_input_dim, self.dim)
-            if self.audio_input_dim != self.dim
-            else nn.Identity()
-        )
-        self.project_text = (
-            nn.Linear(self.text_input_dim, self.dim)
-            if self.text_input_dim != self.dim
-            else nn.Identity()
+        self.model = EncTransDec(
+            fuser=condition_fuser,
+            **tranformer_config,
         )
 
-        self.condition_fuser = ConditionFuser(fuse_method)
+        self.out_quat = True if tranformer_config.dim_out == 4 else False
 
-        positional_embedding_params = PositionalEmbeddingParams(dim=self.dim)
+    def save(self, path):
+        torch.save(self.state_dict(), path)
 
-        self.pos_emb = get_obj_from_str(
-            PositionalEmbeddingType[config.positional_embedding_type].value
-        )(positional_embedding_params)
+    def load(self, path):
+        path = Path(path)
+        assert path.exists()
+        state_dict = torch.load(str(path))
+        self.load_state_dict(state_dict)
 
-        self.emb_dropout = nn.Dropout(config.emb_dropout)
+    def recover_root_rot_pos(self, data):
+        rot_vel = data[..., 0]
+        r_rot_ang = torch.zeros_like(rot_vel).to(data.device)
+        """Get Y-axis rotation from rotation velocity"""
+        r_rot_ang[..., 1:] = rot_vel[..., :-1]
+        r_rot_ang = torch.cumsum(r_rot_ang, dim=-1)
 
-        if "cross_seperate" in fuse_method:
-            cross_attention_params2 = AttentionParams(
-                dim=config.dim,
-                causal=False,
-                add_null_kv=True,
-            )
-            self.transformer_blocks = SeperateCrossTransformerBlock(
-                self_attention_params=self_attention_params,
-                cross_attention_params_audio=cross_attention_params,  ## audio
-                cross_attention_params_text=cross_attention_params2,  ## txt
-                depth=config.depth,
-                ff_mult=config.ff_mult,
-            )
-        else:
+        r_rot_quat = torch.zeros(data.shape[:-1] + (4,)).to(data.device)
+        r_rot_quat[..., 0] = torch.cos(r_rot_ang)
+        r_rot_quat[..., 2] = torch.sin(r_rot_ang)
 
-            self.transformer_blocks = TransformerBlock(
-                self_attention_params=self_attention_params,
-                cross_attention_params=cross_attention_params,
-                depth=config.depth,
-                ff_mult=config.ff_mult,
-            )
-        self.out_norm = LayerNorm(self.dim)
+        r_pos = torch.zeros(data.shape[:-1] + (3,)).to(data.device)
+        data = data.to(torch.float)
+        r_pos[..., 1:, [0, 2]] = data[..., :-1, 1:3]
+        """Add Y-axis rotation to root position"""
+        r_pos = qrot(qinv(r_rot_quat), r_pos)
 
-        self.to_out = nn.Linear(self.dim, config.dim_out, bias=False)
+        r_pos = torch.cumsum(r_pos, dim=-2)
 
-        self.post_emb_norm = (
-            nn.LayerNorm(self.dim) if config.post_emb_norm else nn.Identity()
-        )
-
-    def _prepare_inputs(self, input, conditions):
-        audio_embed = self.project_audio(conditions["audio"][0])
-        text_embed = self.project_text(conditions["text"][0])
-        conditions["audio"] = (audio_embed, conditions["audio"][1])
-        conditions["text"] = (text_embed, conditions["text"][1])
-
-        inputs_, cross_inputs = self.condition_fuser(input, conditions)
-
-        return inputs_, cross_inputs
+        r_pos[..., 1] = data[..., 3]
+        return r_rot_quat, r_pos
 
     def forward(
         self,
-        inputs,
-        conditions,
-        return_embed: bool = False,
-        cond_drop_prob: float = None,
-    ) -> TranslationTransformerOutput:
+        inputs: Dict[str, ConditionType],
+        conditions: Dict[str, ConditionType],
+        cond_drop_prob=None,
+        return_embed=True,
+        quality_list=None,
+    ):
+        # tokenize if needed
 
-        motion = inputs["motion"][0].clone()
-        motion_padding_mask = inputs["motion"][1].clone()
+        motion_trajectory = inputs[0].to(torch.long)
+        input_mask = inputs[1].to(torch.bool)
+        r_rot, r_pos = self.recover_root_rot_pos(motion_trajectory)
 
-        device, b, n, d = motion.device, *motion.shape
+        r_pos = r_pos[..., [0, 2]]
 
-        x = self.pos_emb(motion).repeat(b, 1, 1) * motion_padding_mask.unsqueeze(-1)
+        if not self.out_quat:
+            r_rot = geometry.matrix_to_rotation_6d(geometry.quaternion_to_matrix(r_rot))
 
-        x = self.post_emb_norm(x)
-        x = self.emb_dropout(x)
+        # get loss
 
-        x_tple = (x, motion_padding_mask)
-
-        conditions = self.cfg_dropout(conditions, cond_drop_prob)
-        inputs_, cross_inputs_ = self._prepare_inputs(x_tple, conditions)
-
-        x_ = inputs_[0]
-        x_padding_mask = inputs_[1]
-        context = cross_inputs_[0]
-        context_padding_mask = cross_inputs_[1]
-
-        embed = self.transformer_blocks(
-            x=x_,
-            mask=x_padding_mask,
-            context=context,
-            context_mask=context_padding_mask,
+        loss, embed = self.model(
+            inputs=(r_pos, input_mask),
+            conditions=conditions,
+            labels=r_rot,
+            cond_drop_prob=cond_drop_prob,
+            quality_list=quality_list,
         )
 
-        embed = self.out_norm(embed)
+        if not return_embed:
+            return loss
 
-        if len(self.condition_fuser.fuse2cond.get("prepend", [])) > 0:
-            embed = embed[:, -n:, :]
+        return loss, embed
 
-        embed = self.to_out(embed)
-        embed = embed * motion_padding_mask.unsqueeze(-1)
 
-        if return_embed:
-            return TranslationTransformerOutput(pred_motion=embed)
+# class TranslationTransformer(nn.Module):
+#     def __init__(self, config: CN):
+#         super().__init__()
 
-        # translation_gt = motion[..., :4]
+#         self_attention_params = AttentionParams(
+#             dim=config.dim, causal=config.is_self_causal
+#         )
+#         cross_attention_params = AttentionParams(
+#             dim=config.dim,
+#             causal=config.is_cross_causal,
+#             add_null_kv=True,
+#         )
+#         # transformer_params = TranslationTransformerParams(
+#         #     self_attention_params=sap,
+#         #     cross_attention_params=cap,
+#         #     depth=config.depth,
+#         #     positional_embedding_params=PositionalEmbeddingParams(dim=config.dim),
+#         #     positional_embedding=PositionalEmbeddingType.SINE,
+#         #     fuse_method=config.fuse_method[0],
+#         #     cond_dropout=config.cond_dropout,
+#         #     audio_input_dim=config.audio_input_dim,
+#         #     text_input_dim=config.text_input_dim,
+#         #     dim_out=config.dim_out,
+#         #     loss_fnc=config.loss_fnc,
+#         # )
 
-        recon_loss = self.loss_fnc(motion[..., :4], embed[..., :4])
-        contact_loss = None
+#         self.dim = config.dim
+#         self.dim_out = config.dim_out
+#         self.audio_input_dim = config.audio_input_dim
+#         self.text_input_dim = config.text_input_dim
 
-        if self.dim_out == 8:
-            contact_loss = self.contact_loss_func(
-                input=embed[..., -4:], target=motion[..., -4:]
-            )
+#         fuse_method = config.fuse_method[0]
 
-        return TranslationTransformerOutput(
-            pred_motion=embed, recon_loss=recon_loss, contact_loss=contact_loss
-        )
+#         self.cfg_dropout = ClassifierFreeGuidanceDropout(config.cond_dropout)
+
+#         if config.loss_fnc == "l1":
+#             self.loss_fnc = torch.nn.L1Loss()
+#         elif config.loss_fnc == "l2":
+#             self.loss_fnc = torch.nn.MSELoss()
+#         elif config.loss_fnc == "l1_smooth":
+#             self.loss_fnc = torch.nn.SmoothL1Loss()
+
+#         if self.dim_out == 8:
+#             self.contact_loss_func = torch.nn.BCEWithLogitsLoss()
+
+#         self.project_audio = (
+#             nn.Linear(self.audio_input_dim, self.dim)
+#             if self.audio_input_dim != self.dim
+#             else nn.Identity()
+#         )
+#         self.project_text = (
+#             nn.Linear(self.text_input_dim, self.dim)
+#             if self.text_input_dim != self.dim
+#             else nn.Identity()
+#         )
+
+#         self.condition_fuser = ConditionFuser(fuse_method)
+
+#         positional_embedding_params = PositionalEmbeddingParams(dim=self.dim)
+
+#         self.pos_emb = get_obj_from_str(
+#             PositionalEmbeddingType[config.positional_embedding_type].value
+#         )(positional_embedding_params)
+
+#         self.emb_dropout = nn.Dropout(config.emb_dropout)
+
+#         if "cross_seperate" in fuse_method:
+#             cross_attention_params2 = AttentionParams(
+#                 dim=config.dim,
+#                 causal=False,
+#                 add_null_kv=True,
+#             )
+#             self.transformer_blocks = SeperateCrossTransformerBlock(
+#                 self_attention_params=self_attention_params,
+#                 cross_attention_params_audio=cross_attention_params,  ## audio
+#                 cross_attention_params_text=cross_attention_params2,  ## txt
+#                 depth=config.depth,
+#                 ff_mult=config.ff_mult,
+#             )
+#         else:
+
+#             self.transformer_blocks = TransformerBlock(
+#                 self_attention_params=self_attention_params,
+#                 cross_attention_params=cross_attention_params,
+#                 depth=config.depth,
+#                 ff_mult=config.ff_mult,
+#             )
+#         self.out_norm = LayerNorm(self.dim)
+
+#         self.to_out = nn.Linear(self.dim, config.dim_out, bias=False)
+
+#         self.post_emb_norm = (
+#             nn.LayerNorm(self.dim) if config.post_emb_norm else nn.Identity()
+#         )
+
+#     def _prepare_inputs(self, input, conditions):
+#         audio_embed = self.project_audio(conditions["audio"][0])
+#         text_embed = self.project_text(conditions["text"][0])
+#         conditions["audio"] = (audio_embed, conditions["audio"][1])
+#         conditions["text"] = (text_embed, conditions["text"][1])
+
+#         inputs_, cross_inputs = self.condition_fuser(input, conditions)
+
+#         return inputs_, cross_inputs
+
+#     def forward(
+#         self,
+#         inputs,
+#         conditions,
+#         return_embed: bool = False,
+#         cond_drop_prob: float = None,
+#     ) -> TranslationTransformerOutput:
+
+#         motion = inputs["motion"][0].clone()
+#         motion_padding_mask = inputs["motion"][1].clone()
+
+#         device, b, n, d = motion.device, *motion.shape
+
+#         x = self.pos_emb(motion).repeat(b, 1, 1) * motion_padding_mask.unsqueeze(-1)
+
+#         x = self.post_emb_norm(x)
+#         x = self.emb_dropout(x)
+
+#         x_tple = (x, motion_padding_mask)
+
+#         conditions = self.cfg_dropout(conditions, cond_drop_prob)
+#         inputs_, cross_inputs_ = self._prepare_inputs(x_tple, conditions)
+
+#         x_ = inputs_[0]
+#         x_padding_mask = inputs_[1]
+#         context = cross_inputs_[0]
+#         context_padding_mask = cross_inputs_[1]
+
+#         embed = self.transformer_blocks(
+#             x=x_,
+#             mask=x_padding_mask,
+#             context=context,
+#             context_mask=context_padding_mask,
+#         )
+
+#         embed = self.out_norm(embed)
+
+#         if len(self.condition_fuser.fuse2cond.get("prepend", [])) > 0:
+#             embed = embed[:, -n:, :]
+
+#         embed = self.to_out(embed)
+#         embed = embed * motion_padding_mask.unsqueeze(-1)
+
+#         if return_embed:
+#             return TranslationTransformerOutput(pred_motion=embed)
+
+#         # translation_gt = motion[..., :4]
+
+#         recon_loss = self.loss_fnc(motion[..., :4], embed[..., :4])
+#         contact_loss = None
+
+#         if self.dim_out == 8:
+#             contact_loss = self.contact_loss_func(
+#                 input=embed[..., -4:], target=motion[..., -4:]
+#             )
+
+#         return TranslationTransformerOutput(
+#             pred_motion=embed, recon_loss=recon_loss, contact_loss=contact_loss
+#         )

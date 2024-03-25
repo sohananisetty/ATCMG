@@ -206,7 +206,7 @@ class MotionAudioTextDataset(BaseMotionDataset):
 
         self.audio_dir = os.path.join(data_root, "audio")
 
-        if self.audio_rep in ["encodec", "librosa", "clap"]:
+        if self.audio_rep in ["encodec", "librosa"]:
             self.sampling_rate = 30
         else:
             self.sampling_rate = sampling_rate

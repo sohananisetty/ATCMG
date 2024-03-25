@@ -124,6 +124,8 @@ cfg.translation_transformer.input_dim = 2
 cfg.translation_transformer.depth = 2
 cfg.translation_transformer.conv_depth = 1
 cfg.translation_transformer.dim_out = 4
+cfg.translation_transformer.down_sampling_ratio = 4
+
 cfg.translation_transformer.heads = 8
 cfg.translation_transformer.flash = True
 cfg.translation_transformer.custom = True
@@ -131,7 +133,6 @@ cfg.translation_transformer.loss_fnc = "l1_smooth"
 cfg.translation_transformer.cond_dropout = 0.4
 cfg.translation_transformer.emb_dropout = 0.1
 cfg.translation_transformer.post_emb_norm = False
-cfg.translation_transformer.positional_embedding_type = "SINE"
 cfg.translation_transformer.var_len = True
 
 

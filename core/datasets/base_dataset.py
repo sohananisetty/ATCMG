@@ -92,12 +92,10 @@ class Motion2Positions:
         joints_num = data.nb_joints
         if joints_num == 22 or joints_num == 52:
             r_rot_quat, r_pos = self.recover_root_rot_pos(data)
-            print("rpos", r_pos.shape)
             # r_pos[:, [0, 2]] = 0
             positions = data.positions
             positions = positions.view(positions.shape[:-1] + (-1, 3)).to(torch.float32)
 
-            print(positions.shape)
             """Add Y-axis rotation to local joints"""
             positions = qrot(
                 qinv(r_rot_quat[..., None, :]).expand(positions.shape[:-1] + (4,)),

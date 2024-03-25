@@ -12,18 +12,21 @@ import torch
 import transformers
 import utils.vis_utils.plot_3d_global as plot_3d
 import wandb
-from configs.config_t2m import cfg, get_cfg_defaults
 from core.datasets.conditioner import ConditionProvider
-from core.datasets.multimodal_dataset import load_dataset, simple_collate
-from core.models.utils import instantiate_from_config
 from core.optimizer import get_optimizer
 from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AdamW, get_scheduler
-from utils.motion_processing.hml_process import (recover_from_ric,
-                                                 recover_root_rot_pos)
+from utils.motion_processing.hml_process import recover_from_ric, recover_root_rot_pos
 from yacs.config import CfgNode
+from core.models.generation.translation_transformer import TranslationTransformer
+from core import AudioRep, MotionRep, MotionTokenizerParams, TextRep
+from core.datasets.translation_dataset import (
+    TranslationAudioTextDataset,
+    load_dataset,
+    simple_collate,
+)
 
 
 def cycle(dl):
@@ -55,22 +58,18 @@ class TranslationTransformerTrainer(nn.Module):
         self.args = args
         self.training_args = args.train
         self.dataset_args = args.dataset
-        self.tt_model_args = args.translation_transformer
+        self.model_args = args.translation_transformer
 
         self.num_train_steps = self.training_args.num_train_iters
         self.output_dir = Path(self.args.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        if self.dataset_args.motion_rep == "full":
-            self.nb_joints = 52
-        elif self.dataset_args.motion_rep == "body":
-            self.nb_joints = 22
-        elif self.dataset_args.motion_rep == "hand":
-            self.nb_joints = 30
+        target = self.model_args.pop("target")
+        fuse_config = self.args.fuser
 
-        self.translation_transformer = instantiate_from_config(self.tt_model_args).to(
-            self.device
-        )
+        self.translation_transformer = TranslationTransformer(
+            self.model_args, fuse_config
+        ).to(self.device)
 
         self.register_buffer("steps", torch.Tensor([0]))
 
@@ -110,33 +109,22 @@ class TranslationTransformerTrainer(nn.Module):
         }
 
         train_ds, sampler_train, weights_train = load_dataset(
-            dataset_root=self.dataset_args.dataset_root,
+            dataset_args=self.dataset_args,
             split="train",
             dataset_names=list(dataset_names.keys()),
             weight_scale=list(dataset_names.values()),
-            motion_min_length_s=self.dataset_args.motion_min_length_s,
-            motion_max_length_s=self.dataset_args.motion_max_length_s,
-            motion_rep=self.dataset_args.motion_rep,
-            audio_rep=self.dataset_args.audio_rep,
         )
         test_ds, _, _ = load_dataset(
-            dataset_root=self.dataset_args.dataset_root,
+            dataset_names=list(dataset_names.keys()),
+            dataset_args=self.dataset_args,
             split="test",
-            motion_min_length_s=self.dataset_args.motion_min_length_s,
-            motion_max_length_s=self.dataset_args.motion_max_length_s,
-            motion_rep=self.dataset_args.motion_rep,
-            audio_rep=self.dataset_args.audio_rep,
         )
 
         self.render_ds, _, _ = load_dataset(
-            dataset_root=self.dataset_args.dataset_root,
+            dataset_names=list(dataset_names.keys()),
+            dataset_args=self.dataset_args,
             split="render",
-            motion_min_length_s=self.dataset_args.motion_min_length_s,
-            motion_max_length_s=self.dataset_args.motion_max_length_s,
-            motion_rep=self.dataset_args.motion_rep,
-            audio_rep=self.dataset_args.audio_rep,
         )
-
         self.print(
             f"training with training {len(train_ds)} and test dataset of and {len(test_ds)} samples"
         )
@@ -144,13 +132,15 @@ class TranslationTransformerTrainer(nn.Module):
         # dataloader
 
         condition_provider = ConditionProvider(
-            motion_rep=self.dataset_args.motion_rep,
-            audio_rep=self.dataset_args.audio_rep,
-            text_rep=self.dataset_args.text_rep,
+            text_conditioner_name=self.dataset_args.text_conditioner_name,
+            motion_rep=MotionRep(self.dataset_args.motion_rep),
+            audio_rep=AudioRep(self.dataset_args.audio_rep),
+            text_rep=TextRep(self.dataset_args.text_rep),
             motion_padding=self.dataset_args.motion_padding,
             audio_padding=self.dataset_args.audio_padding,
             motion_max_length_s=self.dataset_args.motion_max_length_s,
             audio_max_length_s=self.dataset_args.motion_max_length_s,
+            fps=self.dataset_args.fps,
         )
 
         self.dl = DataLoader(
@@ -243,16 +233,9 @@ class TranslationTransformerTrainer(nn.Module):
             inputs = self.to_device(inputs)
             conditions = self.to_device(conditions)
 
-            output = self.translation_transformer(inputs, conditions)
-
-            try:
-                loss = (
-                    output.recon_loss
-                    + self.tt_model_args.contact_loss_factor * output.contact_loss
-                )
-            except:
-                loss = output.recon_loss
-
+            loss, pred_orient = self.translation_transformer(
+                inputs["motion"], conditions
+            )
             loss = loss / self.grad_accum_every
 
             loss.backward()
@@ -261,7 +244,6 @@ class TranslationTransformerTrainer(nn.Module):
                 logs,
                 dict(
                     loss=loss.detach().cpu(),
-                    recon_loss=output.recon_loss.detach().cpu(),
                 ),
             )
 
@@ -271,7 +253,7 @@ class TranslationTransformerTrainer(nn.Module):
 
         # build pretty printed losses
 
-        losses_str = f"{steps}: model total loss: {logs['loss'].float():.3} ,  model recon loss: {logs['recon_loss'].float():.3}"
+        losses_str = f"{steps}: model total loss: {logs['loss'].float():.3}"
 
         # log
         if steps % self.wandb_every == 0:
@@ -302,7 +284,7 @@ class TranslationTransformerTrainer(nn.Module):
 
         if steps % self.evaluate_every == 0:
             self.validation_step()
-            self.sample_render_hmlvec(os.path.join(self.output_dir, "samples"))
+            # self.sample_render_hmlvec(os.path.join(self.output_dir, "samples"))
 
         self.steps += 1
         return logs
@@ -324,19 +306,11 @@ class TranslationTransformerTrainer(nn.Module):
                 conditions = self.to_device(conditions)
                 loss_dict = {}
 
-                output = self.translation_transformer(inputs, conditions)
-                try:
-                    loss = (
-                        output.recon_loss
-                        + self.tt_model_args.contact_loss_factor * output.contact_loss
-                    )
-                    loss_dict["contact_loss"] = output.contact_loss.detach().cpu()
-                except:
-                    loss = output.recon_loss
+                loss, pred_orient = self.translation_transformer(
+                    inputs["motion"], conditions
+                )
 
                 loss_dict["total_loss"] = loss.detach().cpu()
-                loss_dict["recon_loss"] = output.recon_loss.detach().cpu()
-
                 val_loss_ae.update(loss_dict)
 
                 sums_ae = dict(Counter(val_loss_ae) + Counter(loss_dict))
@@ -425,19 +399,3 @@ class TranslationTransformerTrainer(nn.Module):
             logs = self.train_step()
 
         self.print("training complete")
-
-
-# if __name__ == "__main__":
-#     nme = "motion_translation"
-#     path = f"/srv/hays-lab/scratch/sanisetty3/music_motion/motion_translation/checkpoints/{nme}/{nme}.yaml"
-#     cfg = get_cfg_defaults()
-#     print("loading config from:", path)
-#     cfg.merge_from_file(path)
-#     cfg.freeze()
-#     print("output_dir: ", cfg.output_dir)
-
-#     trainer = TranslationTransformerTrainer(
-#         args=cfg,
-#     ).cuda()
-
-#     trainer.train(cfg.train.resume)
