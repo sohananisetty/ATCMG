@@ -294,6 +294,7 @@ class TranslationTransformerTrainer(nn.Module):
         val_loss_ae = {}
 
         self.print(f"validation start")
+        cnt = 0
 
         with torch.no_grad():
             for inputs, conditions in tqdm(
@@ -310,20 +311,22 @@ class TranslationTransformerTrainer(nn.Module):
                     inputs["motion"], conditions
                 )
 
-                loss_dict["total_loss"] = loss.detach().cpu()
-                val_loss_ae.update(loss_dict)
+                loss_dict["loss"] = loss.detach().cpu()
 
-                sums_ae = dict(Counter(val_loss_ae) + Counter(loss_dict))
-                means_ae = {
-                    k: sums_ae[k] / float((k in val_loss_ae) + (k in loss_dict))
-                    for k in sums_ae
-                }
-                val_loss_ae.update(means_ae)
+                for key, value in loss_dict.items():
+                    if key in val_loss_ae:
+                        val_loss_ae[key] += value
+                    else:
+                        val_loss_ae[key] = value
+
+                    cnt += 1
+
+        for key in val_loss_ae.keys():
+            val_loss_ae[key] = val_loss_ae[key] / cnt
 
         for key, value in val_loss_ae.items():
             wandb.log({f"val_loss/{key}": value})
-
-            print(f"val/{key} ", value)
+            print(f"val_loss/{key}", value)
 
         self.translation_transformer.train()
 

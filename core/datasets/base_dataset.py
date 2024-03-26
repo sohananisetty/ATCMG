@@ -146,10 +146,10 @@ def split_hands(hand_data: Motion) -> Tuple[Motion, Motion]:
     return left_hand, right_hand
 
 
-class BaseMotionDataset(ABC, data.Dataset):
+class BaseMotionDataset(data.Dataset):
     def __init__(
         self,
-        dataset_root,
+        dataset_root="/srv/hays-lab/scratch/sanisetty3/motionx",
         motion_rep=MotionRep.FULL,
         hml_rep="gprvc",
     ) -> None:
@@ -557,10 +557,10 @@ class BaseMotionDataset(ABC, data.Dataset):
                 file_path.append(fullname)
         return file_path
 
-    @abstractmethod
-    def __len__(self):
-        raise NotImplementedError("not implemented")
+    # @abstractmethod
+    # def __len__(self):
+    #     raise NotImplementedError("not implemented")
 
-    @abstractmethod
-    def __getitem__(self, item):
-        raise NotImplementedError("not implemented")
+    # @abstractmethod
+    # def __getitem__(self, item):
+    #     raise NotImplementedError("not implemented")

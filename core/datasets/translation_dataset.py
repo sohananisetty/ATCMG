@@ -169,6 +169,10 @@ class TranslationAudioTextDataset(data.Dataset):
         data_root = dataset_root
 
         self.text_dir = os.path.join(data_root, "texts/semantic_labels")
+        self.mean_rot = np.load(os.path.join(data_root, "motion_data/Mean_rots.npy"))
+        self.std_rot = np.load(os.path.join(data_root, "motion_data/Std_rots.npy"))
+        self.mean_pos = np.load(os.path.join(data_root, "motion_data/Mean_pos.npy"))
+        self.std_pos = np.load(os.path.join(data_root, "motion_data/Std_pos.npy"))
 
         self.motion_dir = os.path.join(data_root, "motion_data/new_joint_vecs")
         self.audio_dir = os.path.join(data_root, "audio")
@@ -303,6 +307,25 @@ class TranslationAudioTextDataset(data.Dataset):
 
         return audio_data, motion
 
+    def inv_transform(self, data: torch.Tensor) -> torch.Tensor:
+
+        if data.shape[-1] == 4:
+            return data * (
+                torch.Tensor(self.std_rot).to(data.device) - 1e-8
+            ) + torch.Tensor(self.mean_rot).to(data.device)
+
+        elif data.shape[-1] == 3:
+            return data * (
+                torch.Tensor(self.std_pos).to(data.device) - 1e-8
+            ) + torch.Tensor(self.mean_pos).to(data.device)
+
+    def transform(self, data: np.ndarray) -> np.ndarray:
+
+        if data.shape[-1] == 4:
+            return (data - self.mean_rot) / (self.std_rot + 1e-8)
+        elif data.shape[-1] == 3:
+            return (data - self.mean_pos) / (self.std_pos + 1e-8)
+
     def __getitem__(self, item: int) -> Tuple[torch.Tensor, str]:
 
         name, ind, f_, to_ = self.id_list[item].rsplit("_", 3)
@@ -350,7 +373,14 @@ class TranslationAudioTextDataset(data.Dataset):
 
             audio_data, motion = self.get_windowed_data(audio_data, motion)
 
-        final_motion = motion  ## n 1/3
+        # final_motion = motion  ## n 4
+
+        r_rot_quat, r_pos = recover_root_rot_pos(torch.Tensor(motion))
+
+        r_rot_quat = self.transform(r_rot_quat)
+        r_pos = self.transform(r_pos)
+
+        final_motion = np.concatenate([r_rot_quat, r_pos], -1)
 
         return {
             "name": name,

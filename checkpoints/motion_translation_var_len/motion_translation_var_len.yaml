@@ -1,5 +1,5 @@
-model_name: "motion_translation"
-output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_translation"
+model_name: "motion_translation_var_len"
+output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_translation_var_len"
 dataset:
   dataset_name: "mix"
   dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
@@ -9,8 +9,7 @@ dataset:
   audio_rep: "encodec"
   hml_rep: "g"
   motion_min_length_s: 4
-  motion_max_length_s: 4
-  window_size_s: 4
+  motion_max_length_s: 12
 
 train:
   resume: False
@@ -43,7 +42,7 @@ translation_transformer:
   cond_dropout: 0.5
   flash: True
   custom: True
-  var_len: False
+  var_len: True
   loss_fnc: "l1_smooth"
 
 
