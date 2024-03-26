@@ -54,275 +54,118 @@ Total number of motions EgoBody: 2 and texts 2
 training with training 84144 and test dataset of 10667 and render 27 samples
 /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_constant
 0: model cross entropy loss: 6.39 
-6.390906810760498 inf
+6.391495227813721 inf
 0: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_constant/checkpoints
 validation start
-val/ce_loss tensor(6.3837)
+val/ce_loss tensor(6.3883)
 render start
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-200: model cross entropy loss: 3.85 
-400: model cross entropy loss: 2.95 
-600: model cross entropy loss: 2.83 
-800: model cross entropy loss: 2.7 
-1000: model cross entropy loss: 2.64 
-1200: model cross entropy loss: 2.66 
-1400: model cross entropy loss: 2.6 
-1600: model cross entropy loss: 2.48 
-1800: model cross entropy loss: 2.58 
-2000: model cross entropy loss: 2.55 
-2200: model cross entropy loss: 2.48 
-2400: model cross entropy loss: 2.39 
-2600: model cross entropy loss: 2.53 
-2800: model cross entropy loss: 2.43 
-3000: model cross entropy loss: 2.38 
-3200: model cross entropy loss: 2.27 
-3400: model cross entropy loss: 2.33 
-3600: model cross entropy loss: 2.29 
-3800: model cross entropy loss: 2.21 
-4000: model cross entropy loss: 2.18 
-4200: model cross entropy loss: 2.11 
-4400: model cross entropy loss: 2.13 
-4600: model cross entropy loss: 2.05 
-4800: model cross entropy loss: 2.03 
-5000: model cross entropy loss: 1.94 
-5200: model cross entropy loss: 1.93 
-5400: model cross entropy loss: 1.9 
-5600: model cross entropy loss: 1.86 
-5800: model cross entropy loss: 1.95 
-6000: model cross entropy loss: 1.88 
+200: model cross entropy loss: 4.74 
+400: model cross entropy loss: 3.28 
+600: model cross entropy loss: 2.91 
+800: model cross entropy loss: 2.8 
+1000: model cross entropy loss: 2.78 
+1200: model cross entropy loss: 2.64 
+1400: model cross entropy loss: 2.62 
+1600: model cross entropy loss: 2.63 
+1800: model cross entropy loss: 2.52 
+2000: model cross entropy loss: 2.62 
+2200: model cross entropy loss: 2.56 
+2400: model cross entropy loss: 2.56 
+2600: model cross entropy loss: 2.45 
+2800: model cross entropy loss: 2.46 
+3000: model cross entropy loss: 2.46 
+3200: model cross entropy loss: 2.47 
+3400: model cross entropy loss: 2.46 
+3600: model cross entropy loss: 2.41 
+3800: model cross entropy loss: 2.46 
+4000: model cross entropy loss: 2.33 
+4200: model cross entropy loss: 2.37 
+4400: model cross entropy loss: 2.42 
+4600: model cross entropy loss: 2.33 
+4800: model cross entropy loss: 2.28 
+5000: model cross entropy loss: 2.22 
+5200: model cross entropy loss: 2.18 
+5400: model cross entropy loss: 2.16 
+5600: model cross entropy loss: 2.16 
+5800: model cross entropy loss: 2.07 
+6000: model cross entropy loss: 2.05 
 6200: model cross entropy loss: 1.93 
-6400: model cross entropy loss: 1.88 
-6600: model cross entropy loss: 1.85 
-6800: model cross entropy loss: 1.76 
-7000: model cross entropy loss: 1.85 
-7200: model cross entropy loss: 1.84 
-7400: model cross entropy loss: 1.77 
-7600: model cross entropy loss: 1.8 
-7800: model cross entropy loss: 1.82 
-8000: model cross entropy loss: 1.71 
-8200: model cross entropy loss: 1.72 
-8400: model cross entropy loss: 1.77 
-8600: model cross entropy loss: 1.69 
-8800: model cross entropy loss: 1.68 
-9000: model cross entropy loss: 1.7 
-9200: model cross entropy loss: 1.77 
-9400: model cross entropy loss: 1.66 
-9600: model cross entropy loss: 1.7 
-9800: model cross entropy loss: 1.63 
-10000: model cross entropy loss: 1.68 
-1.6795073747634888 tensor(6.3909)
+6400: model cross entropy loss: 2.02 
+6600: model cross entropy loss: 2.02 
+6800: model cross entropy loss: 1.91 
+7000: model cross entropy loss: 1.88 
+7200: model cross entropy loss: 1.9 
+7400: model cross entropy loss: 1.94 
+7600: model cross entropy loss: 1.91 
+7800: model cross entropy loss: 1.94 
+8000: model cross entropy loss: 1.92 
+8200: model cross entropy loss: 1.81 
+8400: model cross entropy loss: 1.8 
+8600: model cross entropy loss: 1.81 
+8800: model cross entropy loss: 1.89 
+9000: model cross entropy loss: 1.87 
+9200: model cross entropy loss: 1.8 
+9400: model cross entropy loss: 1.85 
+9600: model cross entropy loss: 1.87 
+9800: model cross entropy loss: 1.8 
+10000: model cross entropy loss: 1.82 
+1.8249765634536743 tensor(6.3915)
 10000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_constant/checkpoints
 validation start
-val/ce_loss tensor(2.2900)
+val/ce_loss tensor(2.3120)
 render start
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
-rpos torch.Size([120, 3])
-torch.Size([120, 21, 3])
+10200: model cross entropy loss: 1.86 
+10400: model cross entropy loss: 1.76 
+10600: model cross entropy loss: 1.77 
+10800: model cross entropy loss: 1.78 
+11000: model cross entropy loss: 1.8 
+11200: model cross entropy loss: 1.76 
+11400: model cross entropy loss: 1.65 
+11600: model cross entropy loss: 1.7 
+11800: model cross entropy loss: 1.79 
+12000: model cross entropy loss: 1.74 
+12200: model cross entropy loss: 1.67 
+12400: model cross entropy loss: 1.74 
+12600: model cross entropy loss: 1.71 
+12800: model cross entropy loss: 1.67 
+13000: model cross entropy loss: 1.67 
+13200: model cross entropy loss: 1.67 
+13400: model cross entropy loss: 1.69 
+13600: model cross entropy loss: 1.73 
+13800: model cross entropy loss: 1.69 
+14000: model cross entropy loss: 1.72 
+14200: model cross entropy loss: 1.71 
+14400: model cross entropy loss: 1.61 
+14600: model cross entropy loss: 1.56 
+14800: model cross entropy loss: 1.65 
+15000: model cross entropy loss: 1.66 
+15200: model cross entropy loss: 1.68 
+15400: model cross entropy loss: 1.61 
+15600: model cross entropy loss: 1.52 
+15800: model cross entropy loss: 1.73 
+16000: model cross entropy loss: 1.68 
+16200: model cross entropy loss: 1.69 
+16400: model cross entropy loss: 1.54 
+16600: model cross entropy loss: 1.6 
+16800: model cross entropy loss: 1.7 
+17000: model cross entropy loss: 1.52 
+17200: model cross entropy loss: 1.56 
+17400: model cross entropy loss: 1.47 
+17600: model cross entropy loss: 1.65 
+17800: model cross entropy loss: 1.53 
+18000: model cross entropy loss: 1.7 
+18200: model cross entropy loss: 1.63 
+18400: model cross entropy loss: 1.58 
+18600: model cross entropy loss: 1.6 
+18800: model cross entropy loss: 1.68 
+19000: model cross entropy loss: 1.51 
+19200: model cross entropy loss: 1.59 
+19400: model cross entropy loss: 1.54 
+19600: model cross entropy loss: 1.52 
+19800: model cross entropy loss: 1.54 
+20000: model cross entropy loss: 1.55 
+1.5473215579986572 tensor(1.8250)
+20000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_constant/checkpoints
+validation start
+val/ce_loss tensor(2.2097)
+render start

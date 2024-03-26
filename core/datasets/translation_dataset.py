@@ -188,9 +188,7 @@ class TranslationAudioTextDataset(data.Dataset):
             for line in f.readlines():
                 if dataset_name + "/" in line:
                     try:
-                        motion = np.load(
-                            os.path.join(self.motion_dir, line.strip())
-                        ).squeeze()
+                        motion = np.load(os.path.join(self.motion_dir, line.strip()))
                         seq_len = motion.shape[0]
 
                         if seq_len < round(
@@ -309,9 +307,10 @@ class TranslationAudioTextDataset(data.Dataset):
 
         name, ind, f_, to_ = self.id_list[item].rsplit("_", 3)
         f_, to_ = int(f_), int(to_)
-        motion = (np.load(os.path.join(self.motion_dir, name + ".npy")).squeeze())[
-            :, :4
-        ]
+        try:
+            motion = np.load(os.path.join(self.motion_dir, name + ".npy"))[:, :4]
+        except:
+            print(name, np.load(os.path.join(self.motion_dir, name + ".npy")).shape)
 
         seq_len = (motion.shape[0] // self.downsample_ratio) * self.downsample_ratio
         motion = motion[:seq_len]
@@ -336,13 +335,6 @@ class TranslationAudioTextDataset(data.Dataset):
 
             common_len_seconds = min(motion_s, audio_s)
             motion = motion[: int((common_len_seconds * self.fps))]
-            if self.motion_rep == "full":
-                left_hand_motion = left_hand_motion[
-                    : int((common_len_seconds * self.fps))
-                ]
-                right_hand_motion = right_hand_motion[
-                    : int((common_len_seconds * self.fps))
-                ]
 
             audio_data = audio_data[: int(common_len_seconds * self.sampling_rate)]
 

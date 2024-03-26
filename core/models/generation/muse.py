@@ -563,8 +563,7 @@ class MLMModel(nn.Module):
             x=x_,
             mask=x_padding_mask if self.var_len else None,
             context=context,
-            context_mask=None,
-            # context_padding_mask,
+            context_mask=context_padding_mask,
         )
         if self.out_norm:
             embed = self.out_norm(embed)

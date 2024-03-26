@@ -1,5 +1,5 @@
 model_name: "motion_translation"
-output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ACTMG/checkpoints/motion_translation"
+output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_translation"
 dataset:
   dataset_name: "mix"
   dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
@@ -19,8 +19,8 @@ train:
   logging_steps : 10
   wandb_every : 200
   evaluate_every : 10000
-  eval_bs : 400
-  train_bs : 400
+  eval_bs : 1000
+  train_bs : 1000
   gradient_accumulation_steps : 1
   learning_rate : 2e-4
   weight_decay : 1e-3
@@ -35,16 +35,16 @@ translation_transformer:
   target: "core.models.generation.translation_transformer.TranslationTransformer"
   input_dim: 2
   dim : 128
-  conv_depth: 2
+  conv_depth: 0
   depth: 2
-  dim_out: 6
-  cond_dropout: 0.2
+  dim_out: 1
   audio_input_dim: 128
   text_input_dim: 768
+  cond_dropout: 0.5
   flash: True
   custom: True
   var_len: False
-  loss_fnc: "l1_smooth"
+  loss_fnc: "l1"
 
 
   

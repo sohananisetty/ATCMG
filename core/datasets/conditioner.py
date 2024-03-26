@@ -10,10 +10,13 @@ from core.param_dataclasses import AudioRep, MotionRep, TextRep
 from torch import nn
 from transformers.feature_extraction_utils import BatchFeature
 
-from .audio_encoders import (EncodecConditioner, LibrosaConditioner,
-                             getAudioConditioner)
-from .text_encoders import (BERTConditioner, ClipConditioner, T5Conditioner,
-                            getTextConditioner)
+from .audio_encoders import EncodecConditioner, LibrosaConditioner, getAudioConditioner
+from .text_encoders import (
+    BERTConditioner,
+    ClipConditioner,
+    T5Conditioner,
+    getTextConditioner,
+)
 
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
 
@@ -317,7 +320,7 @@ class ConditionProvider(nn.Module):
 
         ### Assume both have sam e max length
 
-        if raw_audio is None and raw_text is None:
+        if raw_audio is None and raw_text is None and raw_motion is not None:
             padded_motion, motion_mask = self._get_motion_features(
                 max_length=motion_max_length,
                 motion_list=raw_motion,
@@ -345,16 +348,16 @@ class ConditionProvider(nn.Module):
 
         if raw_motion[0] is None:
             padded_text, text_mask = self._get_text_features(raw_text)
-            if raw_audio is not None:
+            if raw_audio[0] is not None:
 
                 for i in range(len(raw_audio)):
                     if isinstance(raw_audio[i], str):
                         raw_audio[i] = self.audio_encoder(raw_audio[i]).cpu().numpy()
 
-                padded_audio, audio_mask = self._get_audio_features(
-                    audio_list=raw_audio,
-                    padding="longest",
-                )
+            padded_audio, audio_mask = self._get_audio_features(
+                audio_list=raw_audio,
+                padding="longest",
+            )
 
             condition_features["audio"] = (
                 torch.Tensor(padded_audio).to(self.device),

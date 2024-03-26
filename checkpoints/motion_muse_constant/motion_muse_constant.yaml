@@ -4,8 +4,8 @@ dataset:
   dataset_name: "mix"
   dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
   motion_rep: "body"
-  text_conditioner_name: "openai/clip-vit-large-patch14" #"t5-base" #"openai/clip-vit-large-patch14" #"t5-base" #"openai/clip-vit-large-patch14" #"laion/larger_clap_music_and_speech"
-  text_rep: "pooled_text_embed"
+  text_conditioner_name: "t5-large" #"openai/clip-vit-large-patch14" #"t5-base" #"openai/clip-vit-large-patch14" #"t5-base" #"openai/clip-vit-large-patch14" #"laion/larger_clap_music_and_speech"
+  text_rep: "full_text_embed"
   audio_rep: "encodec"
   hml_rep: "gpvc"
   motion_min_length_s: 4
@@ -44,12 +44,12 @@ fuser:
 motion_generator:
   target: "core.models.generation.motion_generator.MotionMuse"
   n_q : 1
-  dim : 768
+  dim : 512
   depth: 8
   cond_dropout: 0.4
   no_mask_token_prob: 0.4
   audio_input_dim: 128
-  text_input_dim: 768
+  text_input_dim: 1024
   emb_dropout: 0.1
   num_tokens: 512
   flash: True

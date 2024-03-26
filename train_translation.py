@@ -1,3 +1,8 @@
+import torch
+
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+
 from configs.config_t2m import cfg, get_cfg_defaults
 from ctl.trainer_translation import TranslationTransformerTrainer
 

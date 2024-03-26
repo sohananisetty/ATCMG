@@ -232,28 +232,39 @@ class EncTransDec(nn.Module):
         self.text_input_dim = text_input_dim
         self.cond_dropout = cond_dropout
         self.var_len = var_len
-        self.quality_emb = quality_emb
+        # self.quality_emb = quality_emb
         self.down_sampling_ratio = down_sampling_ratio
 
-        if quality_emb:
+        # if quality_emb:
 
-            self.qual_emb = nn.Embedding(2, self.dim)
+        #     self.qual_emb = nn.Embedding(2, self.dim)
 
         self.pos_emb = ScaledSinusoidalEmbedding(
             PositionalEmbeddingParams(dim=self.dim)
         )
-        self.encoder = Encoder(
-            input_dim,
-            dim,
-            down_sampling_ratio // 2,
-            depth=conv_depth,
-        )
-        self.decoder = Decoder(
-            dim_out,
-            dim,
-            down_sampling_ratio // 2,
-            depth=conv_depth,
-        )
+        self.conv_depth = conv_depth
+
+        if conv_depth != 0:
+
+            self.encoder = Encoder(
+                input_dim,
+                dim,
+                down_sampling_ratio // 2,
+                depth=conv_depth,
+            )
+            self.decoder = Decoder(
+                dim_out,
+                dim,
+                down_sampling_ratio // 2,
+                depth=conv_depth,
+            )
+
+        else:
+            self.project_input = (
+                nn.Linear(input_dim, self.dim, bias=False)
+                if input_dim != self.dim
+                else nn.Identity()
+            )
 
         if custom:
             self.transformer_blocks = TransformerBlockCustom(dim=dim, **kwargs)
@@ -279,6 +290,7 @@ class EncTransDec(nn.Module):
         )
 
         self.out_norm = LayerNorm(dim)
+        self.out_proj = nn.Linear(dim, dim_out)
 
         if loss_fnc == "l1":
             self.loss_fnc = torch.nn.L1Loss()
@@ -300,104 +312,41 @@ class EncTransDec(nn.Module):
 
         return inputs_, cross_inputs
 
-    def forward_with_cond_scale(
-        self,
-        inputs: Dict[str, ConditionType],
-        conditions: Dict[str, ConditionType],
-        cond_scale=3.0,
-        return_embed=False,
-        **kwargs,
-    ):
-        if cond_scale == 1:
-            return self.forward(
-                inputs,
-                conditions,
-                return_embed=return_embed,
-                cond_drop_prob=0.0,
-                **kwargs,
-            )
-
-        # print("*")
-        # print(inputs[0].shape)
-        # print(conditions["audio"][0].shape, conditions["text"][0].shape)
-
-        logits, embed = self.forward(
-            inputs, conditions, return_embed=True, cond_drop_prob=0.0, **kwargs
-        )
-        # print("*")
-        # print(inputs[0].shape)
-        # print(conditions["audio"][0].shape, conditions["text"][0].shape)
-
-        null_logits = self.forward(inputs, conditions, cond_drop_prob=1.0, **kwargs)
-
-        scaled_logits = null_logits + (logits - null_logits) * cond_scale
-
-        if return_embed:
-            return scaled_logits, embed
-
-        return scaled_logits
-
-    def forward_with_neg_prompt(
-        self,
-        inputs: Dict[str, ConditionType],
-        conditions: Dict[str, ConditionType],
-        neg_conditions: Dict[str, ConditionType],
-        cond_scale=3.0,
-        return_embed=False,
-        **kwargs,
-    ):
-        neg_logits = self.forward(
-            inputs,
-            neg_conditions,
-            cond_drop_prob=0.0,
-            **kwargs,
-        )
-        pos_logits, embed = self.forward(
-            inputs,
-            conditions,
-            return_embed=True,
-            cond_drop_prob=0.0,
-            **kwargs,
-        )
-
-        scaled_logits = neg_logits + (pos_logits - neg_logits) * cond_scale
-
-        if return_embed:
-            return scaled_logits, embed
-
-        return scaled_logits
-
     def forward(
         self,
         inputs: ConditionTensors,
         conditions: ConditionTensors,
-        return_embed: bool = False,
         labels: Optional[torch.Tensor] = None,
         cond_drop_prob: float = None,
-        quality_list=None,
+        # quality_list=None,
     ):
 
         sequence = inputs[0]
         sequence_mask = inputs[1]
         B, S, D = sequence.shape
 
-        if self.quality_emb is True and quality_list is None:
-            quality_list = torch.ones(B, dtype=torch.long, device=sequence.device)
+        # if self.quality_emb is True and quality_list is None:
+        #     quality_list = torch.ones(B, dtype=torch.long, device=sequence.device)
 
         # classifier free guidance
         cond_drop_prob = default(cond_drop_prob, self.cond_dropout)
         if cond_drop_prob > 0.0:
             conditions = self.cfg_dropout(conditions, cond_drop_prob)
 
-        x_ = sequence.contiguous().permute(0, 2, 1)  ## b n d -> b d n
-        x_ = self.encoder(x_)
-        x_ = x_.permute(0, 2, 1)
-        sequence_mask = torch.nn.functional.interpolate(
-            sequence_mask[None].float(), scale_factor=(1 / self.down_sampling_ratio)
-        )[0].to(torch.bool)
+        if self.conv_depth != 0:
+
+            sequence = sequence.contiguous().permute(0, 2, 1)  ## b n d -> b d n
+            sequence = self.encoder(sequence)
+            sequence = sequence.permute(0, 2, 1)
+            sequence_mask = torch.nn.functional.interpolate(
+                sequence_mask[None].float(), scale_factor=(1 / self.down_sampling_ratio)
+            )[0].to(torch.bool)
+
+        else:
+            sequence = self.project_input(sequence)
 
         input_, cross_attention_input = self._prepare_inputs(
-            (x_, sequence_mask), conditions
+            (sequence, sequence_mask), conditions
         )
 
         x_trans = input_[0]
@@ -409,11 +358,11 @@ class EncTransDec(nn.Module):
         x_trans = self.post_emb_norm(x_trans)
         x_trans = self.emb_dropout(x_trans)
 
-        if quality_list is not None and self.quality_emb == True:
-            x_trans = torch.cat(
-                [self.qual_emb(quality_list).unsqueeze(1), x_trans], dim=-2
-            )
-            x_padding_mask = F.pad(x_padding_mask, (1, 0), value=True)
+        # if quality_list is not None and self.quality_emb == True:
+        #     x_trans = torch.cat(
+        #         [self.qual_emb(quality_list).unsqueeze(1), x_trans], dim=-2
+        #     )
+        #     x_padding_mask = F.pad(x_padding_mask, (1, 0), value=True)
 
         embed = self.transformer_blocks(
             x=x_trans,
@@ -422,23 +371,28 @@ class EncTransDec(nn.Module):
             context_mask=context_padding_mask,
         )
 
-        embed = embed.permute(0, 2, 1)
-        embed = self.decoder(embed)
-        embed = embed.permute(0, 2, 1)
+        if self.conv_depth != 0:
+
+            embed = embed.permute(0, 2, 1)
+            embed = self.decoder(embed)
+            embed = embed.permute(0, 2, 1)
+
+        else:
+            embed = self.out_proj(embed)
 
         if (
-            len(self.condition_fuser.fuse2cond.get("prepend", [])) > 0
-            or self.quality_emb
+            len(self.condition_fuser.fuse2cond.get("prepend", []))
+            > 0
+            # or self.quality_emb
         ):
             logits = logits[:, :, -S:]
 
-        if return_embed:
-            return embed
-
         if exists(labels):
-            loss = self.loss_fnc(embed, labels)
+            loss = 10 * self.loss_fnc(embed, labels)
 
             return loss, embed
+
+        return embed
 
 
 class TranslationTransformer(nn.Module):
@@ -464,7 +418,7 @@ class TranslationTransformer(nn.Module):
             **tranformer_config,
         )
 
-        self.out_quat = True if tranformer_config.dim_out == 4 else False
+        self.dim_out = tranformer_config.dim_out
 
     def save(self, path):
         torch.save(self.state_dict(), path)
@@ -473,7 +427,7 @@ class TranslationTransformer(nn.Module):
         path = Path(path)
         assert path.exists()
         state_dict = torch.load(str(path))
-        self.load_state_dict(state_dict)
+        self.load_state_dict(state_dict["model"])
 
     def recover_root_rot_pos(self, data):
         rot_vel = data[..., 0]
@@ -497,23 +451,52 @@ class TranslationTransformer(nn.Module):
         r_pos[..., 1] = data[..., 3]
         return r_rot_quat, r_pos
 
+    def predict(self, trajectory, conditions=None, cond_drop_prob=0.0):
+
+        assert trajectory.shape[-1] == 2, "trajectory is xz"
+        pred_r_rot = self.model(
+            inputs=(trajectory, torch.ones_like(trajectory)[..., 0]),
+            conditions=conditions,
+            cond_drop_prob=cond_drop_prob,
+            # quality_list=quality_list,
+        )
+
+        if self.dim_out == 1:
+            pred_r_rot = torch.nn.functional.pad(pred_r_rot, (1, 1), value=0)
+        elif self.dim_out == 2:
+            pred_r_rot = torch.zeros(
+                (pred_r_rot.shape[:-1] + (4,)),
+                device=pred_r_rot.device,
+                dtype=pred_r_rot.dtype,
+            )
+            pred_r_rot[..., [0, 2]] = pred_r_rot[..., [0, 2]]
+        elif self.dim_out == 6:
+            pred_r_rot = geometry.matrix_to_quaternion(
+                geometry.rotation_6d_to_matrix(pred_r_rot)
+            )
+
+        return pred_r_rot
+
     def forward(
         self,
         inputs: Dict[str, ConditionType],
         conditions: Dict[str, ConditionType],
         cond_drop_prob=None,
         return_embed=True,
-        quality_list=None,
+        # quality_list=None,
     ):
         # tokenize if needed
 
         motion_trajectory = inputs[0].to(torch.long)
         input_mask = inputs[1].to(torch.bool)
         r_rot, r_pos = self.recover_root_rot_pos(motion_trajectory)
-
         r_pos = r_pos[..., [0, 2]]
 
-        if not self.out_quat:
+        if self.dim_out == 1:
+            r_rot = geometry.quaternion_to_axis_angle(r_rot)[..., 1:2]
+        elif self.dim_out == 2:
+            r_rot = r_rot[..., [0, 2]]
+        elif self.dim_out == 6:
             r_rot = geometry.matrix_to_rotation_6d(geometry.quaternion_to_matrix(r_rot))
 
         # get loss
@@ -523,13 +506,26 @@ class TranslationTransformer(nn.Module):
             conditions=conditions,
             labels=r_rot,
             cond_drop_prob=cond_drop_prob,
-            quality_list=quality_list,
+            # quality_list=quality_list,
         )
+
+        if self.dim_out == 1:
+            pred_r_rot_aa = torch.nn.functional.pad(embed, (1, 1), value=0)
+            pred_r_rot = geometry.axis_angle_to_quaternion(pred_r_rot_aa)
+        elif self.dim_out == 2:
+            pred_r_rot = torch.zeros(
+                (embed.shape[:-1] + (4,)), device=embed.device, dtype=embed.dtype
+            )
+            pred_r_rot[..., [0, 2]] = embed[..., [0, 2]]
+        elif self.dim_out == 6:
+            pred_r_rot = geometry.matrix_to_quaternion(
+                geometry.rotation_6d_to_matrix(embed)
+            )
 
         if not return_embed:
             return loss
 
-        return loss, embed
+        return loss, pred_r_rot
 
 
 # class TranslationTransformer(nn.Module):
