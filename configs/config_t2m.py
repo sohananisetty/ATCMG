@@ -105,6 +105,8 @@ cfg.motion_generator.positional_embedding_type = "SINE"
 ## Conditional
 cfg.motion_generator.audio_input_dim = 128
 cfg.motion_generator.text_input_dim = 768
+cfg.motion_generator.film = False
+
 
 cfg.motion_generator.no_mask_token_prob = 0.1
 cfg.motion_generator.cond_dropout = 0.4
@@ -156,6 +158,7 @@ cfg.translation_tcn.k = [7, 3]
 cfg.translation_tcn.loss_fnc = "l1_smooth"
 cfg.translation_tcn.var_len = True
 cfg.translation_tcn.causal = True
+cfg.translation_tcn.dilation = 3
 
 
 def get_cfg_defaults():

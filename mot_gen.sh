@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=motion_muse_constant
-#SBATCH --output=/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/sbach_outputs/motion_muse_constant.out
-#SBATCH --error=/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/sbach_outputs/motion_muse_constant.err
+#SBATCH --job-name=motion_muse_film
+#SBATCH --output=/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/sbach_outputs/motion_muse_film.out
+#SBATCH --error=/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/sbach_outputs/motion_muse_film.err
 #SBATCH --ntasks=1
 #SBATCH -G a40:1
 #SBATCH -p overcap

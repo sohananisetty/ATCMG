@@ -423,8 +423,9 @@ class TranslationDataset(data.Dataset):
 
         self.mean_rot = np.load(os.path.join(data_root, "motion_data/Mean_rots.npy"))
         self.std_rot = np.load(os.path.join(data_root, "motion_data/Std_rots.npy"))
-        self.mean_pos = np.load(os.path.join(data_root, "motion_data/Mean_pos.npy"))
-        self.std_pos = np.load(os.path.join(data_root, "motion_data/Std_pos.npy"))
+
+        self.mean_pos = np.load(os.path.join(data_root, "motion_data/Mean_rel_pos.npy"))
+        self.std_pos = np.load(os.path.join(data_root, "motion_data/Std_rel_pos.npy"))
 
         self.motion_dir = os.path.join(data_root, "motion_data/new_joint_vecs")
         self.audio_dir = os.path.join(data_root, "audio")
@@ -500,8 +501,13 @@ class TranslationDataset(data.Dataset):
 
         r_rot_quat, r_pos = recover_root_rot_pos(torch.Tensor(g))
 
-        r_rot_quat = self.transform(r_rot_quat)
-        r_pos = self.transform(r_pos)
+        # r_rot_quat = (r_rot_quat - self.mean_rot) / (self.std_rot + 1e-8)
+        # self.transform(r_rot_quat)
+
+        # r_pos = self.transform(r_pos)
+        # rel_pos = np.zeros_like(r_pos)
+        # rel_pos[..., 1:, [0, 2]] = r_pos[..., 1:, [0, 2]] - r_pos[..., :-1, [0, 2]]
+        # rel_pos = self.transform(rel_pos)  ##n 3
 
         final_motion = np.concatenate([r_rot_quat, r_pos, c], -1)
 

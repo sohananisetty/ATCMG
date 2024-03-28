@@ -6,7 +6,8 @@ dataset:
   motion_rep: "body"
   hml_rep: "gc"
   window_size_s: 4
-
+  motion_min_length_s: 4
+  motion_max_length_s: 4
 train:
   resume: False
   num_train_iters : 110001 #'Number of training steps
@@ -17,7 +18,7 @@ train:
   eval_bs : 400
   train_bs : 400
   gradient_accumulation_steps : 1
-  learning_rate : 2e-4
+  learning_rate : 1e-5
   weight_decay : 1e-3
   warmup_steps : 0
   gamma : 0.05
@@ -32,6 +33,7 @@ translation_tcn:
   var_len: False
   loss_fnc: "l2"
   causal: False
+  dilation: 3
 
 
   

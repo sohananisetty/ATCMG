@@ -1,0 +1,10 @@
+wandb: Currently logged in as: sohananisetty (ai-choreo). Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.16.5 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.16.2
+wandb: Run data is saved locally in /coc/scratch/sanisetty3/music_motion/ATCMG/wandb/run-20240328_164103-2ex975z6
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run autumn-spaceship-9
+wandb:  View project at https://wandb.ai/ai-choreo/simple_motion_translation
+wandb:  View run at https://wandb.ai/ai-choreo/simple_motion_translation/runs/2ex975z6
+  0%|          | 0/13 [00:00<?, ?it/s]  8%|7         | 1/13 [00:00<00:04,  2.66it/s] 15%|#5        | 2/13 [00:00<00:04,  2.60it/s] 23%|##3       | 3/13 [00:01<00:03,  2.66it/s] 31%|###       | 4/13 [00:01<00:03,  2.66it/s] 38%|###8      | 5/13 [00:01<00:03,  2.65it/s] 46%|####6     | 6/13 [00:02<00:02,  2.61it/s] 54%|#####3    | 7/13 [00:02<00:02,  2.64it/s] 62%|######1   | 8/13 [00:03<00:01,  2.66it/s] 69%|######9   | 9/13 [00:03<00:01,  2.69it/s] 77%|#######6  | 10/13 [00:03<00:01,  2.28it/s] 85%|########4 | 11/13 [00:04<00:00,  2.38it/s] 92%|#########2| 12/13 [00:04<00:00,  2.45it/s]100%|##########| 13/13 [00:04<00:00,  2.74it/s]

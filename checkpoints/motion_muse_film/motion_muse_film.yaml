@@ -1,0 +1,65 @@
+model_name: "motion_muse_film"
+output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_film"
+dataset:
+  dataset_name: "mix"
+  dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
+  motion_rep: "body"
+  text_conditioner_name: "t5-large" #"openai/clip-vit-large-patch14" #"t5-base" #"openai/clip-vit-large-patch14" #"t5-base" #"openai/clip-vit-large-patch14" #"laion/larger_clap_music_and_speech"
+  text_rep: "full_text_embed"
+  audio_rep: "encodec"
+  hml_rep: "gpvc"
+  motion_min_length_s: 4
+  motion_max_length_s: 4
+  window_size_s: 4
+train:
+  resume: False
+  num_train_iters : 110001 #'Number of training steps
+  save_steps : 10000
+  logging_steps : 10
+  wandb_every : 200
+  evaluate_every : 10000
+  eval_bs : 400
+  train_bs : 400
+  gradient_accumulation_steps : 1
+  learning_rate : 2e-4
+  weight_decay : 1e-3
+  warmup_steps : 4000
+  gamma : 0.05
+  lr_scheduler_type : "cosine"
+
+vqvae:
+  body_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gpvc/vqvae_body_gpvc.yaml"
+  
+codebooks_pattern:
+  modeling: "parallel"
+
+fuser:
+  fuse_method: [{"cross": ["text"], "input_interpolate": ["audio"]}]
+  #[{"cross": ["audio"], "prepend": ["text"]}]
+  # [{"cross": ["text"], "input_interpolate": ["audio"] , "sum":[ "translation"]}]
+  #
+
+motion_generator:
+  target: "core.models.generation.motion_generator.MotionMuse"
+  n_q : 1
+  dim : 512
+  depth: 8
+  cond_dropout: 0.4
+  no_mask_token_prob: 0.4
+  audio_input_dim: 128
+  text_input_dim: 1024
+  emb_dropout: 0.1
+  num_tokens: 512
+  flash: True
+  var_len: False
+  quality_emb: False
+  custom: True
+  attn_dropout: 0.1
+  film: True
+  
+
+
+
+  
+  
+

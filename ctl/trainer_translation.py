@@ -234,12 +234,8 @@ class TranslationTransformerTrainer(nn.Module):
 
             inputs = self.to_device(inputs)
             # conditions = self.to_device(conditions)
-            mask = inputs["motion"][1].to(self.device)
-            pos = inputs["motion"][0][..., 4:][..., [0, 2]].to(self.device)
 
-            rot = inputs["motion"][0][..., :4].to(self.device)
-
-            loss, pred_orient = self.tcn_model((pos, mask), y=rot)
+            loss, pred_orient = self.tcn_model(inputs["motion"])
             loss = loss / self.grad_accum_every
 
             loss.backward()
@@ -309,11 +305,7 @@ class TranslationTransformerTrainer(nn.Module):
                 # conditions = self.to_device(conditions)
                 loss_dict = {}
 
-                mask = inputs["motion"][1].to(self.device)
-                pos = inputs["motion"][0][..., 4:][..., [0, 2]].to(self.device)
-                rot = inputs["motion"][0][..., :4].to(self.device)
-
-                loss, pred_orient = self.tcn_model((pos, mask), y=rot)
+                loss, pred_orient = self.tcn_model(inputs["motion"])
                 loss = loss / self.grad_accum_every
 
                 loss_dict["loss"] = loss.detach().cpu()

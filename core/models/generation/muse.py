@@ -150,6 +150,16 @@ def FeedForward2(
     )
 
 
+class FiLM(nn.Module):
+    def __init__(self, dim, dim_cond):
+        super().__init__()
+        self.to_cond = nn.Linear(dim_cond, dim * 2)
+
+    def forward(self, x, cond):
+        gamma, beta = self.to_cond(cond).chunk(2, dim=-1)
+        return x * gamma + beta
+
+
 class ScaledEmbedding(nn.Embedding):
     """Boost learning rate for embeddings (with `scale`)."""
 
@@ -227,6 +237,96 @@ class TransformerBlockMuseCustom(nn.Module):
                     k=context,
                     v=context,
                     key_padding_mask=context_mask,
+                )
+                + x
+            )
+
+            x = self.norm_out(ff1(x) + x)
+
+        return x
+
+
+class TransformerBlockFilmMuseCustom(nn.Module):
+    def __init__(
+        self,
+        dim: int = 768,
+        heads: int = 8,
+        attn_dropout: float = 0.0,
+        flash: bool = False,
+        depth: int = 1,
+        ff_mult: int = 4,
+    ):
+        super().__init__()
+        self.layers = nn.ModuleList([])
+
+        for _ in range(depth):
+            self.layers.append(
+                nn.ModuleList(
+                    [
+                        CustomMHA(
+                            dim=dim,
+                            heads=heads,
+                            dropout=attn_dropout,
+                            add_null_kv=False,
+                            causal=False,
+                            flash=flash,
+                        ),
+                        CustomMHA(
+                            dim=dim,
+                            heads=heads,
+                            dropout=attn_dropout,
+                            add_null_kv=True,
+                            flash=flash,
+                            causal=False,
+                        ),
+                        FiLM(dim, dim),
+                        FeedForward(dim=dim, mult=ff_mult, dropout=attn_dropout),
+                    ]
+                )
+            )
+
+        self.norm_sa = LayerNorm(dim)
+        self.norm_cross = LayerNorm(dim)
+        self.norm_film = LayerNorm(dim)
+        self.norm_out = LayerNorm(dim)
+
+    def forward(
+        self,
+        x,
+        mask=None,
+        context=None,
+        context_mask=None,
+        film_context=None,
+        rel_pos=None,
+    ):
+        for attn, cross_attn, film, ff1 in self.layers:
+
+            x = self.norm_sa(x)
+            x = (
+                attn(
+                    q=x,
+                    k=x,
+                    v=x,
+                    key_padding_mask=mask,
+                    rel_pos=rel_pos,
+                )
+                + x
+            )
+
+            x = (
+                cross_attn(
+                    q=self.norm_cross(x),
+                    k=context,
+                    v=context,
+                    key_padding_mask=context_mask,
+                )
+                + x
+            )
+
+            x = (
+                film(
+                    self.norm_film(x),
+                    cond=film_context,
                 )
                 + x
             )
@@ -327,6 +427,7 @@ class MLMModel(nn.Module):
         positional_embedding_type="SINE",
         var_len=True,
         custom=True,
+        film=False,
         quality_emb=False,
         emb_lr: tp.Optional[float] = None,
         bias_proj=False,
@@ -348,6 +449,7 @@ class MLMModel(nn.Module):
         self.pattern_provider = pattern_provider
         self.var_len = var_len
         self.quality_emb = quality_emb
+        self.film = film
 
         self.set_token_ids(num_tokens, False)
 
@@ -364,7 +466,12 @@ class MLMModel(nn.Module):
         )
 
         if custom:
-            self.transformer_blocks = TransformerBlockMuseCustom(dim=dim, **kwargs)
+            if film:
+                self.transformer_blocks = TransformerBlockFilmMuseCustom(
+                    dim=dim, **kwargs
+                )
+            else:
+                self.transformer_blocks = TransformerBlockMuseCustom(dim=dim, **kwargs)
         else:
             self.transformer_blocks = TransformerBlockMuse(dim=dim, **kwargs)
         self.norm = LayerNorm(dim)
@@ -476,6 +583,22 @@ class MLMModel(nn.Module):
             }
         inputs_, cross_inputs = self.condition_fuser(input, new_conditions)
 
+        if self.film:
+            input_seq_len = input[0].shape[1]
+            film_cond = F.interpolate(
+                audio_embed.permute(0, 2, 1), size=input_seq_len
+            ).permute(0, 2, 1)
+            film_cond_mask = (
+                F.interpolate(
+                    conditions["audio"][1].unsqueeze(1).to(torch.float),
+                    size=input_seq_len,
+                )
+                .squeeze(1)
+                .to(torch.bool)
+            )
+
+            return inputs_, cross_inputs, film_cond * film_cond_mask[..., None]
+
         return inputs_, cross_inputs
 
     def forward_with_cond_scale(
@@ -574,9 +697,12 @@ class MLMModel(nn.Module):
             conditions = self.cfg_dropout(conditions, cond_drop_prob)
         # fuse conditions
 
-        input_, cross_attention_input = self._prepare_inputs(
-            (input_, sequence_mask), conditions
-        )
+        processed_inputs = self._prepare_inputs((input_, sequence_mask), conditions)
+
+        if self.film:
+            input_, cross_attention_input, film_input_ = processed_inputs
+        else:
+            input_, cross_attention_input = processed_inputs
 
         x_ = input_[0]
         x_padding_mask = input_[1]
@@ -591,12 +717,23 @@ class MLMModel(nn.Module):
             x_ = torch.cat([self.qual_emb(quality_list).unsqueeze(1), x_], dim=-2)
             x_padding_mask = F.pad(x_padding_mask, (1, 0), value=True)
 
-        embed = self.transformer_blocks(
-            x=x_,
-            mask=x_padding_mask if self.var_len else None,
-            context=context,
-            context_mask=context_padding_mask,
-        )
+        if self.film:
+            embed = self.transformer_blocks(
+                x=x_,
+                mask=x_padding_mask if self.var_len else None,
+                context=context,
+                context_mask=context_padding_mask,
+                film_context=film_input_,
+            )
+
+        else:
+
+            embed = self.transformer_blocks(
+                x=x_,
+                mask=x_padding_mask if self.var_len else None,
+                context=context,
+                context_mask=context_padding_mask,
+            )
         if self.out_norm:
             embed = self.out_norm(embed)
         logits = torch.stack([self.linears[k](embed) for k in range(K)], dim=1)

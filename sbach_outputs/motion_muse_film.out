@@ -1,0 +1,61 @@
+loading config from: /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_film/motion_muse_film.yaml
+output_dir:  /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_film
+Non-A100 GPU detected, using math or mem efficient attention if input tensor is on cuda
+Sync is turned on False
+loaded model with  0.03015906736254692 tensor([110000.], device='cuda:0') steps
+Total number of motions animation: 120 and texts 120
+Total number of motions humanml: 49974 and texts 49974
+Total number of motions perform: 346 and texts 346
+Total number of motions GRAB: 1268 and texts 1268
+Total number of motions idea400: 10949 and texts 10949
+Total number of motions humman: 314 and texts 314
+Total number of motions beat: 1458 and texts 1458
+Total number of motions game_motion: 2784 and texts 2784
+Total number of motions music: 2865 and texts 2865
+Total number of motions aist: 1141 and texts 1141
+Total number of motions fitness: 10905 and texts 10905
+Total number of motions moyo: 161 and texts 161
+Total number of motions choreomaster: 34 and texts 34
+Total number of motions dance: 97 and texts 97
+Total number of motions kungfu: 827 and texts 827
+Total number of motions EgoBody: 900 and texts 900
+Total number of motions animation: 2 and texts 2
+Total number of motions humanml: 8802 and texts 8802
+Total number of motions perform: 16 and texts 16
+Total number of motions GRAB: 67 and texts 67
+Total number of motions idea400: 577 and texts 577
+Total number of motions humman: 20 and texts 20
+Total number of motions beat: 162 and texts 162
+Total number of motions game_motion: 131 and texts 131
+Total number of motions music: 148 and texts 148
+Total number of motions aist: 61 and texts 61
+Total number of motions fitness: 572 and texts 572
+Total number of motions moyo: 9 and texts 9
+Total number of motions choreomaster: 2 and texts 2
+Total number of motions dance: 7 and texts 7
+Total number of motions kungfu: 42 and texts 42
+Total number of motions EgoBody: 49 and texts 49
+Total number of motions animation: 1 and texts 1
+Total number of motions humanml: 3 and texts 3
+Total number of motions perform: 2 and texts 2
+Total number of motions GRAB: 2 and texts 2
+Total number of motions idea400: 2 and texts 2
+Total number of motions humman: 1 and texts 1
+Total number of motions beat: 1 and texts 1
+Total number of motions game_motion: 2 and texts 2
+Total number of motions music: 1 and texts 1
+Total number of motions aist: 1 and texts 1
+Total number of motions fitness: 2 and texts 2
+Total number of motions moyo: 2 and texts 2
+Total number of motions choreomaster: 2 and texts 2
+Total number of motions dance: 1 and texts 1
+Total number of motions kungfu: 2 and texts 2
+Total number of motions EgoBody: 2 and texts 2
+training with training 84143 and test dataset of 10667 and render 27 samples
+/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_film
+0: model cross entropy loss: 6.4 
+6.403072834014893 inf
+0: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_film/checkpoints
+validation start
+val/ce_loss tensor(6.4100)
+render start
