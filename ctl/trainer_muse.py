@@ -217,26 +217,34 @@ class MotionMuseTrainer(nn.Module):
 
         self.body_cfg = vqvae_get_cfg_defaults()
         self.body_cfg.merge_from_file(vqvae_args.body_config)
-        # self.left_cfg = vqvae_get_cfg_defaults()
-        # self.left_cfg.merge_from_file(vqvae_args.left_hand_config)
-        # self.right_cfg = vqvae_get_cfg_defaults()
-        # self.right_cfg.merge_from_file(vqvae_args.right_hand_config)
-
-        # self.left_hand_model = instantiate_from_config(self.left_cfg.vqvae).to(self.device).eval()
-        # self.left_hand_model.load(
-        #     os.path.join(self.left_cfg.output_dir, "vqvae_motion.pt")
-        # )
-
-        # self.right_hand_model = instantiate_from_config(self.right_cfg.vqvae).to(self.device).eval()
-        # self.right_hand_model.load(
-        #     os.path.join(self.right_cfg.output_dir, "vqvae_motion.pt")
-        # )
-
         self.body_model = (
             instantiate_from_config(self.body_cfg.vqvae).to(self.device).eval()
         )
-        # HumanVQVAE(self.body_cfg.vqvae).to(self.device).eval()
         self.body_model.load(os.path.join(self.body_cfg.output_dir, "vqvae_motion.pt"))
+
+        if vqvae_args.left_hand_config is not None:
+            self.left_cfg = vqvae_get_cfg_defaults()
+            self.left_cfg.merge_from_file(vqvae_args.left_hand_config)
+            self.left_hand_model = (
+                instantiate_from_config(self.left_cfg.vqvae).to(self.device).eval()
+            )
+            self.left_hand_model.load(
+                os.path.join(self.left_cfg.output_dir, "vqvae_motion.pt")
+            )
+        else:
+            self.left_hand_model = None
+
+        if vqvae_args.right_hand_config is not None:
+            self.right_cfg = vqvae_get_cfg_defaults()
+            self.right_cfg.merge_from_file(vqvae_args.right_hand_config)
+            self.right_hand_model = (
+                instantiate_from_config(self.right_cfg.vqvae).to(self.device).eval()
+            )
+            self.right_hand_model.load(
+                os.path.join(self.right_cfg.output_dir, "vqvae_motion.pt")
+            )
+        else:
+            self.right_hand_model = None
 
     def print(self, msg):
         # self.accelerator.print(msg)
@@ -298,9 +306,12 @@ class MotionMuseTrainer(nn.Module):
                 [dataset_qualities[nm.split("/")[0]] for nm in inputs["names"]]
             ).to(motions.device)
 
-            loss = self.motion_muse(
+            out = self.motion_muse(
                 (motions, motion_mask), conditions, quality_list=quality_list
             )
+            loss = out.loss
+            # if out.ce_per_codebook is not None:
+            #     loss + out.ce_per_codebook[0] + 1.5*out.ce_per_codebook[1] + out.ce_per_codebook[2]
 
             loss = loss / self.grad_accum_every
 
@@ -372,7 +383,8 @@ class MotionMuseTrainer(nn.Module):
                 motions = inputs["motion"][0].to(torch.long)
                 motion_mask = inputs["motion"][1]
 
-                loss = self.motion_muse((motions, motion_mask), conditions)
+                out = self.motion_muse((motions, motion_mask), conditions)
+                loss = out.loss
 
                 loss_dict["loss"] = loss.detach().cpu()
 
@@ -399,12 +411,10 @@ class MotionMuseTrainer(nn.Module):
 
     def bkn_to_motion(self, codes, dset):
         # codes b k n
+
+        k = codes.shape[1]
         body_inds = codes[:, 0]
-        # left_inds = codes[:, 1]
-        # right_inds = codes[:, 2]
         body_motion = self.body_model.decode(body_inds[0:1]).detach().cpu()
-        # left_motion = self.left_hand_model.decode(left_inds[0:1]).detach().cpu()
-        # right_motion = self.right_hand_model.decode(right_inds[0:1]).detach().cpu()
 
         if "g" in self.dataset_args.hml_rep:
             z = torch.zeros(
@@ -421,17 +431,26 @@ class MotionMuseTrainer(nn.Module):
             motion_rep=MotionRep(self.body_cfg.dataset.motion_rep),
             hml_rep=self.body_cfg.dataset.hml_rep,
         )
-        # left_M = dset.toMotion(
-        #     left_motion[0],
-        #     motion_rep=MotionRep(self.left_cfg.dataset.motion_rep),
-        #     hml_rep=self.left_cfg.dataset.hml_rep,
-        # )
-        # right_M = dset.toMotion(
-        #     right_motion[0],
-        #     motion_rep=MotionRep(self.right_cfg.dataset.motion_rep),
-        #     hml_rep=self.right_cfg.dataset.hml_rep,
-        # )
-        # full_M = dset.to_full_joint_representation(body_M, left_M, right_M)
+
+        if k == 3:
+            left_inds = codes[:, 1]
+            right_inds = codes[:, 2]
+
+            left_motion = self.left_hand_model.decode(left_inds[0:1]).detach().cpu()
+            right_motion = self.right_hand_model.decode(right_inds[0:1]).detach().cpu()
+
+            left_M = dset.toMotion(
+                left_motion[0],
+                motion_rep=MotionRep(self.left_cfg.dataset.motion_rep),
+                hml_rep=self.left_cfg.dataset.hml_rep,
+            )
+            right_M = dset.toMotion(
+                right_motion[0],
+                motion_rep=MotionRep(self.right_cfg.dataset.motion_rep),
+                hml_rep=self.right_cfg.dataset.hml_rep,
+            )
+            full_M = dset.to_full_joint_representation(body_M, left_M, right_M)
+            return full_M
 
         return body_M
 

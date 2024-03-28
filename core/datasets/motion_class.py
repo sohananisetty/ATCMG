@@ -49,7 +49,7 @@ class Motion:
         if "c" in self.hml_rep:
             dim += 4
 
-        return
+        return dim
 
     @property
     def device(self):
@@ -353,6 +353,9 @@ class Motion:
             velocity=self.velocity[idx] if self.velocity is not None else None,
             contact=self.contact[idx] if self.contact is not None else None,
         )
+
+    def __str__(self) -> str:
+        return f"motion representation: {self.motion_rep.value}, type: {self.hml_rep}, num joints: {self.nb_joints}, dim: {self.dim}"
 
     # def __setitem__(
     #     self, idx: Union[slice, int], value: Union[List, np.ndarray, torch.Tensor]

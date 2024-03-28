@@ -25,6 +25,15 @@ ConditionType = Tuple[torch.Tensor, torch.Tensor]
 ConditionTensors = tp.Dict[str, ConditionType]
 CFGConditions = tp.Union[ConditionTensors, tp.Tuple[ConditionTensors, ConditionTensors]]
 
+
+@dataclass
+class MuseOutput:
+    loss: torch.Tensor = None
+    logits: torch.Tensor = None
+    embed: torch.Tensor = None
+    ce_per_codebook: List[torch.Tensor] = None
+
+
 # helpers
 
 
@@ -409,6 +418,47 @@ class MLMModel(nn.Module):
     def num_codebooks(self) -> int:
         return self.n_q
 
+    def _compute_cross_entropy(
+        self,
+        logits: torch.Tensor,
+        targets: torch.Tensor,
+        mask: torch.Tensor = None,
+        ignore_index=-100,
+    ) -> tp.Tuple[torch.Tensor, tp.List[torch.Tensor]]:
+        """Compute cross entropy between multi-codebook targets and model's logits.
+        The cross entropy is computed per codebook to provide codebook-level cross entropy.
+        Valid timesteps for each of the codebook are pulled from the mask, where invalid
+        timesteps are set to 0.
+
+        Args:
+            logits (torch.Tensor): Model's logits of shape [B, K, T, card].
+            targets (torch.Tensor): Target codes, of shape [B, K, T].
+            mask (torch.Tensor): Mask for valid target codes, of shape [B, K, T].
+        Returns:
+            ce (torch.Tensor): Cross entropy averaged over the codebooks
+            ce_per_codebook (list of torch.Tensor): Cross entropy per codebook (detached).
+        """
+        B, K, T = targets.shape
+        assert logits.shape[:-1] == targets.shape
+        # assert mask.shape == targets.shape
+        ce = torch.zeros([], device=targets.device)
+        ce_per_codebook: tp.List[torch.Tensor] = []
+        for k in range(K):
+            logits_k = (
+                logits[:, k, ...].contiguous().view(-1, logits.size(-1))
+            )  # [B x T, card]
+            targets_k = targets[:, k, ...].contiguous().view(-1)  # [B x T]
+            if mask is not None:
+                mask_k = mask[:, k, ...].contiguous().view(-1)  # [B x T]
+                targets_k = targets_k[mask_k]
+                logits_k = logits_k[mask_k]
+            q_ce = F.cross_entropy(logits_k, targets_k, ignore_index=ignore_index)
+            ce += q_ce
+            ce_per_codebook.append(q_ce)
+        # average cross entropy across codebooks
+        ce = ce / K
+        return ce, ce_per_codebook
+
     def _prepare_inputs(self, input, conditions):
         audio_embed = self.project_audio(conditions["audio"][0])
         text_embed = self.project_text(conditions["text"][0])
@@ -437,31 +487,24 @@ class MLMModel(nn.Module):
         **kwargs,
     ):
         if cond_scale == 1:
-            return self.forward(
+            out = self.forward(
                 inputs,
                 conditions,
-                return_embed=return_embed,
                 cond_drop_prob=0.0,
                 **kwargs,
             )
+            return out.logits, out.embed
 
-        # print("*")
-        # print(inputs[0].shape)
-        # print(conditions["audio"][0].shape, conditions["text"][0].shape)
+        pos_out = self.forward(inputs, conditions, cond_drop_prob=0.0, **kwargs)
 
-        logits, embed = self.forward(
-            inputs, conditions, return_embed=True, cond_drop_prob=0.0, **kwargs
+        null_out = self.forward(inputs, conditions, cond_drop_prob=1.0, **kwargs)
+
+        scaled_logits = (
+            null_out.logits + (pos_out.logits - null_out.logits) * cond_scale
         )
-        # print("*")
-        # print(inputs[0].shape)
-        # print(conditions["audio"][0].shape, conditions["text"][0].shape)
-
-        null_logits = self.forward(inputs, conditions, cond_drop_prob=1.0, **kwargs)
-
-        scaled_logits = null_logits + (logits - null_logits) * cond_scale
 
         if return_embed:
-            return scaled_logits, embed
+            return scaled_logits, pos_out.embed
 
         return scaled_logits
 
@@ -474,24 +517,23 @@ class MLMModel(nn.Module):
         return_embed=False,
         **kwargs,
     ):
-        neg_logits = self.forward(
+        neg_out = self.forward(
             inputs,
             neg_conditions,
             cond_drop_prob=0.0,
             **kwargs,
         )
-        pos_logits, embed = self.forward(
+        pos_out = self.forward(
             inputs,
             conditions,
-            return_embed=True,
             cond_drop_prob=0.0,
             **kwargs,
         )
 
-        scaled_logits = neg_logits + (pos_logits - neg_logits) * cond_scale
+        scaled_logits = neg_out.logits + (pos_out.logits - neg_out.logits) * cond_scale
 
         if return_embed:
-            return scaled_logits, embed
+            return scaled_logits, pos_out.embed
 
         return scaled_logits
 
@@ -499,8 +541,6 @@ class MLMModel(nn.Module):
         self,
         inputs: ConditionTensors,
         conditions: ConditionTensors,
-        return_embed: bool = False,
-        return_logits: bool = False,
         labels: Optional[torch.IntTensor] = None,
         cond_drop_prob: float = None,
         ignore_index: int = -100,
@@ -534,11 +574,6 @@ class MLMModel(nn.Module):
             conditions = self.cfg_dropout(conditions, cond_drop_prob)
         # fuse conditions
 
-        # print(input_.shape)
-        # print(sequence_mask.shape)
-        # print(conditions["audio"][0].shape, conditions["text"][0].shape)
-        # print(conditions["audio"][1].shape, conditions["text"][1].shape)
-
         input_, cross_attention_input = self._prepare_inputs(
             (input_, sequence_mask), conditions
         )
@@ -547,9 +582,6 @@ class MLMModel(nn.Module):
         x_padding_mask = input_[1]
         context = cross_attention_input[0]
         context_padding_mask = cross_attention_input[1]
-
-        # print(x_.shape, x_padding_mask.shape)
-        # print(context.shape, context_padding_mask.shape)
 
         x_ = x_ + self.pos_emb(x_)
         x_ = self.post_emb_norm(x_)
@@ -575,11 +607,11 @@ class MLMModel(nn.Module):
         ):
             logits = logits[:, :, -S:]
 
-        if return_embed:
-            return logits, embed
+        # if return_embed:
+        #     return logits, embed
 
         if not exists(labels):
-            return logits  ## B K N num_tokens
+            return MuseOutput(logits=logits, embed=embed)  ## B K N num_tokens
 
         if self.num_codebooks == 1:
 
@@ -588,13 +620,22 @@ class MLMModel(nn.Module):
                 labels.squeeze(1),
                 ignore_index=ignore_index,
             )
+            return MuseOutput(loss=loss, logits=logits, embed=embed)
+
         else:
-            loss = None
+            loss, ce_per_codebook = self._compute_cross_entropy(
+                logits,
+                labels,
+                ignore_index=ignore_index,
+            )
+            return MuseOutput(
+                loss=loss, logits=logits, embed=embed, ce_per_codebook=ce_per_codebook
+            )
 
-        if not return_logits:
-            return loss
+        # if not return_logits:
+        #     return loss
 
-        return loss, logits
+        # return loss, logits
 
 
 # sampling helpers
@@ -647,6 +688,7 @@ class MotionMuse(nn.Module):
     ):
         super().__init__()
         self.vqvae = vqvae.eval().freeze() if exists(vqvae) else None
+        # percentage of tokens to be [mask]ed to remain the same token, so that transformer produces better embeddings across all tokens as done in original BERT paper
         self.no_mask_token_prob = tranformer_config.pop("no_mask_token_prob")
 
         fuse_method = fuse_config.pop("fuse_method")
@@ -678,9 +720,6 @@ class MotionMuse(nn.Module):
         self.noise_schedule = noise_schedule
         self.num_codeboks = self.model.num_codebooks
 
-        # percentage of tokens to be [mask]ed to remain the same token, so that transformer produces better embeddings across all tokens as done in original BERT paper
-        # may be needed for self conditioning
-
     def save(self, path):
         torch.save(self.state_dict(), path)
 
@@ -691,6 +730,35 @@ class MotionMuse(nn.Module):
         self.load_state_dict(state_dict)
 
     def muse_mask(self, motion_ids: torch.Tensor, ignore_index: int = -100):
+        batch, K, seq_len, device = (
+            *motion_ids.shape,
+            motion_ids.device,
+        )
+
+        code_ids = motion_ids.clone()
+
+        rand_time = uniform((batch,), device=device)
+        rand_mask_probs = self.noise_schedule(rand_time)
+        num_token_masked = (seq_len * K * rand_mask_probs).round().clamp(min=1)
+
+        # mask_id = self.mask_token_id
+        batch_randperm = torch.rand((batch, K * seq_len), device=device).argsort(dim=-1)
+        mask = batch_randperm < rearrange(num_token_masked, "b -> b 1")
+        mask = mask.reshape(batch, K, seq_len)
+        mask[code_ids == self.model.pad_token_id] = False
+
+        # mask_id = self.transformer.mask_token_id
+        labels = torch.where(mask, code_ids, ignore_index)
+
+        if self.no_mask_token_prob > 0.0:
+            no_mask_mask = get_mask_subset_prob(mask, self.no_mask_token_prob)
+            mask &= ~no_mask_mask
+
+        x = torch.where(mask, self.mask_token_id, code_ids)
+
+        return x, labels
+
+    def muse_mask_legacy(self, motion_ids: torch.Tensor, ignore_index: int = -100):
         batch, K, seq_len, device = (
             *motion_ids.shape,
             motion_ids.device,
@@ -796,10 +864,12 @@ class MotionMuse(nn.Module):
 
         # begin with all image token ids masked
 
-        assert self.num_codeboks == 1, "only 1 codebook supported  for now"
+        # assert self.num_codeboks == 1, "only 1 codebook supported  for now"
+        down_sample_ratio = 4
+        fps = 30
 
         device = next(self.parameters()).device
-        duration = int(duration_s * (30 / 4))
+        duration = int(duration_s * (fps / down_sample_ratio))
 
         seq_len = duration
         try:
@@ -816,6 +886,7 @@ class MotionMuse(nn.Module):
 
             else:
                 batch_size = len(conditions["audio"][0].shape[0])
+                seq_len = int(conditions["audio"][0].shape[1] // down_sample_ratio)
                 if (
                     neg_conditions is not None
                     and neg_conditions.get("audio", None) is not None
@@ -858,9 +929,7 @@ class MotionMuse(nn.Module):
         ):
 
             rand_mask_prob = self.noise_schedule(timestep)
-            num_token_masked = max(
-                int((rand_mask_prob * seq_len * self.num_codeboks).item()), 1
-            )
+            num_token_masked = max(int((rand_mask_prob * seq_len * 1).item()), 1)
 
             masked_indices = scores.topk(num_token_masked, dim=-1).indices
 
@@ -917,7 +986,6 @@ class MotionMuse(nn.Module):
         conditions: Dict[str, ConditionType],
         ignore_index: int = -100,
         cond_drop_prob=None,
-        return_logits=False,
         quality_list=None,
     ):
         # tokenize if needed
@@ -930,17 +998,21 @@ class MotionMuse(nn.Module):
 
         # get loss
 
-        ce_loss, logits = self.model(
+        # ce_loss, logits
+
+        out = self.model(
             inputs=(x, input_mask),
             conditions=conditions,
             labels=labels,
             cond_drop_prob=cond_drop_prob,
             ignore_index=ignore_index,
-            return_logits=True,
+            # return_logits=True,
             quality_list=quality_list,
         )
 
-        if not return_logits:
-            return ce_loss
+        # if not return_logits:
+        #     return ce_loss
 
-        return ce_loss, logits
+        return out
+
+    # ce_loss, logits

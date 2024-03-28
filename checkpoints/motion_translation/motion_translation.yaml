@@ -20,7 +20,7 @@ train:
   wandb_every : 200
   evaluate_every : 10000
   eval_bs : 400
-  train_bs : 400
+  train_bs : 2000
   gradient_accumulation_steps : 1
   learning_rate : 2e-4
   weight_decay : 1e-3
@@ -35,7 +35,7 @@ translation_transformer:
   target: "core.models.generation.translation_transformer.TranslationTransformer"
   input_dim: 2
   dim : 128
-  conv_depth: 0
+  conv_depth: 2
   depth: 2
   dim_out: 2
   audio_input_dim: 128
@@ -44,7 +44,7 @@ translation_transformer:
   flash: True
   custom: True
   var_len: False
-  loss_fnc: "l1_smooth"
+  loss_fnc: "l2"
 
 
   
