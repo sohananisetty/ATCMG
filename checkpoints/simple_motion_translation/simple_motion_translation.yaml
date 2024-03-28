@@ -1,0 +1,39 @@
+model_name: "simple_motion_translation"
+output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/simple_motion_translation"
+dataset:
+  dataset_name: "mix"
+  dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
+  motion_rep: "body"
+  hml_rep: "gc"
+  window_size_s: 4
+
+train:
+  resume: False
+  num_train_iters : 110001 #'Number of training steps
+  save_steps : 10000
+  logging_steps : 10
+  wandb_every : 200
+  evaluate_every : 10000
+  eval_bs : 400
+  train_bs : 400
+  gradient_accumulation_steps : 1
+  learning_rate : 2e-4
+  weight_decay : 1e-3
+  warmup_steps : 0
+  gamma : 0.05
+
+translation_tcn:
+  target: "core.models.generation.translator.Traj2Orient"
+  input_dim: 2
+  dim : 128
+  depth: 2
+  output_dim: 2
+  k: [7,3]
+  var_len: False
+  loss_fnc: "l2"
+  causal: False
+
+
+  
+  
+

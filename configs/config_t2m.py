@@ -145,6 +145,19 @@ cfg.translation_transformer.attn_dropout = 0.0
 cfg.translation_transformer.emb_dropout = 0.1
 
 
+cfg.translation_tcn = CN()
+cfg.translation_tcn.target = "core.models.generation.translator.Traj2Orient"
+
+cfg.translation_tcn.dim = 64
+cfg.translation_tcn.input_dim = 2
+cfg.translation_tcn.output_dim = 4
+cfg.translation_tcn.depth = 2
+cfg.translation_tcn.k = [7, 3]
+cfg.translation_tcn.loss_fnc = "l1_smooth"
+cfg.translation_tcn.var_len = True
+cfg.translation_tcn.causal = True
+
+
 def get_cfg_defaults():
     """Get a yacs CfgNode object with default values for my_project."""
     # Return a clone so that the defaults will not be altered

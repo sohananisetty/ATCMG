@@ -20,13 +20,13 @@ from tqdm import tqdm
 from transformers import AdamW, get_scheduler
 from utils.motion_processing.hml_process import recover_from_ric, recover_root_rot_pos
 from yacs.config import CfgNode
-from core.models.generation.translation_transformer import TranslationTransformer
 from core import AudioRep, MotionRep, MotionTokenizerParams, TextRep
 from core.datasets.translation_dataset import (
-    TranslationAudioTextDataset,
+    TranslationDataset,
     load_dataset,
     simple_collate,
 )
+from core.models.utils import instantiate_from_config
 
 
 def cycle(dl):
@@ -58,35 +58,30 @@ class TranslationTransformerTrainer(nn.Module):
         self.args = args
         self.training_args = args.train
         self.dataset_args = args.dataset
-        self.model_args = args.translation_transformer
+        self.model_args = args.translation_tcn
 
         self.num_train_steps = self.training_args.num_train_iters
         self.output_dir = Path(self.args.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        target = self.model_args.pop("target")
-        fuse_config = self.args.fuser
-
-        self.translation_transformer = TranslationTransformer(
-            self.model_args, fuse_config
-        ).to(self.device)
+        self.tcn_model = instantiate_from_config(self.model_args).to(self.device)
 
         self.register_buffer("steps", torch.Tensor([0]))
 
         self.grad_accum_every = self.training_args.gradient_accumulation_steps
 
         self.optim = get_optimizer(
-            self.translation_transformer.parameters(),
+            self.tcn_model.parameters(),
             lr=self.training_args.learning_rate,
             wd=self.training_args.weight_decay,
         )
 
-        self.lr_scheduler = get_scheduler(
-            name=self.training_args.lr_scheduler_type,
-            optimizer=self.optim,
-            num_warmup_steps=self.training_args.warmup_steps,
-            num_training_steps=self.num_train_steps,
-        )
+        # self.lr_scheduler = get_scheduler(
+        #     name=self.training_args.lr_scheduler_type,
+        #     optimizer=self.optim,
+        #     num_warmup_steps=self.training_args.warmup_steps,
+        #     num_training_steps=self.num_train_steps,
+        # )
 
         dataset_names = {
             "animation": 0.8,
@@ -112,7 +107,7 @@ class TranslationTransformerTrainer(nn.Module):
             dataset_args=self.dataset_args,
             split="train",
             dataset_names=list(dataset_names.keys()),
-            weight_scale=list(dataset_names.values()),
+            # weight_scale=list(dataset_names.values()),
         )
         test_ds, _, _ = load_dataset(
             dataset_names=list(dataset_names.keys()),
@@ -131,16 +126,22 @@ class TranslationTransformerTrainer(nn.Module):
 
         # dataloader
 
+        # condition_provider = ConditionProvider(
+        #     text_conditioner_name=self.dataset_args.text_conditioner_name,
+        #     motion_rep=MotionRep(self.dataset_args.motion_rep),
+        #     audio_rep=AudioRep(self.dataset_args.audio_rep),
+        #     text_rep=TextRep(self.dataset_args.text_rep),
+        #     motion_padding=self.dataset_args.motion_padding,
+        #     audio_padding=self.dataset_args.audio_padding,
+        #     motion_max_length_s=self.dataset_args.motion_max_length_s,
+        #     audio_max_length_s=self.dataset_args.motion_max_length_s,
+        #     fps=self.dataset_args.fps,
+        # )
         condition_provider = ConditionProvider(
-            text_conditioner_name=self.dataset_args.text_conditioner_name,
-            motion_rep=MotionRep(self.dataset_args.motion_rep),
-            audio_rep=AudioRep(self.dataset_args.audio_rep),
-            text_rep=TextRep(self.dataset_args.text_rep),
             motion_padding=self.dataset_args.motion_padding,
-            audio_padding=self.dataset_args.audio_padding,
-            motion_max_length_s=self.dataset_args.motion_max_length_s,
-            audio_max_length_s=self.dataset_args.motion_max_length_s,
+            # motion_max_length_s=dataset_args.motion_max_length_s,
             fps=self.dataset_args.fps,
+            only_motion=True,
         )
 
         self.dl = DataLoader(
@@ -191,7 +192,7 @@ class TranslationTransformerTrainer(nn.Module):
 
     def save(self, path, loss=None):
         pkg = dict(
-            model=self.translation_transformer.state_dict(),
+            model=self.tcn_model.state_dict(),
             optim=self.optim.state_dict(),
             steps=self.steps,
             total_loss=self.best_loss if loss is None else loss,
@@ -203,7 +204,7 @@ class TranslationTransformerTrainer(nn.Module):
         assert path.exists()
 
         pkg = torch.load(str(path), map_location="cuda")
-        self.translation_transformer.load_state_dict(pkg["model"])
+        self.tcn_model.load_state_dict(pkg["model"])
 
         self.optim.load_state_dict(pkg["optim"])
         self.steps = pkg["steps"]
@@ -221,21 +222,24 @@ class TranslationTransformerTrainer(nn.Module):
     def train_step(self):
         steps = int(self.steps.item())
 
-        self.translation_transformer = self.translation_transformer.train()
+        self.tcn_model = self.tcn_model.train()
 
         # logs
 
         logs = {}
 
         for _ in range(self.grad_accum_every):
-            inputs, conditions = next(self.dl_iter)
+            # inputs, conditions = next(self.dl_iter)
+            inputs = next(self.dl_iter)
 
             inputs = self.to_device(inputs)
-            conditions = self.to_device(conditions)
+            # conditions = self.to_device(conditions)
+            mask = inputs["motion"][1].to(self.device)
+            pos = inputs["motion"][0][..., 4:][..., [0, 2]].to(self.device)
 
-            loss, pred_orient = self.translation_transformer(
-                inputs["motion"], conditions
-            )
+            rot = inputs["motion"][0][..., :4].to(self.device)
+
+            loss, pred_orient = self.tcn_model((pos, mask), y=rot)
             loss = loss / self.grad_accum_every
 
             loss.backward()
@@ -248,7 +252,7 @@ class TranslationTransformerTrainer(nn.Module):
             )
 
         self.optim.step()
-        self.lr_scheduler.step()
+        # self.lr_scheduler.step()
         self.optim.zero_grad()
 
         # build pretty printed losses
@@ -266,15 +270,13 @@ class TranslationTransformerTrainer(nn.Module):
         if not (steps % self.save_model_every):
             os.makedirs(os.path.join(self.output_dir, "checkpoints"), exist_ok=True)
             model_path = os.path.join(
-                self.output_dir, "checkpoints", f"translation_transformer.{steps}.pt"
+                self.output_dir, "checkpoints", f"tcn_model.{steps}.pt"
             )
             self.save(model_path)
             print(float(logs["loss"]), self.best_loss)
 
             if float(logs["loss"]) <= self.best_loss:
-                model_path = os.path.join(
-                    self.output_dir, f"translation_transformer.pt"
-                )
+                model_path = os.path.join(self.output_dir, f"tcn_model.pt")
                 self.save(model_path)
                 self.best_loss = logs["loss"]
 
@@ -290,26 +292,29 @@ class TranslationTransformerTrainer(nn.Module):
         return logs
 
     def validation_step(self):
-        self.translation_transformer.eval()
+        self.tcn_model.eval()
         val_loss_ae = {}
 
         self.print(f"validation start")
         cnt = 0
 
         with torch.no_grad():
-            for inputs, conditions in tqdm(
+            for inputs in tqdm(
                 (self.valid_dl),
                 position=0,
                 leave=True,
             ):
 
                 inputs = self.to_device(inputs)
-                conditions = self.to_device(conditions)
+                # conditions = self.to_device(conditions)
                 loss_dict = {}
 
-                loss, pred_orient = self.translation_transformer(
-                    inputs["motion"], conditions
-                )
+                mask = inputs["motion"][1].to(self.device)
+                pos = inputs["motion"][0][..., 4:][..., [0, 2]].to(self.device)
+                rot = inputs["motion"][0][..., :4].to(self.device)
+
+                loss, pred_orient = self.tcn_model((pos, mask), y=rot)
+                loss = loss / self.grad_accum_every
 
                 loss_dict["loss"] = loss.detach().cpu()
 
@@ -328,7 +333,7 @@ class TranslationTransformerTrainer(nn.Module):
             wandb.log({f"val_loss/{key}": value})
             print(f"val_loss/{key}", value)
 
-        self.translation_transformer.train()
+        self.tcn_model.train()
 
     def sample_render_hmlvec(self, save_path):
         save_file = os.path.join(save_path, f"{int(self.steps.item())}")
@@ -337,7 +342,7 @@ class TranslationTransformerTrainer(nn.Module):
         # assert self.render_dl.batch_size == 1 , "Batch size for rendering should be 1!"
 
         dataset_lens = self.render_ds.cumulative_sizes
-        self.translation_transformer.eval()
+        self.tcn_model.eval()
         print(f"render start")
         with torch.no_grad():
             for idx, (inputs, conditions) in tqdm(
@@ -349,7 +354,7 @@ class TranslationTransformerTrainer(nn.Module):
                 inputs = self.to_device(inputs)
                 conditions = self.to_device(conditions)
 
-                output = self.translation_transformer(inputs, conditions)
+                output = self.tcn_model(inputs, conditions)
 
                 gt_motion = inputs["motion"][0].clone()
                 gt_mask = inputs["motion"][1].clone().cpu()
@@ -386,7 +391,7 @@ class TranslationTransformerTrainer(nn.Module):
                     ),
                 )
 
-        self.translation_transformer.train()
+        self.tcn_model.train()
 
     def train(self, resume=False):
         self.best_loss = float("inf")
@@ -394,7 +399,7 @@ class TranslationTransformerTrainer(nn.Module):
 
         if resume:
             save_dir = self.args.output_dir
-            save_path = os.path.join(save_dir, "translation_transformer.pt")
+            save_path = os.path.join(save_dir, "tcn_model.pt")
             print("resuming from ", save_path)
             self.load(save_path)
 

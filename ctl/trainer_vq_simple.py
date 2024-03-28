@@ -170,6 +170,7 @@ class VQVAEMotionTrainer(nn.Module):
             motion_rep=self.dataset_args.motion_rep,
             motion_padding=self.dataset_args.motion_padding,
             motion_max_length_s=self.dataset_args.motion_max_length_s,
+            only_motion=True,
         )
 
         self.dl = DataLoader(

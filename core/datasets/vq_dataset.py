@@ -150,9 +150,8 @@ class VQSMPLXMotionDataset(BaseMotionDataset):
 
     def __getitem__(self, item: int) -> Tuple[torch.Tensor, str]:
         motion = np.load(os.path.join(self.motion_dir, self.id_list[item]))
-        prob = random.random()
 
-        if self.enable_var_len and prob < 0.3:
+        if self.enable_var_len:
             if self.max_motion_length < 0:
                 mot_len = motion.shape[0]
             else:

@@ -58,10 +58,11 @@ class ConditionProvider(nn.Module):
         audio_max_length_s=None,
         audio_padding: str = "longest",
         motion_padding: str = "longest",
-        motion_max_length_s: int = 10,
+        motion_max_length_s: int = 20,
         fps: int = 30,
         motion_rep: MotionRep = MotionRep.FULL,
         pad_id: int = 0,
+        only_motion=False,
     ):
         super().__init__()
 
@@ -95,8 +96,10 @@ class ConditionProvider(nn.Module):
         self.motion_max_length = motion_max_length_s * fps
         self.pad_id = pad_id
 
-        self.audio_encoder, self.audio_dim = getAudioConditioner(audio_rep.value)
-        self.text_encoder, self.text_dim = getTextConditioner(text_conditioner_name)
+        if not only_motion:
+
+            self.audio_encoder, self.audio_dim = getAudioConditioner(audio_rep.value)
+            self.text_encoder, self.text_dim = getTextConditioner(text_conditioner_name)
 
     def _select_common_start_idx(self, motion, audio, max_length_s):
         motion_s = motion.shape[0] // self.fps

@@ -58,12 +58,7 @@ dataset_names_default = [
 
 def load_dataset(
     dataset_args,
-    # dataset_root,
     dataset_names=dataset_names_default,
-    # motion_min_length_s=3,
-    # motion_max_length_s=10,
-    # audio_rep="encodec",
-    # motion_rep="full",
     split: str = "train",
     weight_scale: Optional[List[int]] = None,
 ):
@@ -74,16 +69,24 @@ def load_dataset(
     weights = []
     for dataset_name in dataset_names:
         dataset_list.append(
-            TranslationAudioTextDataset(
+            TranslationDataset(
                 dataset_name,
                 dataset_root=dataset_args.dataset_root,
                 split=split,
                 motion_min_length_s=dataset_args.motion_min_length_s,
                 motion_max_length_s=dataset_args.motion_max_length_s,
-                audio_rep=dataset_args.audio_rep,
-                motion_rep=dataset_args.motion_rep,
-                hml_rep=dataset_args.hml_rep,
+                window_size_s=dataset_args.window_size_s,
             )
+            # TranslationAudioTextDataset(
+            #     dataset_name,
+            #     dataset_root=dataset_args.dataset_root,
+            #     split=split,
+            #     motion_min_length_s=dataset_args.motion_min_length_s,
+            #     motion_max_length_s=dataset_args.motion_max_length_s,
+            #     audio_rep=dataset_args.audio_rep,
+            #     motion_rep=dataset_args.motion_rep,
+            #     hml_rep=dataset_args.hml_rep,
+            # )
         )
 
     concat_dataset = torch.utils.data.ConcatDataset(dataset_list)
@@ -390,7 +393,122 @@ class TranslationAudioTextDataset(data.Dataset):
         }
 
 
-def simple_collate(
+class TranslationDataset(data.Dataset):
+    def __init__(
+        self,
+        dataset_name: str,
+        dataset_root: str,
+        motion_min_length_s=3,
+        motion_max_length_s=10,
+        window_size_s=None,
+        fps: int = 30,
+        split: str = "train",
+    ):
+        super().__init__()
+        self.dataset_name = dataset_name
+        self.split = split
+        self.fps = fps
+
+        self.window_size = (
+            max(int(window_size_s * self.fps), -1)
+            if window_size_s is not None
+            else None
+        )
+        self.enable_var_len = True if self.window_size is None else False
+
+        self.min_motion_length = motion_min_length_s * fps
+        self.max_motion_length = motion_max_length_s * fps
+
+        data_root = dataset_root
+
+        self.mean_rot = np.load(os.path.join(data_root, "motion_data/Mean_rots.npy"))
+        self.std_rot = np.load(os.path.join(data_root, "motion_data/Std_rots.npy"))
+        self.mean_pos = np.load(os.path.join(data_root, "motion_data/Mean_pos.npy"))
+        self.std_pos = np.load(os.path.join(data_root, "motion_data/Std_pos.npy"))
+
+        self.motion_dir = os.path.join(data_root, "motion_data/new_joint_vecs")
+        self.audio_dir = os.path.join(data_root, "audio")
+
+        split_file = os.path.join(data_root, f"motion_data/{split}.txt")
+
+        self.id_list = []
+        with open(split_file, "r") as f:
+            for line in f.readlines():
+                if dataset_name + "/" in line:
+                    try:
+                        motion = np.load(os.path.join(self.motion_dir, line.strip()))
+                        min_length = (
+                            default(self.window_size, self.min_motion_length)
+                            if self.window_size != -1
+                            else motion.shape[0]
+                        )
+
+                        if motion.shape[0] >= min_length:
+                            self.id_list.append(line.strip())
+                    except:
+                        continue
+
+        print(f"Total number of motions {dataset_name}: {len(self.id_list)}")
+
+    def __len__(self) -> int:
+        return len(self.id_list)
+
+    def inv_transform(self, data: torch.Tensor) -> torch.Tensor:
+
+        if data.shape[-1] == 4:
+            return data * (
+                torch.Tensor(self.std_rot).to(data.device) - 1e-8
+            ) + torch.Tensor(self.mean_rot).to(data.device)
+
+        elif data.shape[-1] == 3:
+            return data * (
+                torch.Tensor(self.std_pos).to(data.device) - 1e-8
+            ) + torch.Tensor(self.mean_pos).to(data.device)
+
+    def transform(self, data: np.ndarray) -> np.ndarray:
+
+        if data.shape[-1] == 4:
+            return (data - self.mean_rot) / (self.std_rot + 1e-8)
+        elif data.shape[-1] == 3:
+            return (data - self.mean_pos) / (self.std_pos + 1e-8)
+
+    def __getitem__(self, item: int) -> Tuple[torch.Tensor, str]:
+
+        motion = np.load(os.path.join(self.motion_dir, self.id_list[item]))
+
+        if self.enable_var_len:
+            if self.max_motion_length < 0:
+                mot_len = motion.shape[0]
+            else:
+                mot_len = np.random.randint(
+                    self.window_size, min(motion.shape[0], self.max_motion_length)
+                )
+
+        else:
+            if self.window_size == -1:
+                mot_len = (motion).shape[0]
+
+            else:
+                mot_len = self.window_size
+
+        idx = random.randint(0, motion.shape[0] - mot_len)
+
+        motion = motion[idx : idx + mot_len]
+
+        g = motion[:, :4]
+        c = motion[:, -4:]
+
+        r_rot_quat, r_pos = recover_root_rot_pos(torch.Tensor(g))
+
+        r_rot_quat = self.transform(r_rot_quat)
+        r_pos = self.transform(r_pos)
+
+        final_motion = np.concatenate([r_rot_quat, r_pos, c], -1)
+
+        return {"name": self.id_list[item], "motion": final_motion}
+
+
+def simple_collate_c(
     samples: List[Tuple[torch.Tensor, str]],
     conditioner: ConditionProvider,
 ) -> Dict[str, torch.Tensor]:
@@ -415,3 +533,31 @@ def simple_collate(
     inputs["texts"] = np.array(texts)
 
     return inputs, conditions
+
+
+def simple_collate(
+    samples: List[Tuple[torch.Tensor, str]],
+    conditioner: ConditionProvider,
+) -> Dict[str, torch.Tensor]:
+
+    inputs = {}
+
+    names = []
+    lens = []
+    motions = []
+
+    for sample in samples:
+        names.append(sample["name"])
+        motions.append(sample["motion"])
+        lens.append(len(sample["motion"]))
+
+    motion, mask = conditioner._get_motion_features(
+        motion_list=motions,
+        max_length=max(lens),
+    )
+
+    inputs["names"] = np.array(names)
+    inputs["motion"] = (torch.Tensor(motion[..., :-4]), torch.Tensor(mask))
+    inputs["contacts"] = (torch.Tensor(motion[..., -4:]), torch.Tensor(mask))
+
+    return inputs

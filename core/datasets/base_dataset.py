@@ -177,6 +177,8 @@ class BaseMotionDataset(data.Dataset):
 
         self.mean = np.load(os.path.join(self.data_root, "motion_data/Mean_cl.npy"))
         self.std = np.load(os.path.join(self.data_root, "motion_data/Std_cl.npy"))
+        # self.mean = np.load(os.path.join(self.data_root, "motion_data/Mean.npy"))
+        # self.std = np.load(os.path.join(self.data_root, "motion_data/Std.npy"))
         self.body_mean, self.hand_mean, self.full_mean = self.hmldata_process(self.mean)
         self.body_std, self.hand_std, self.full_std = self.hmldata_process(self.std)
 

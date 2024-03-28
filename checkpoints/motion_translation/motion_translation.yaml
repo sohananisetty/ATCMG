@@ -7,7 +7,7 @@ dataset:
   text_conditioner_name: "t5-large" #"openai/clip-vit-large-patch14" #"t5-base" #"openai/clip-vit-large-patch14" #"laion/larger_clap_music_and_speech"
   text_rep: "full_text_embed"
   audio_rep: "encodec"
-  hml_rep: "g"
+  hml_rep: "gc"
   motion_min_length_s: 4
   motion_max_length_s: 4
   window_size_s: 4
