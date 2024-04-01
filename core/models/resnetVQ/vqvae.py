@@ -492,7 +492,16 @@ class TranslationVQVAE(nn.Module):
         motion = torch.cat([rel_pos, r_rot], -1)
 
         if self.training:
-            motion = self.mask_augment(motion)
+            # motion = self.mask_augment(motion)
+            b, n, d = motion.shape
+            device = motion.device
+            num_masked_d = torch.Tensor(
+                np.random.choice([0, 1, 2], size=b, p=[0.5, 0.3, 0.2])
+            ).to(device)
+            batch_randperm2 = torch.rand((b, d), device=device).argsort(dim=-1)
+            mask2 = ~(batch_randperm2 < rearrange(num_masked_d, "b -> b 1"))
+            motion[..., 2:] = motion[..., 2:] * mask2[:, None, :]
+
         return self.vqvae(motion, mask)
 
     def decode(self, indices, mask=None):

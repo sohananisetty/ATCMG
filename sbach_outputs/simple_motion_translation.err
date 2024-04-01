@@ -2,14 +2,28 @@ wandb: Currently logged in as: sohananisetty (ai-choreo). Use `wandb login --rel
 wandb: wandb version 0.16.5 is available!  To upgrade, please run:
 wandb:  $ pip install wandb --upgrade
 wandb: Tracking run with wandb version 0.16.2
-wandb: Run data is saved locally in /coc/scratch/sanisetty3/music_motion/ATCMG/wandb/run-20240401_100708-e3zlflnc
+wandb: Run data is saved locally in /coc/scratch/sanisetty3/music_motion/ATCMG/wandb/run-20240401_155553-lbetezjv
 wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run silvery-violet-18
+wandb: Syncing run fresh-jazz-19
 wandb:  View project at https://wandb.ai/ai-choreo/simple_motion_translation
-wandb:  View run at https://wandb.ai/ai-choreo/simple_motion_translation/runs/e3zlflnc
-  0%|          | 0/13 [00:00<?, ?it/s]  8%|7         | 1/13 [00:00<00:02,  5.36it/s] 15%|#5        | 2/13 [00:00<00:02,  4.23it/s] 23%|##3       | 3/13 [00:00<00:02,  3.71it/s] 31%|###       | 4/13 [00:01<00:02,  3.55it/s] 38%|###8      | 5/13 [00:01<00:01,  4.06it/s] 46%|####6     | 6/13 [00:01<00:01,  4.38it/s] 54%|#####3    | 7/13 [00:01<00:01,  4.67it/s] 62%|######1   | 8/13 [00:01<00:01,  4.85it/s] 69%|######9   | 9/13 [00:02<00:00,  4.56it/s] 77%|#######6  | 10/13 [00:02<00:00,  3.48it/s] 85%|########4 | 11/13 [00:02<00:00,  3.39it/s] 92%|#########2| 12/13 [00:03<00:00,  3.32it/s]100%|##########| 13/13 [00:03<00:00,  4.10it/s]
-  0%|          | 0/13 [00:00<?, ?it/s]  8%|7         | 1/13 [00:00<00:03,  3.34it/s] 15%|#5        | 2/13 [00:00<00:03,  3.38it/s] 23%|##3       | 3/13 [00:00<00:02,  3.36it/s] 31%|###       | 4/13 [00:01<00:02,  3.35it/s] 38%|###8      | 5/13 [00:01<00:02,  3.37it/s] 46%|####6     | 6/13 [00:01<00:02,  3.34it/s] 54%|#####3    | 7/13 [00:02<00:01,  3.35it/s] 62%|######1   | 8/13 [00:02<00:01,  3.36it/s] 69%|######9   | 9/13 [00:02<00:01,  3.28it/s] 77%|#######6  | 10/13 [00:03<00:01,  2.93it/s] 85%|########4 | 11/13 [00:03<00:00,  3.02it/s] 92%|#########2| 12/13 [00:03<00:00,  3.04it/s]100%|##########| 13/13 [00:03<00:00,  3.45it/s]
-  0%|          | 0/13 [00:00<?, ?it/s]  8%|7         | 1/13 [00:00<00:03,  3.28it/s] 15%|#5        | 2/13 [00:00<00:03,  3.38it/s] 23%|##3       | 3/13 [00:00<00:02,  3.38it/s] 31%|###       | 4/13 [00:01<00:02,  3.34it/s] 38%|###8      | 5/13 [00:01<00:02,  3.34it/s] 46%|####6     | 6/13 [00:01<00:02,  3.32it/s] 54%|#####3    | 7/13 [00:02<00:01,  3.30it/s] 62%|######1   | 8/13 [00:02<00:01,  3.32it/s] 69%|######9   | 9/13 [00:02<00:01,  3.33it/s] 77%|#######6  | 10/13 [00:03<00:01,  2.99it/s] 85%|########4 | 11/13 [00:03<00:00,  3.09it/s] 92%|#########2| 12/13 [00:03<00:00,  3.11it/s]100%|##########| 13/13 [00:03<00:00,  3.48it/s]
-  0%|          | 0/13 [00:00<?, ?it/s]  8%|7         | 1/13 [00:00<00:03,  3.42it/s] 15%|#5        | 2/13 [00:00<00:03,  3.45it/s] 23%|##3       | 3/13 [00:00<00:02,  3.43it/s] 31%|###       | 4/13 [00:01<00:02,  3.47it/s] 38%|###8      | 5/13 [00:01<00:02,  3.46it/s] 46%|####6     | 6/13 [00:01<00:02,  3.43it/s] 54%|#####3    | 7/13 [00:02<00:01,  3.47it/s] 62%|######1   | 8/13 [00:02<00:01,  3.41it/s] 69%|######9   | 9/13 [00:02<00:01,  3.38it/s] 77%|#######6  | 10/13 [00:03<00:00,  3.03it/s] 85%|########4 | 11/13 [00:03<00:00,  3.12it/s] 92%|#########2| 12/13 [00:03<00:00,  3.15it/s]100%|##########| 13/13 [00:03<00:00,  3.55it/s]
-  0%|          | 0/13 [00:00<?, ?it/s]  8%|7         | 1/13 [00:00<00:03,  3.20it/s] 15%|#5        | 2/13 [00:00<00:03,  3.25it/s] 23%|##3       | 3/13 [00:00<00:03,  3.18it/s] 31%|###       | 4/13 [00:01<00:02,  3.19it/s] 38%|###8      | 5/13 [00:01<00:02,  3.19it/s] 46%|####6     | 6/13 [00:01<00:02,  3.25it/s] 54%|#####3    | 7/13 [00:02<00:01,  3.27it/s] 62%|######1   | 8/13 [00:02<00:01,  3.27it/s] 69%|######9   | 9/13 [00:02<00:01,  3.21it/s] 77%|#######6  | 10/13 [00:03<00:01,  2.86it/s] 85%|########4 | 11/13 [00:03<00:00,  2.93it/s] 92%|#########2| 12/13 [00:03<00:00,  2.99it/s]100%|##########| 13/13 [00:03<00:00,  3.35it/s]
-  0%|          | 0/13 [00:00<?, ?it/s]  8%|7         | 1/13 [00:00<00:03,  3.47it/s] 15%|#5        | 2/13 [00:00<00:03,  3.63it/s] 23%|##3       | 3/13 [00:00<00:02,  3.65it/s] 31%|###       | 4/13 [00:01<00:02,  3.64it/s] 38%|###8      | 5/13 [00:01<00:02,  3.54it/s] 46%|####6     | 6/13 [00:01<00:02,  3.49it/s] 54%|#####3    | 7/13 [00:01<00:01,  3.42it/s] 62%|######1   | 8/13 [00:02<00:01,  3.35it/s] 69%|######9   | 9/13 [00:02<00:01,  3.34it/s] 77%|#######6  | 10/13 [00:03<00:01,  3.00it/s] 85%|########4 | 11/13 [00:03<00:00,  3.07it/s] 92%|#########2| 12/13 [00:03<00:00,  3.09it/s]100%|##########| 13/13 [00:03<00:00,  3.55it/s]
+wandb:  View run at https://wandb.ai/ai-choreo/simple_motion_translation/runs/lbetezjv
+Traceback (most recent call last):
+  File "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/train_translation.py", line 22, in <module>
+    trainer.train(cfg.train.resume)
+  File "/coc/scratch/sanisetty3/music_motion/ATCMG/ctl/trainer_translation.py", line 463, in train
+    logs = self.train_step()
+  File "/coc/scratch/sanisetty3/music_motion/ATCMG/ctl/trainer_translation.py", line 267, in train_step
+    out = self.tcn_model(gt_motion)
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/coc/scratch/sanisetty3/music_motion/ATCMG/core/models/resnetVQ/vqvae.py", line 503, in forward
+    motion[..., 2:] = motion[..., 2:] * mask2[:, None, :]
+RuntimeError: The size of tensor a (2) must match the size of tensor b (4) at non-singleton dimension 2
+wandb: WARNING No program path found, not creating job artifact. See https://docs.wandb.ai/guides/launch/create-job
+wandb: - 0.007 MB of 0.007 MB uploadedwandb: \ 0.012 MB of 0.012 MB uploadedwandb:  View run fresh-jazz-19 at: https://wandb.ai/ai-choreo/simple_motion_translation/runs/lbetezjv
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20240401_155553-lbetezjv/logs
+srun: error: alexa: task 0: Exited with exit code 1
+srun: Terminating StepId=846578.0

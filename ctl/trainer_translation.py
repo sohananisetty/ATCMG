@@ -85,22 +85,22 @@ class TranslationTransformerTrainer(nn.Module):
         # )
 
         dataset_names = {
-            "animation": 0.8,
+            # "animation": 0.8,
             "humanml": 2.0,
-            "perform": 0.6,
+            # "perform": 0.6,
             "GRAB": 1.0,
             "idea400": 1.0,
-            "humman": 0.5,
+            # "humman": 0.5,
             "beat": 1.0,
-            "game_motion": 0.8,
-            "music": 0.5,
+            # "game_motion": 0.8,
+            # "music": 0.5,
             "aist": 1.0,
             "fitness": 1.0,
             "moyo": 2.0,
             "choreomaster": 1.0,
-            "dance": 1.0,
-            "kungfu": 1.0,
-            "EgoBody": 0.5,
+            # "dance": 1.0,
+            # "kungfu": 1.0,
+            # "EgoBody": 0.5,
             # "HAA500": 1.0,
         }
 
