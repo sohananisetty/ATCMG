@@ -57,12 +57,7 @@ dataset_names_default = [
 
 def load_dataset(
     dataset_args,
-    # dataset_root,
     dataset_names=dataset_names_default,
-    # motion_min_length_s=3,
-    # motion_max_length_s=10,
-    # audio_rep="encodec",
-    # motion_rep="full",
     split: str = "train",
     weight_scale: Optional[List[int]] = None,
 ):
@@ -436,10 +431,10 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
             for line in f.readlines():
                 if dataset_name + "/" in line:
                     try:
-                        if self.motion_rep in ["full", "body"]:
-                            motion = np.load(
-                                os.path.join(self.motion_ind_dir, line.strip())
-                            ).squeeze()
+                        # if self.motion_rep in ["full", "body"]:
+                        motion = np.load(
+                            os.path.join(self.motion_ind_dir, line.strip())
+                        ).squeeze()
                         seq_len = motion.shape[0]
                         if self.motion_rep in ["full", "hand"]:
                             left_hand_motion = np.load(
@@ -610,7 +605,7 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         motion = motion[
             subset_idx_motion : subset_idx_motion + int(mot_len_s * self.fps)
         ]
-        if self.motion_rep == "full":
+        if self.motion_rep in ["full", "hand"]:
             left_hand_motion = left_hand_motion[
                 subset_idx_motion : subset_idx_motion + int(mot_len_s * self.fps)
             ]
@@ -631,17 +626,17 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
             .squeeze()
             .reshape(-1, 1)
         )
-        if "g" in self.hml_rep:
-            vel_xz_ = np.load(os.path.join(self.motion_dir, name + ".npy"))[
-                : int(motion.shape[0] * self.downsample_ratio), [1, 2]
-            ]  ## n 2
-            vel_xz = np.array(
-                F.interpolate(torch.Tensor(vel_xz_).T[None], size=motion.shape[0])[0].T
-            )
+        # if "g" in self.hml_rep:
+        #     vel_xz_ = np.load(os.path.join(self.motion_dir, name + ".npy"))[
+        #         : int(motion.shape[0] * self.downsample_ratio), [1, 2]
+        #     ]  ## n 2
+        #     vel_xz = np.array(
+        #         F.interpolate(torch.Tensor(vel_xz_).T[None], size=motion.shape[0])[0].T
+        #     )
 
-            motion = np.concatenate([motion, vel_xz], -1)
+        #     motion = np.concatenate([motion, vel_xz], -1)
 
-        if self.motion_rep == "full":
+        if self.motion_rep in ["full", "hand"]:
             left_hand_motion = (
                 np.load(
                     os.path.join(
@@ -709,13 +704,13 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
             self.window_size, self.min_motion_length
         ):
             motion = motion[int(f_) : math.ceil(to_)]
-            if self.motion_rep == "full":
+            if self.motion_rep in ["full", "hand"]:
                 left_hand_motion = left_hand_motion[int(f_) : math.ceil(to_)]
                 right_hand_motion = right_hand_motion[int(f_) : math.ceil(to_)]
 
         if self.window_size is not None:
 
-            if self.motion_rep == "full":
+            if self.motion_rep in ["full", "hand"]:
 
                 audio_data, motion, left_hand_motion, right_hand_motion = (
                     self.get_windowed_data(
@@ -726,14 +721,24 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
             else:
                 audio_data, motion = self.get_windowed_data(audio_data, motion)
 
-        if self.motion_rep == "full":
+        if self.motion_rep in ["full"]:
             final_motion = [
                 motion[..., :1].reshape(-1, 1),
                 left_hand_motion.reshape(-1, 1),
                 right_hand_motion.reshape(-1, 1),
             ]
-            if "g" in self.hml_rep:
-                final_motion.append(motion[..., 1:].reshape(-1, 2))
+        if self.motion_rep in ["hand"]:
+            final_motion = [
+                left_hand_motion.reshape(-1, 1),
+                right_hand_motion.reshape(-1, 1),
+            ]
+            # if "g" in self.hml_rep:
+            #     final_motion.append(motion[..., 1:].reshape(-1, 2))
+        # elif self.motion_rep == "hand":
+        #     final_motion = [
+        #         left_hand_motion.reshape(-1, 1),
+        #         right_hand_motion.reshape(-1, 1),
+        #     ]
         else:
 
             final_motion = motion  ## n 1/3
@@ -741,7 +746,7 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         return {
             "name": name,
             "motion": final_motion,
-            "hml_rep": self.hml_rep,
+            "motion_rep": self.motion_rep,
             "text": text,
             "audio": audio_data,
         }
@@ -757,7 +762,7 @@ def simple_collate(
     audios = []
     names = []
 
-    hml_rep = samples[0]["hml_rep"]
+    # motion_rep = samples[0]["motion_rep"]
 
     for sample in samples:
         names.append(sample["name"])
@@ -777,14 +782,14 @@ def simple_collate(
         raw_text=texts,
     )
 
-    if "g" in hml_rep:
-        translation = inputs["motion"][0][..., [1, 2]]
-        translation_mask = torch.ones(
-            translation.shape[:-1], dtype=torch.long, device=translation.device
-        )
+    # if "g" in hml_rep:
+    #     translation = inputs["motion"][0][..., [1, 2]]
+    #     translation_mask = torch.ones(
+    #         translation.shape[:-1], dtype=torch.long, device=translation.device
+    #     )
 
-        conditions["translation"] = (translation, translation_mask)
-        inputs["motion"] = (inputs["motion"][0][..., :-2], inputs["motion"][1])
+    #     conditions["translation"] = (translation, translation_mask)
+    #     inputs["motion"] = (inputs["motion"][0][..., :-2], inputs["motion"][1])
 
     if permute:
         inputs["motion"] = (

@@ -153,7 +153,7 @@ def FeedForward2(
 class FiLM(nn.Module):
     def __init__(self, dim, dim_cond):
         super().__init__()
-        self.to_cond = nn.Linear(dim_cond, dim * 2, bias=False)
+        self.to_cond = nn.Linear(dim_cond, dim * 2, bias=True)
 
     def forward(self, x, cond):
         gamma, beta = self.to_cond(cond).chunk(2, dim=-1)
@@ -280,11 +280,12 @@ class TransformerBlockFilmMuseCustom(nn.Module):
                             flash=flash,
                             causal=False,
                         ),
-                        (
-                            FiLM(dim, dim)
-                            if (d % film_skip == 0 and d != depth - 1)
-                            else nn.Identity()
-                        ),
+                        # (
+                        #     FiLM(dim, dim)
+                        #     if (d % film_skip == 0 and d != depth - 1)
+                        #     else nn.Identity()
+                        # ),
+                        (FiLM(dim, dim) if (d % film_skip == 0) else nn.Identity()),
                         FeedForward(dim=dim, mult=ff_mult, dropout=attn_dropout),
                     ]
                 )
@@ -575,20 +576,34 @@ class MLMModel(nn.Module):
         return ce, ce_per_codebook
 
     def _prepare_inputs(self, input, conditions):
-        audio_embed = self.project_audio(conditions["audio"][0])
-        text_embed = self.project_text(conditions["text"][0])
+        new_conditions = {}
 
-        new_conditions = {
-            "audio": (audio_embed, conditions["audio"][1]),
-            "text": (text_embed, conditions["text"][1]),
-        }
-        if self.translation_present:
-            translation_embed = self.project_translation(conditions["translation"][0])
-            new_conditions = {
-                "translation": (translation_embed, conditions["translation"][1]),
-                "audio": (audio_embed, conditions["audio"][1]),
-                "text": (text_embed, conditions["text"][1]),
-            }
+        if conditions.get("audio", None) is not None:
+            audio_embed = self.project_audio(conditions["audio"][0])
+            new_conditions["audio"] = (audio_embed, conditions["audio"][1])
+        if conditions.get("text", None) is not None:
+            text_embed = self.project_text(conditions["text"][0])
+            new_conditions["text"] = (text_embed, conditions["text"][1])
+
+        rem_keys = [x for x in list(conditions.keys()) if x not in ["audio", "text"]]
+
+        for k in rem_keys:
+            new_conditions[k] = conditions[k]
+
+        # audio_embed = self.project_audio(conditions["audio"][0])
+        # text_embed = self.project_text(conditions["text"][0])
+
+        # new_conditions = {
+        #     "audio": (audio_embed, conditions["audio"][1]),
+        #     "text": (text_embed, conditions["text"][1]),
+        # }
+        # if self.translation_present:
+        #     translation_embed = self.project_translation(conditions["translation"][0])
+        #     new_conditions = {
+        #         "translation": (translation_embed, conditions["translation"][1]),
+        #         "audio": (audio_embed, conditions["audio"][1]),
+        #         "text": (text_embed, conditions["text"][1]),
+        #     }
         inputs_, cross_inputs = self.condition_fuser(input, new_conditions)
 
         if self.film:
@@ -953,7 +968,10 @@ class MotionMuse(nn.Module):
             fuse_method = fuse_method[0]
         condition_fuser = ConditionFuser(fuse_method, **fuse_config)
 
-        if condition_fuser.cond2fuse["audio"] == "cross":
+        if (
+            len(condition_fuser.fuse2cond["cross"]) > 0
+            and tranformer_config.cond_dropout > 0
+        ):
             assert (
                 tranformer_config.custom == True
             ), "when audio is cross attention, you need custom attention"
@@ -1138,8 +1156,8 @@ class MotionMuse(nn.Module):
                         neg_conditions["text"][0].shape[0] == batch_size
                     ), "negetive text conditions should have same number as positive "
 
-            else:
-                batch_size = len(conditions["audio"][0].shape[0])
+            elif conditions.get("audio", None) is not None:
+                batch_size = conditions["audio"][0].shape[0]
                 seq_len = int(conditions["audio"][0].shape[1] // down_sample_ratio)
                 if (
                     neg_conditions is not None
@@ -1147,6 +1165,20 @@ class MotionMuse(nn.Module):
                 ):
                     assert (
                         neg_conditions["audio"][0].shape[0] == batch_size
+                    ), "negetive audio conditions should have same number as positive "
+
+            else:
+                rem_keys = [
+                    x for x in list(conditions.keys()) if x not in ["audio", "text"]
+                ]
+                batch_size = conditions[rem_keys[0]][0].shape[0]
+                seq_len = int(conditions[rem_keys[0]][0].shape[1])
+                if (
+                    neg_conditions is not None
+                    and neg_conditions.get(rem_keys[0], None) is not None
+                ):
+                    assert (
+                        neg_conditions[rem_keys[0]][0].shape[0] == batch_size
                     ), "negetive audio conditions should have same number as positive "
 
         except:
@@ -1265,6 +1297,7 @@ class MotionMuse(nn.Module):
         cond_drop_prob=None,
         quality_list=None,
         sample_temperature=None,
+        train_critic=True,
     ) -> LMOutput:
 
         motions_ids = inputs[0].to(torch.long)
@@ -1282,7 +1315,7 @@ class MotionMuse(nn.Module):
             quality_list=quality_list,
         )
 
-        if not exists(self.token_critic):
+        if not exists(self.token_critic) or train_critic == False:
             return out
 
         sampled_ids = gumbel_sample(

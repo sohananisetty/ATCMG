@@ -81,9 +81,6 @@ class MotionMuseTrainer(nn.Module):
         self.dataset_args = args.dataset
         self.model_args = args.motion_generator
 
-        self.motion_rep = self.dataset_args.motion_rep
-        self.hml_rep = self.dataset_args.hml_rep
-
         self.num_train_steps = self.training_args.num_train_iters
         self.output_dir = Path(self.args.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -97,9 +94,6 @@ class MotionMuseTrainer(nn.Module):
             self.device
         )
         self.load_vqvae(vqvae_config)
-
-        # if self.motion_rep == "hand":
-        #     self.body_muse = self.getBodyMuse(nme="motion_muse_film")
 
         self.register_buffer("steps", torch.Tensor([0]))
 
@@ -259,30 +253,6 @@ class MotionMuseTrainer(nn.Module):
         else:
             self.right_hand_model = None
 
-    def getBodyMuse(self, nme="motion_muse_film"):
-        gen_cfg = muse_get_cfg_defaults()
-        gen_cfg.merge_from_file(
-            f"/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/{nme}/{nme}.yaml"
-        )
-        gen_cfg.freeze()
-
-        tranformer_config = gen_cfg.motion_generator
-        fuse_config = gen_cfg.fuser
-        pattern_config = gen_cfg.codebooks_pattern
-
-        target = tranformer_config.pop("target")
-        motion_gen = (
-            MotionMuse(tranformer_config, fuse_config, pattern_config)
-            .to(self.device)
-            .eval()
-        )
-        pkg = torch.load(
-            f"/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/{nme}/motion_muse.pt",
-            map_location="cuda",
-        )
-        motion_gen.load_state_dict(pkg["model"])
-        return motion_gen
-
     def print(self, msg):
         # self.accelerator.print(msg)
         print(msg)
@@ -337,25 +307,14 @@ class MotionMuseTrainer(nn.Module):
 
             # inputs["motion"][0] b n 1
 
-            motions = inputs["motion"][0].to(torch.long)
+            motions = inputs["motion"][0][:, 1:].to(torch.long)
             motion_mask = inputs["motion"][1]
             quality_list = torch.LongTensor(
                 [dataset_qualities[nm.split("/")[0]] for nm in inputs["names"]]
             ).to(motions.device)
 
-            # out_body = self.body_muse(
-            #     (inputs["motion"][0][:, :1, :], motion_mask),
-            #     conditions,
-            #     train_critic=False,
-            # )
-            # conditions["body"] = (out_body.embed, motion_mask)
-            # _ = conditions.pop("audio")
-            # _ = conditions.pop("text")
-
             out = self.motion_muse(
-                (inputs["motion"][0][:, 1:, :], motion_mask),
-                conditions,
-                quality_list=quality_list,
+                (motions, motion_mask), conditions, quality_list=quality_list
             )
             loss = out.loss
             # if out.ce_per_codebook is not None:

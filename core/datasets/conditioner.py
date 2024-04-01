@@ -330,8 +330,8 @@ class ConditionProvider(nn.Module):
                 padding=motion_padding,
             )
             input_features["motion"] = (
-                torch.Tensor(padded_motion),
-                torch.BoolTensor(motion_mask),
+                torch.Tensor(padded_motion).to(self.device),
+                torch.BoolTensor(motion_mask).to(self.device),
             )
 
             return BatchFeature(input_features), BatchFeature(condition_features)
@@ -548,7 +548,9 @@ class ConditionFuser(nn.Module):
         cross_attention_mask = None
 
         for cond_type, (cond, cond_mask) in conditions.items():
-            op = self.cond2fuse[cond_type]
+            op = self.cond2fuse.get(cond_type, None)  # [cond_type]
+            if op is None:
+                continue
             if op == "sum":
                 input += cond * cond_mask[..., None]
                 # input_padding_mask = input_padding_mask
@@ -862,6 +864,13 @@ class ClassifierFreeGuidanceDropout(nn.Module):
         else:
             return torch.zeros(shape, device=device).float().uniform_(0, 1) < prob
 
+    def make_copy(self, condition):
+        copy_conditions = {}
+        for condition_modality, (embedding, mask) in condition.items():
+            copy_conditions[condition_modality] = (embedding.clone(), mask.clone())
+
+        return copy_conditions
+
     def forward(
         self,
         conditions: Dict[str, ConditionType],
@@ -877,7 +886,7 @@ class ClassifierFreeGuidanceDropout(nn.Module):
 
         drop_prob = drop_prob if drop_prob is not None else self.p
 
-        conditions_ = deepcopy(conditions)
+        conditions_ = self.make_copy(conditions)
 
         for condition_modality, (embedding, mask) in conditions.items():
             b, n = mask.shape
