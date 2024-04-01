@@ -624,7 +624,10 @@ class MLMModel(nn.Module):
                 cond_drop_prob=0.0,
                 **kwargs,
             )
-            return out.logits, out.embed
+            if return_embed:
+                return out.logits, pos_out.embed
+
+            return out.logits
 
         pos_out = self.forward(inputs, conditions, cond_drop_prob=0.0, **kwargs)
 
@@ -777,11 +780,6 @@ class MLMModel(nn.Module):
                 loss=loss, logits=logits, embed=embed, ce_per_codebook=ce_per_codebook
             )
 
-        # if not return_logits:
-        #     return loss
-
-        # return loss, logits
-
 
 # sampling helpers
 
@@ -826,27 +824,53 @@ class SelfCritic(nn.Module):
     def __init__(self, net):
         super().__init__()
         self.net = net
-        self.to_pred = nn.Linear(net.dim, 1)
         self.num_codebooks = self.net.num_codebooks
         self.to_preds = nn.ModuleList(
             [nn.Linear(net.dim, 1) for _ in range(self.num_codebooks)]
         )
 
     def forward_with_cond_scale(
-        self, inputs: Dict[str, ConditionType], *args, **kwargs
+        self,
+        inputs: Dict[str, ConditionType],
+        conditions: Dict[str, ConditionType],
+        cond_scale=3.0,
+        **kwargs,
     ):
-        _, embeds = self.net.forward_with_cond_scale(
-            inputs, *args, return_embed=True, **kwargs
+
+        logits = self.forward(
+            inputs, conditions=conditions, cond_drop_prob=0.0, **kwargs
         )
-        return self.to_pred(embeds)
+
+        if cond_scale == 1:
+            return logits
+
+        null_logits = self.forward(
+            inputs, conditions=conditions, cond_drop_prob=1.0, **kwargs
+        )
+
+        return null_logits + (logits - null_logits) * cond_scale
 
     def forward_with_neg_prompt(
-        self, inputs: Dict[str, ConditionType], *args, **kwargs
+        self,
+        inputs: Dict[str, ConditionType],
+        conditions: Dict[str, ConditionType],
+        neg_conditions: Dict[str, ConditionType],
+        cond_scale=3.0,
+        **kwargs,
     ):
-        _, embeds = self.net.forward_with_neg_prompt(
-            inputs, *args, return_embed=True, **kwargs
+
+        logits = self.forward(
+            inputs, conditions=conditions, cond_drop_prob=0.0, **kwargs
         )
-        return self.to_pred(embeds)
+
+        if cond_scale == 1:
+            return logits
+
+        neg_logits = self.forward(
+            inputs, conditions=neg_conditions, cond_drop_prob=0.0, **kwargs
+        )
+
+        return neg_logits + (logits - neg_logits) * cond_scale
 
     def _compute_cross_entropy(
         self,
@@ -855,19 +879,7 @@ class SelfCritic(nn.Module):
         mask: torch.Tensor = None,
         ignore_index=-100,
     ) -> tp.Tuple[torch.Tensor, tp.List[torch.Tensor]]:
-        """Compute cross entropy between multi-codebook targets and model's logits.
-        The cross entropy is computed per codebook to provide codebook-level cross entropy.
-        Valid timesteps for each of the codebook are pulled from the mask, where invalid
-        timesteps are set to 0.
 
-        Args:
-            logits (torch.Tensor): Model's logits of shape [B, K, T, card].
-            targets (torch.Tensor): Target codes, of shape [B, K, T].
-            mask (torch.Tensor): Mask for valid target codes, of shape [B, K, T].
-        Returns:
-            ce (torch.Tensor): Cross entropy averaged over the codebooks
-            ce_per_codebook (list of torch.Tensor): Cross entropy per codebook (detached).
-        """
         B, K, T = targets.shape
         assert logits.shape[:-1] == targets.shape
         # assert mask.shape == targets.shape
@@ -887,12 +899,17 @@ class SelfCritic(nn.Module):
         ce = ce / K
         return ce, ce_per_codebook
 
-    def forward(self, inputs: Dict[str, ConditionType], *args, labels=None, **kwargs):
-        out = self.net(inputs, *args, **kwargs)
+    def forward(
+        self,
+        inputs: ConditionTensors,
+        conditions: ConditionTensors,
+        labels: Optional[torch.IntTensor] = None,
+        **kwargs,
+    ):
+        out = self.net(inputs, conditions, **kwargs)
         logits = torch.stack(
             [self.to_preds[k](out.embed) for k in range(self.num_codebooks)], dim=1
         )
-        # logits = self.to_pred(out.embed)
 
         if not exists(labels):
             return logits
@@ -925,6 +942,7 @@ class MotionMuse(nn.Module):
     ):
         super().__init__()
         self.vqvae = vqvae.eval().freeze() if exists(vqvae) else None
+        self.token_critic = None
         # percentage of tokens to be [mask]ed to remain the same token, so that transformer produces better embeddings across all tokens as done in original BERT paper
         self.no_mask_token_prob = tranformer_config.pop("no_mask_token_prob")
         self.critic_loss_weight = tranformer_config.pop("critic_loss_weight")
@@ -1174,16 +1192,15 @@ class MotionMuse(nn.Module):
             total=timesteps,
         ):
 
+            # print(steps_until_x0)
+            is_last_step = steps_until_x0 == 0
+
             rand_mask_prob = self.noise_schedule(timestep)
             num_token_masked = max(int((rand_mask_prob * seq_len * 1).item()), 1)
 
             masked_indices = scores.topk(num_token_masked, dim=-1).indices
 
-            # print(ids.shape, masked_indices.shape)
-
             ids = ids.scatter(-1, masked_indices, self.mask_token_id)
-
-            # print(ids[0, 0])
 
             # print(ids.shape, mask.shape)
 
@@ -1206,7 +1223,7 @@ class MotionMuse(nn.Module):
 
             ids = torch.where(is_mask, pred_ids, ids)
 
-            if use_token_critic:
+            if use_token_critic and not is_last_step:
                 scores = token_critic_fn(
                     inputs=(ids, mask.squeeze(1)),
                     conditions=conditions,

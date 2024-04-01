@@ -490,7 +490,9 @@ class TranslationVQVAE(nn.Module):
         r_rot = geometry.quaternion_to_matrix(r_rot)[..., [0, 0], [0, 2]]
 
         motion = torch.cat([rel_pos, r_rot], -1)
-        motion = self.mask_augment(motion)
+
+        if self.training:
+            motion = self.mask_augment(motion)
         return self.vqvae(motion, mask)
 
     def decode(self, indices, mask=None):

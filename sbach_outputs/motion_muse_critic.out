@@ -1,0 +1,19 @@
+loading config from: /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_critic/motion_muse_critic.yaml
+output_dir:  /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_critic
+Non-A100 GPU detected, using math or mem efficient attention if input tensor is on cuda
+Sync is turned on False
+loaded model with  0.03015906736254692 tensor([110000.], device='cuda:0') steps
+Total number of motions animation: 120 and texts 120
+Total number of motions choreomaster: 34 and texts 34
+Total number of motions animation: 2 and texts 2
+Total number of motions choreomaster: 2 and texts 2
+Total number of motions animation: 1 and texts 1
+Total number of motions choreomaster: 2 and texts 2
+training with training 154 and test dataset of 4 and render 3 samples
+/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_critic
+0: model cross entropy loss: 7.05 
+7.0547895431518555 inf
+0: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_critic/checkpoints
+validation start
+val/ce_loss tensor(7.0210)
+render start

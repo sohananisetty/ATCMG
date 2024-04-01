@@ -42,7 +42,7 @@ motion_generator:
   dim : 512
   depth: 8
   cond_dropout: 0.4
-  no_mask_token_prob: 0.4
+  no_mask_token_prob: 0.3
   audio_input_dim: 128
   text_input_dim: 1024
   emb_dropout: 0.1
@@ -53,7 +53,7 @@ motion_generator:
   custom: True
   attn_dropout: 0.1
   film: True
-  film_skip: 3
+  film_skip: 2
   critic_loss_weight: 1.0
   
 
