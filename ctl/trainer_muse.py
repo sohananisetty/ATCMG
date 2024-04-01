@@ -125,7 +125,7 @@ class MotionMuseTrainer(nn.Module):
         )
 
         dataset_names = {
-            "animation": 0.8,
+            # "animation": 0.8,
             "humanml": 3.5,
             "perform": 0.6,
             "GRAB": 1.0,

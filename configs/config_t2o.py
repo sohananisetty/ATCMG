@@ -80,41 +80,73 @@ cfg.fuser.cross_attention_pos_emb = False
 cfg.fuser.cross_attention_pos_emb_scale = 1.0
 
 
-cfg.vqvae = CN()
-cfg.vqvae.body_config = "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_rv/vqvae_rv.yaml"
-cfg.vqvae.left_hand_config = None
-cfg.vqvae.right_hand_config = None
+cfg.translation_transformer = CN()
+cfg.translation_transformer.target = (
+    "core.models.generation.translation_transformer.TranslationTransformer"
+)
 
+cfg.translation_transformer.dim = 256
+cfg.translation_transformer.input_dim = 2
+cfg.translation_transformer.depth = 2
+cfg.translation_transformer.conv_depth = 1
+cfg.translation_transformer.dim_out = 4
+cfg.translation_transformer.down_sampling_ratio = 4
 
-cfg.motion_generator = CN()
-cfg.motion_generator.target = "core.models.generation.motion_generator.MotionMuse"
-cfg.motion_generator.n_q = 3  # number of streams to model
-cfg.motion_generator.var_len = True
-cfg.motion_generator.quality_emb = False
-cfg.motion_generator.dim = 256
-cfg.motion_generator.depth = 8
-cfg.motion_generator.heads = 8
+cfg.translation_transformer.heads = 8
+cfg.translation_transformer.flash = True
+cfg.translation_transformer.custom = True
+cfg.translation_transformer.loss_fnc = "l1_smooth"
+cfg.translation_transformer.cond_dropout = 0.4
+cfg.translation_transformer.emb_dropout = 0.1
+cfg.translation_transformer.post_emb_norm = False
+cfg.translation_transformer.var_len = True
 
-cfg.motion_generator.flash = True
-cfg.motion_generator.custom = True
-cfg.motion_generator.num_tokens = 1024
-cfg.motion_generator.ff_mult = 4
-cfg.motion_generator.post_emb_norm = False
-cfg.motion_generator.positional_embedding_type = "SINE"
 
 ## Conditional
-cfg.motion_generator.audio_input_dim = 128
-cfg.motion_generator.text_input_dim = 768
-cfg.motion_generator.film = False
-cfg.motion_generator.film_skip = 1
+cfg.translation_transformer.audio_input_dim = 128
+cfg.translation_transformer.text_input_dim = 768
 
-
-cfg.motion_generator.no_mask_token_prob = 0.1
-cfg.motion_generator.cond_dropout = 0.4
-cfg.motion_generator.critic_loss_weight = 0.0
 ##dropouts
-cfg.motion_generator.attn_dropout = 0.0
-cfg.motion_generator.emb_dropout = 0.1
+cfg.translation_transformer.attn_dropout = 0.0
+cfg.translation_transformer.emb_dropout = 0.1
+
+
+cfg.translation_tcn = CN()
+cfg.translation_tcn.target = "core.models.generation.translator.Traj2Orient"
+
+cfg.translation_tcn.dim = 64
+cfg.translation_tcn.input_dim = 2
+cfg.translation_tcn.output_dim = 4
+cfg.translation_tcn.depth = 2
+cfg.translation_tcn.k = [7, 3]
+cfg.translation_tcn.loss_fnc = "l1_smooth"
+cfg.translation_tcn.var_len = True
+cfg.translation_tcn.causal = True
+cfg.translation_tcn.dilation = 3
+
+cfg.vqvae = CN()
+cfg.vqvae.target = "core.models"
+cfg.vqvae.nb_joints = 52
+cfg.vqvae.motion_dim = 623
+cfg.vqvae.dim = 512
+cfg.vqvae.depth = 3
+cfg.vqvae.dropout = 0.1
+cfg.vqvae.down_sampling_ratio = 4
+cfg.vqvae.conv_kernel_size = 5
+cfg.vqvae.rearrange_output = False
+
+cfg.vqvae.heads = 8
+cfg.vqvae.codebook_dim = 768
+cfg.vqvae.codebook_size = 1024
+cfg.vqvae.kmeans_iters = None
+cfg.vqvae.sample_codebook_temp = 0.4
+
+## Loss
+cfg.vqvae.commit = 1.0  # "hyper-parameter for the commitment loss"
+cfg.vqvae.loss_vel = 1.0
+cfg.vqvae.loss_motion = 1.0
+cfg.vqvae.recons_loss = "l1_smooth"  # l1_smooth , l1 , l2
+cfg.vqvae.use_geodesic_loss = False
 
 
 def get_cfg_defaults():

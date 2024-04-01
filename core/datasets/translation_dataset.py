@@ -380,8 +380,8 @@ class TranslationAudioTextDataset(data.Dataset):
 
         r_rot_quat, r_pos = recover_root_rot_pos(torch.Tensor(motion))
 
-        r_rot_quat = self.transform(r_rot_quat)
-        r_pos = self.transform(r_pos)
+        # r_rot_quat = self.transform(r_rot_quat)
+        # r_pos = self.transform(r_pos)
 
         final_motion = np.concatenate([r_rot_quat, r_pos], -1)
 
@@ -505,11 +505,11 @@ class TranslationDataset(data.Dataset):
         # self.transform(r_rot_quat)
 
         # r_pos = self.transform(r_pos)
-        # rel_pos = np.zeros_like(r_pos)
-        # rel_pos[..., 1:, [0, 2]] = r_pos[..., 1:, [0, 2]] - r_pos[..., :-1, [0, 2]]
-        # rel_pos = self.transform(rel_pos)  ##n 3
+        rel_pos = np.zeros_like(r_pos)
+        rel_pos[..., 1:, [0, 2]] = r_pos[..., 1:, [0, 2]] - r_pos[..., :-1, [0, 2]]
+        rel_pos = self.transform(rel_pos)  ##n 3
 
-        final_motion = np.concatenate([r_rot_quat, r_pos, c], -1)
+        final_motion = np.concatenate([r_rot_quat, rel_pos, c], -1)
 
         return {"name": self.id_list[item], "motion": final_motion}
 

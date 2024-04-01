@@ -20,28 +20,60 @@ class TCN(nn.Module):
     ) -> None:
         super().__init__()
 
-        # self.model = nn.Sequential(
-        #     nn.Conv1d(in_dim, dim, k[0], 1, "same"),
-        #     # nn.Dropout1d(0.2),
-        #     (
-        #         Resnet1D(
-        #             dim,
-        #             depth,
-        #             dilation_growth_rate=dilation,
-        #             activation="gelu",
-        #             norm=norm,
-        #         )
-        #         if depth != 0
-        #         else nn.Identity()
-        #     ),
-        #     # nn.Dropout1d(0.2),
-        #     nn.Conv1d(dim, out_dim, k[1], 1, "same"),
-        # )
+        self.model = nn.Sequential(
+            nn.Conv1d(in_dim, dim, k[0], 1, "same"),
+            # nn.Dropout1d(0.2),
+            (
+                Resnet1D(
+                    dim,
+                    depth,
+                    dilation_growth_rate=dilation,
+                    activation="gelu",
+                    norm=norm,
+                )
+                if depth != 0
+                else nn.Identity()
+            ),
+            # nn.Dropout1d(0.2),
+            nn.Conv1d(dim, out_dim, k[1], 1, "same"),
+            # nn.Linear(dim, out_dim),
+        )
+
+    def forward(self, x):
+        x = x.permute(0, 2, 1)
+        x = self.model(x)
+        x = x.permute(0, 2, 1)
+        return x
+
+
+class FiLM(nn.Module):
+    def __init__(self, dim, dim_cond):
+        super().__init__()
+        self.to_cond = nn.Linear(dim_cond, dim * 2)
+
+    def forward(self, x, cond):
+        gamma, beta = self.to_cond(cond).chunk(2, dim=-1)
+        return x * gamma + beta
+
+
+class TLN(nn.Module):
+    def __init__(
+        self,
+        in_dim=2,
+        dim=64,
+        out_dim=2,
+        depth=2,
+    ) -> None:
+        super().__init__()
 
         self.model = nn.Sequential(
             nn.Linear(in_dim, dim),
             nn.GELU(),
             nn.Linear(dim, dim * 4),
+            nn.GELU(),
+            nn.Linear(dim * 4, dim * 4),
+            nn.GELU(),
+            nn.Linear(dim * 4, dim * 4),
             nn.GELU(),
             nn.Linear(dim * 4, dim),
             nn.GELU(),
@@ -50,6 +82,7 @@ class TCN(nn.Module):
         )
 
     def forward(self, x):
+
         return self.model(x)
 
 
@@ -120,24 +153,31 @@ class Traj2Orient(nn.Module):
     def __init__(self, config) -> None:
         super().__init__()
         self.output_dim = config.output_dim
-        if config.causal:
-            self.model = CausalTCN(
-                in_dim=config.input_dim,
-                dim=config.dim,
-                out_dim=config.output_dim,
-                k=config.k,
-                depth=config.depth,
-                dilation=config.dilation,
-            )
-        else:
-            self.model = TCN(
-                in_dim=config.input_dim,
-                dim=config.dim,
-                out_dim=config.output_dim,
-                k=config.k,
-                depth=config.depth,
-                dilation=config.dilation,
-            )
+        # if config.causal:
+        #     self.model = CausalTCN(
+        #         in_dim=config.input_dim,
+        #         dim=config.dim,
+        #         out_dim=config.output_dim,
+        #         k=config.k,
+        #         depth=config.depth,
+        #         dilation=config.dilation,
+        #     )
+        # else:
+        #     self.model = TCN(
+        #         in_dim=config.input_dim,
+        #         dim=config.dim,
+        #         out_dim=config.output_dim,
+        #         k=config.k,
+        #         depth=config.depth,
+        #         dilation=config.dilation,
+        #     )
+
+        self.model = TLN(
+            in_dim=config.input_dim,
+            dim=config.dim,
+            out_dim=config.output_dim,
+            depth=config.depth,
+        )
 
         if config.loss_fnc == "l1":
             self.loss_fnc = nn.L1Loss()
@@ -172,8 +212,8 @@ class Traj2Orient(nn.Module):
         motion = inputs[0].to(self.device)
         mask = inputs[1].to(torch.bool).to(self.device)
         r_rot = motion[..., :4]
-        r_pos = motion[..., 4:]
-        r_pos = r_pos[..., [0, 2]]
+        rel_pos = motion[..., 4:]
+        rel_pos = rel_pos[..., [0, 2]]
 
         if self.output_dim == 1:
             r_rot = geometry.quaternion_to_axis_angle(r_rot)[..., 1:2]
@@ -183,15 +223,48 @@ class Traj2Orient(nn.Module):
             r_rot = geometry.matrix_to_rotation_6d(geometry.quaternion_to_matrix(r_rot))
 
         y = r_rot
+        x = rel_pos
 
-        x = self.process_input(r_pos)
+        # x = self.process_input(r_pos)
 
-        # x = x.permute(0, 2, 1)
         x = self.model(x)
-        # x = x.permute(0, 2, 1)
 
         if mask is not None:
             x = x * mask[..., None]
 
-        loss = self.loss_fnc(x, y)
+        loss = 2 * self.loss_fnc(x, y)
         return loss, x
+
+
+class LengthEstimator(nn.Module):
+    def __init__(self, input_size, output_size):
+        super(LengthEstimator, self).__init__()
+        nd = 512
+        self.output = nn.Sequential(
+            nn.Linear(input_size, nd),
+            nn.LayerNorm(nd),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.2),
+            nn.Linear(nd, nd // 2),
+            nn.LayerNorm(nd // 2),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.2),
+            nn.Linear(nd // 2, nd // 4),
+            nn.LayerNorm(nd // 4),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(nd // 4, output_size),
+        )
+
+        self.output.apply(self.__init_weights)
+
+    def __init_weights(self, module):
+        if isinstance(module, (nn.Linear, nn.Embedding)):
+            module.weight.data.normal_(mean=0.0, std=0.02)
+            if isinstance(module, nn.Linear) and module.bias is not None:
+                module.bias.data.zero_()
+        elif isinstance(module, nn.LayerNorm):
+            module.bias.data.zero_()
+            module.weight.data.fill_(1.0)
+
+    def forward(self, text_emb):
+        return self.output(text_emb)

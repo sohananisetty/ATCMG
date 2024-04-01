@@ -1,0 +1,34 @@
+/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/utils/weight_norm.py:28: UserWarning: torch.nn.utils.weight_norm is deprecated in favor of torch.nn.utils.parametrizations.weight_norm.
+  warnings.warn("torch.nn.utils.weight_norm is deprecated in favor of torch.nn.utils.parametrizations.weight_norm.")
+Could not find image processor class in the image processor config or the model config. Loading based on pattern matching with the model's feature extractor configuration. Please open a PR/issue to update `preprocessor_config.json` to use `image_processor_type` instead of `feature_extractor_type`. This warning will be removed in v4.40.
+wandb: Currently logged in as: sohananisetty (ai-choreo). Use `wandb login --relogin` to force relogin
+wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: wandb version 0.16.5 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.16.2
+wandb: Run data is saved locally in /coc/scratch/sanisetty3/music_motion/ATCMG/wandb/run-20240331_215327-m6yhik5m
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run vocal-dream-5
+wandb:  View project at https://wandb.ai/ai-choreo/motion_muse_var
+wandb:  View run at https://wandb.ai/ai-choreo/motion_muse_var/runs/m6yhik5m
+Traceback (most recent call last):
+  File "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/train_generator.py", line 22, in <module>
+    trainer.train(cfg.train.resume)
+  File "/coc/scratch/sanisetty3/music_motion/ATCMG/ctl/trainer_muse.py", line 521, in train
+    logs = self.train_step()
+  File "/coc/scratch/sanisetty3/music_motion/ATCMG/ctl/trainer_muse.py", line 309, in train_step
+    out = self.motion_muse(
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/coc/scratch/sanisetty3/music_motion/ATCMG/core/models/generation/muse.py", line 1182, in forward
+    if not exists(self.token_critic):
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1688, in __getattr__
+    raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+AttributeError: 'MotionMuse' object has no attribute 'token_critic'
+wandb: WARNING No program path found, not creating job artifact. See https://docs.wandb.ai/guides/launch/create-job
+wandb: - 0.008 MB of 0.008 MB uploadedwandb: \ 0.012 MB of 0.013 MB uploadedwandb:  View run vocal-dream-5 at: https://wandb.ai/ai-choreo/motion_muse_var/runs/m6yhik5m
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20240331_215327-m6yhik5m/logs
+srun: error: brainiac: task 0: Exited with exit code 1
+srun: Terminating StepId=846136.0

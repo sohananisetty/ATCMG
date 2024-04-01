@@ -153,7 +153,7 @@ def FeedForward2(
 class FiLM(nn.Module):
     def __init__(self, dim, dim_cond):
         super().__init__()
-        self.to_cond = nn.Linear(dim_cond, dim * 2)
+        self.to_cond = nn.Linear(dim_cond, dim * 2, bias=False)
 
     def forward(self, x, cond):
         gamma, beta = self.to_cond(cond).chunk(2, dim=-1)
@@ -255,11 +255,12 @@ class TransformerBlockFilmMuseCustom(nn.Module):
         flash: bool = False,
         depth: int = 1,
         ff_mult: int = 4,
+        film_skip: int = 1,
     ):
         super().__init__()
         self.layers = nn.ModuleList([])
 
-        for _ in range(depth):
+        for d in range(depth):
             self.layers.append(
                 nn.ModuleList(
                     [
@@ -279,7 +280,11 @@ class TransformerBlockFilmMuseCustom(nn.Module):
                             flash=flash,
                             causal=False,
                         ),
-                        FiLM(dim, dim),
+                        (
+                            FiLM(dim, dim)
+                            if (d % film_skip == 0 and d != depth - 1)
+                            else nn.Identity()
+                        ),
                         FeedForward(dim=dim, mult=ff_mult, dropout=attn_dropout),
                     ]
                 )
@@ -323,13 +328,15 @@ class TransformerBlockFilmMuseCustom(nn.Module):
                 + x
             )
 
-            x = (
-                film(
-                    self.norm_film(x),
-                    cond=film_context,
+            if not isinstance(film, nn.Identity):
+
+                x = (
+                    film(
+                        self.norm_film(x),
+                        cond=film_context,
+                    )
+                    + x
                 )
-                + x
-            )
 
             x = self.norm_out(ff1(x) + x)
 
@@ -428,6 +435,7 @@ class MLMModel(nn.Module):
         var_len=True,
         custom=True,
         film=False,
+        film_skip=1,
         quality_emb=False,
         emb_lr: tp.Optional[float] = None,
         bias_proj=False,
@@ -468,7 +476,7 @@ class MLMModel(nn.Module):
         if custom:
             if film:
                 self.transformer_blocks = TransformerBlockFilmMuseCustom(
-                    dim=dim, **kwargs
+                    dim=dim, film_skip=film_skip, **kwargs
                 )
             else:
                 self.transformer_blocks = TransformerBlockMuseCustom(dim=dim, **kwargs)
@@ -814,6 +822,98 @@ def cosine_schedule(t):
 from core import MotionTokenizerParams, pattern_providers
 
 
+class SelfCritic(nn.Module):
+    def __init__(self, net):
+        super().__init__()
+        self.net = net
+        self.to_pred = nn.Linear(net.dim, 1)
+        self.num_codebooks = self.net.num_codebooks
+        self.to_preds = nn.ModuleList(
+            [nn.Linear(net.dim, 1) for _ in range(self.num_codebooks)]
+        )
+
+    def forward_with_cond_scale(
+        self, inputs: Dict[str, ConditionType], *args, **kwargs
+    ):
+        _, embeds = self.net.forward_with_cond_scale(
+            inputs, *args, return_embed=True, **kwargs
+        )
+        return self.to_pred(embeds)
+
+    def forward_with_neg_prompt(
+        self, inputs: Dict[str, ConditionType], *args, **kwargs
+    ):
+        _, embeds = self.net.forward_with_neg_prompt(
+            inputs, *args, return_embed=True, **kwargs
+        )
+        return self.to_pred(embeds)
+
+    def _compute_cross_entropy(
+        self,
+        logits: torch.Tensor,
+        targets: torch.Tensor,
+        mask: torch.Tensor = None,
+        ignore_index=-100,
+    ) -> tp.Tuple[torch.Tensor, tp.List[torch.Tensor]]:
+        """Compute cross entropy between multi-codebook targets and model's logits.
+        The cross entropy is computed per codebook to provide codebook-level cross entropy.
+        Valid timesteps for each of the codebook are pulled from the mask, where invalid
+        timesteps are set to 0.
+
+        Args:
+            logits (torch.Tensor): Model's logits of shape [B, K, T, card].
+            targets (torch.Tensor): Target codes, of shape [B, K, T].
+            mask (torch.Tensor): Mask for valid target codes, of shape [B, K, T].
+        Returns:
+            ce (torch.Tensor): Cross entropy averaged over the codebooks
+            ce_per_codebook (list of torch.Tensor): Cross entropy per codebook (detached).
+        """
+        B, K, T = targets.shape
+        assert logits.shape[:-1] == targets.shape
+        # assert mask.shape == targets.shape
+        ce = torch.zeros([], device=targets.device)
+        ce_per_codebook: tp.List[torch.Tensor] = []
+        for k in range(K):
+            logits_k = logits[:, k, ...].contiguous().view(-1)  # [B x T]
+            targets_k = targets[:, k, ...].contiguous().view(-1)  # [B x T]
+            if mask is not None:
+                mask_k = mask[:, k, ...].contiguous().view(-1)  # [B x T]
+                targets_k = targets_k[mask_k]
+                logits_k = logits_k[mask_k]
+            q_ce = F.binary_cross_entropy_with_logits(logits_k, targets_k)
+            ce += q_ce
+            ce_per_codebook.append(q_ce)
+        # average cross entropy across codebooks
+        ce = ce / K
+        return ce, ce_per_codebook
+
+    def forward(self, inputs: Dict[str, ConditionType], *args, labels=None, **kwargs):
+        out = self.net(inputs, *args, **kwargs)
+        logits = torch.stack(
+            [self.to_preds[k](out.embed) for k in range(self.num_codebooks)], dim=1
+        )
+        # logits = self.to_pred(out.embed)
+
+        if not exists(labels):
+            return logits
+
+        logits = rearrange(logits, "... 1 -> ...")
+
+        if self.num_codebooks == 1:
+
+            loss = F.binary_cross_entropy_with_logits(
+                logits.squeeze(1),
+                labels.squeeze(1),
+            )
+
+        else:
+            loss, ce_per_codebook = self._compute_cross_entropy(
+                logits,
+                labels,
+            )
+        return loss
+
+
 class MotionMuse(nn.Module):
     def __init__(
         self,
@@ -827,6 +927,8 @@ class MotionMuse(nn.Module):
         self.vqvae = vqvae.eval().freeze() if exists(vqvae) else None
         # percentage of tokens to be [mask]ed to remain the same token, so that transformer produces better embeddings across all tokens as done in original BERT paper
         self.no_mask_token_prob = tranformer_config.pop("no_mask_token_prob")
+        self.critic_loss_weight = tranformer_config.pop("critic_loss_weight")
+        self.self_token_critic = True if self.critic_loss_weight > 0 else False
 
         fuse_method = fuse_config.pop("fuse_method")
         if isinstance(fuse_method, list):
@@ -852,6 +954,9 @@ class MotionMuse(nn.Module):
             fuser=condition_fuser,
             **tranformer_config,
         )
+
+        if self.self_token_critic:
+            self.token_critic = SelfCritic(self.model)
 
         self.mask_token_id = self.model.mask_token_id
         self.noise_schedule = noise_schedule
@@ -893,7 +998,7 @@ class MotionMuse(nn.Module):
 
         x = torch.where(mask, self.mask_token_id, code_ids)
 
-        return x, labels
+        return x, labels, mask
 
     def muse_mask_legacy(self, motion_ids: torch.Tensor, ignore_index: int = -100):
         batch, K, seq_len, device = (
@@ -933,24 +1038,16 @@ class MotionMuse(nn.Module):
 
         rand_time = uniform((batch,), device=device)
         rand_mask_probs = self.noise_schedule(rand_time)
-
-        # probability_matrix = torch.full(code_ids.shape, self.mlm_probability)
-
-        rand_time = uniform((batch,), device=device)
-        rand_mask_probs = self.noise_schedule(rand_time)
-        num_token_masked = (seq_len * rand_mask_probs).round().clamp(min=1)
+        num_token_masked = (seq_len * K * rand_mask_probs).round().clamp(min=1)
 
         # mask_id = self.mask_token_id
-        batch_randperm = torch.rand((batch, K, seq_len), device=device)
-        batch_randperm[code_ids == self.model.pad_token_id] = 10.0
-        batch_randperm = batch_randperm.argsort(dim=-1)
-
-        mask = batch_randperm < rearrange(num_token_masked, "b -> b 1 1")
+        batch_randperm = torch.rand((batch, K * seq_len), device=device).argsort(dim=-1)
+        mask = batch_randperm < rearrange(num_token_masked, "b -> b 1")
+        mask = mask.reshape(batch, K, seq_len)
         mask[code_ids == self.model.pad_token_id] = False
 
         # mask_id = self.transformer.mask_token_id
         labels = torch.where(mask, code_ids, ignore_index)
-
         # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
         indices_replaced = (
             torch.bernoulli(torch.full(code_ids.shape, 0.8)).bool().to(device) & mask
@@ -997,6 +1094,8 @@ class MotionMuse(nn.Module):
         can_remask_prev_masked=False,
         timesteps=18,  # ideal number of steps is 18 in maskgit paper
         cond_scale=3,
+        critic_noise_scale=1,
+        force_not_use_token_critic=False,
     ):
 
         # begin with all image token ids masked
@@ -1047,6 +1146,10 @@ class MotionMuse(nn.Module):
         starting_temperature = temperature
 
         demask_fn = self.model.forward_with_cond_scale
+        use_token_critic = exists(self.token_critic) and not force_not_use_token_critic
+
+        if use_token_critic:
+            token_critic_fn = self.token_critic.forward_with_cond_scale
 
         # negative prompting, as in paper
 
@@ -1056,6 +1159,12 @@ class MotionMuse(nn.Module):
                 self.model.forward_with_neg_prompt,
                 neg_conditions=neg_conditions,
             )
+
+            if use_token_critic:
+                token_critic_fn = partial(
+                    self.token_critic.forward_with_neg_prompt,
+                    neg_conditions=neg_conditions,
+                )
 
         for timestep, steps_until_x0 in tqdm(
             zip(
@@ -1097,17 +1206,31 @@ class MotionMuse(nn.Module):
 
             ids = torch.where(is_mask, pred_ids, ids)
 
-            probs_without_temperature = logits.softmax(dim=-1)
+            if use_token_critic:
+                scores = token_critic_fn(
+                    inputs=(ids, mask.squeeze(1)),
+                    conditions=conditions,
+                    cond_scale=cond_scale,
+                )
 
-            scores = 1 - probs_without_temperature.gather(-1, pred_ids[..., None])
-            scores = rearrange(scores, "... 1 -> ...")
+                scores = rearrange(scores, "... 1 -> ...")
 
-            if not can_remask_prev_masked:
-                scores = scores.masked_fill(~is_mask, -1e5)
+                scores = scores + (
+                    uniform(scores.shape, device=device) - 0.5
+                ) * critic_noise_scale * (steps_until_x0 / timesteps)
             else:
-                assert (
-                    self.no_mask_token_prob > 0.0
-                ), "without training with some of the non-masked tokens forced to predict, not sure if the logits will be meaningful for these token"
+
+                probs_without_temperature = logits.softmax(dim=-1)
+
+                scores = 1 - probs_without_temperature.gather(-1, pred_ids[..., None])
+                scores = rearrange(scores, "... 1 -> ...")
+
+                if not can_remask_prev_masked:
+                    scores = scores.masked_fill(~is_mask, -1e5)
+                else:
+                    assert (
+                        self.no_mask_token_prob > 0.0
+                    ), "without training with some of the non-masked tokens forced to predict, not sure if the logits will be meaningful for these token"
 
         # get ids
 
@@ -1124,32 +1247,43 @@ class MotionMuse(nn.Module):
         ignore_index: int = -100,
         cond_drop_prob=None,
         quality_list=None,
-    ):
-        # tokenize if needed
+        sample_temperature=None,
+    ) -> LMOutput:
 
         motions_ids = inputs[0].to(torch.long)
         input_mask = inputs[1].to(torch.bool)
         B, K, T = motions_ids.shape
 
-        x, labels = self.muse_mask(motions_ids, ignore_index)
+        x, labels, muse_mask = self.muse_mask(motions_ids, ignore_index)
 
-        # get loss
-
-        # ce_loss, logits
-
-        out = self.model(
+        out: LMOutput = self.model(
             inputs=(x, input_mask),
             conditions=conditions,
             labels=labels,
             cond_drop_prob=cond_drop_prob,
             ignore_index=ignore_index,
-            # return_logits=True,
             quality_list=quality_list,
         )
 
-        # if not return_logits:
-        #     return ce_loss
+        if not exists(self.token_critic):
+            return out
+
+        sampled_ids = gumbel_sample(
+            out.logits, temperature=default(sample_temperature, random())
+        )
+
+        # muse_mask = torch.where(x == self.mask_token_id, 1.0, 0.0).to(torch.bool)
+
+        critic_input = torch.where(muse_mask, sampled_ids, x)
+        critic_labels = (x != critic_input).float()
+
+        bce_loss = self.token_critic(
+            inputs=(critic_input, input_mask),
+            conditions=conditions,
+            labels=critic_labels,
+            cond_drop_prob=cond_drop_prob,
+        )
+
+        out.loss = out.loss + self.critic_loss_weight * bce_loss
 
         return out
-
-    # ce_loss, logits

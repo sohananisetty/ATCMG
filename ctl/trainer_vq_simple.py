@@ -113,12 +113,12 @@ class VQVAEMotionTrainer(nn.Module):
             wd=self.training_args.weight_decay,
         )
 
-        self.lr_scheduler = get_scheduler(
-            name=self.training_args.lr_scheduler_type,
-            optimizer=self.optim,
-            num_warmup_steps=self.training_args.warmup_steps,
-            num_training_steps=self.num_train_steps,
-        )
+        # self.lr_scheduler = get_scheduler(
+        #     name=self.training_args.lr_scheduler_type,
+        #     optimizer=self.optim,
+        #     num_warmup_steps=self.training_args.warmup_steps,
+        #     num_training_steps=self.num_train_steps,
+        # )
 
         self.max_grad_norm = self.training_args.max_grad_norm
 
@@ -232,22 +232,6 @@ class VQVAEMotionTrainer(nn.Module):
         self.steps = pkg["steps"]
         self.best_loss = pkg["total_loss"]
 
-    def mask_augment(self, motion, perc_n=0.0, perc_d=0.0):
-        b, n, d = motion.shape
-
-        to_mask = random.random() > 0.7
-        if to_mask:
-            num_masked_n = int(n * perc_n)
-            num_masked_d = int(d * perc_d)
-
-            n_ind = list(np.random.choice(np.arange(n), num_masked_n))
-            d_ind = list(np.random.choice(np.arange(d), num_masked_d))
-
-            motion[n_ind, :] = 0
-            motion[:, d_ind] = 0
-
-        return motion
-
     @torch.no_grad()
     def compute_perplexity(self, code_idx):
         # Calculate new centres
@@ -280,9 +264,6 @@ class VQVAEMotionTrainer(nn.Module):
                 ohprvc = l[:1] + l[3:]
                 gt_motion = gt_motion[..., ohprvc]
             # mask = batch["motion"][1].to(self.device)
-
-            if self.dataset_args.use_motion_augmentation:
-                gt_motion = self.mask_augment(gt_motion, perc_n=0.2, perc_d=0.1)
 
             vqvae_output = self.vqvae_model(
                 motion=gt_motion,
@@ -317,7 +298,7 @@ class VQVAEMotionTrainer(nn.Module):
             )
 
         self.optim.step()
-        self.lr_scheduler.step()
+        # self.lr_scheduler.step()
         self.optim.zero_grad()
 
         # build pretty printed losses

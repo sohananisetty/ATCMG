@@ -5,6 +5,10 @@ from core.models.resnetVQ.encdec import Decoder, Encoder
 from core.models.resnetVQ.quantizer import QuantizeEMAReset
 from core.quantization.vector_quantize import VectorQuantize
 from einops import pack, rearrange
+import utils.rotation_conversions as geometry
+import random
+import numpy as np
+import math
 
 
 class VQVAE(nn.Module):
@@ -380,5 +384,115 @@ class HumanVQVAE2(nn.Module):
 
     def decode(self, indices, mask=None):
         ##indices: b n
+        x_out = self.vqvae.forward_decoder(indices, mask)
+        return x_out
+
+
+class TranslationVQVAE(nn.Module):
+    def __init__(
+        self,
+        args,
+    ):
+        super().__init__()
+
+        self.vqvae = VQVAE2(
+            input_dim=args.motion_dim,
+            nb_code=args.codebook_size,
+            code_dim=args.codebook_dim,
+            down_t=args.down_sampling_ratio // 2,
+            stride_t=args.down_sampling_ratio // 2,
+            width=args.dim,
+            depth=args.depth,
+            dilation_growth_rate=3,
+            activation="relu",
+            norm=None,
+            # kmeans_iters=args.kmeans_iters,
+        )
+
+    # def load(self, path):
+    #     pkg = torch.load(path, map_location="cuda")
+    #     self.load_state_dict(pkg["model"])
+
+    def load(self, path):
+        pkg = torch.load(str(path), map_location="cuda")
+        self.vqvae.quantizer._codebook.batch_mean = pkg["model"][
+            "vqvae.quantizer._codebook.batch_mean"
+        ]
+        self.vqvae.quantizer._codebook.batch_variance = pkg["model"][
+            "vqvae.quantizer._codebook.batch_variance"
+        ]
+        self.load_state_dict(pkg["model"])
+
+        print("loaded model with ", pkg["total_loss"].item(), pkg["steps"], "steps")
+
+    def freeze(self):
+        # self.eval()
+        for param in self.parameters():
+            param.requires_grad = False
+
+    def encode(self, motion):
+        b, t, c = motion.size()
+        code_idx = self.vqvae.encode(motion)  # (N, T)
+        return code_idx
+
+    def cosine_schedule(self, t):
+        return torch.cos(t * math.pi * 0.5)
+
+    def mask_augment(self, motion, perc_n=0.1):
+        b, n, d = motion.shape
+        device = motion.device
+        rand_time = torch.zeros((b,), device=device).float().uniform_(1 - perc_n, 1)
+        rand_mask_probs = torch.cos(rand_time * math.pi * 0.5)
+        num_masked_n = (n * rand_mask_probs).round().clamp(min=1)
+        num_masked_d = torch.Tensor(np.random.choice([0, 1, 2], b)).to(device)
+
+        to_mask = random.random() > 0.4
+        if to_mask:
+
+            batch_randperm1 = torch.rand((b, n), device=device).argsort(dim=-1)
+            batch_randperm2 = torch.rand((b, d), device=device).argsort(dim=-1)
+
+            mask1 = ~(batch_randperm1 < rearrange(num_masked_n, "b -> b 1"))
+            mask2 = ~(batch_randperm2 < rearrange(num_masked_d, "b -> b 1"))
+
+            # motion = motion * mask1[:, :, None]
+            motion = motion * mask2[:, None, :]
+
+        return motion
+
+    def predict(self, traj):
+        orient = torch.zeros_like(traj)[..., :2]
+        motion = torch.cat([traj, orient], -1)
+        out = self.vqvae(motion)
+        pred_orient = out.decoded_motion[..., -2:]
+        mat = torch.zeros(
+            (
+                pred_orient.shape[:-1]
+                + (
+                    3,
+                    3,
+                )
+            )
+        ).to(pred_orient.device)
+        mat[..., 1, 1] = 1
+        mat[..., 0, 0] = pred_orient[..., 0]
+        mat[..., 0, 2] = pred_orient[..., 1]
+        mat[..., 2, 0] = -pred_orient[..., 0]
+        mat[..., 2, 2] = pred_orient[..., 1]
+        r_rot = geometry.matrix_to_quaternion(mat)
+        return pred_orient
+
+    def forward(self, motion, mask=None):
+        r_rot = motion[..., :4]
+        rel_pos = motion[..., 4:]
+        if rel_pos.shape[-1] == 3:
+            rel_pos = rel_pos[..., [0, 2]]
+        r_rot = geometry.quaternion_to_matrix(r_rot)[..., [0, 0], [0, 2]]
+
+        motion = torch.cat([rel_pos, r_rot], -1)
+        motion = self.mask_augment(motion)
+        return self.vqvae(motion, mask)
+
+    def decode(self, indices, mask=None):
         x_out = self.vqvae.forward_decoder(indices, mask)
         return x_out

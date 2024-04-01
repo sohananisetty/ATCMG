@@ -147,8 +147,8 @@ class T5Conditioner(BaseTextConditioner):
             entries,
             return_tensors="pt",
             padding=True,
-            truncation=True,
-            max_length=256,
+            truncation=False,
+            # max_length=256,
         ).to(self.device)
         inputs["attention_mask"][
             empty_idx, :
@@ -254,15 +254,22 @@ class ClipConditioner2(nn.Module):
     def __init__(
         self,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
-        name: str = "ViT-B/32",
+        name: str = "ViT-L/14",
     ):
+
+        MODELS = ["ViT-B/32", "ViT-L/14"]
+
         super().__init__()
+        self.MODELS_DIMS = {
+            "ViT-L/14": 768,
+            "ViT-B/32": 512,
+        }
         self.device = device
         self.encoder, self.preprocess = clip.load(name)
         clip.model.convert_weights(self.encoder)
 
         self.encoder = self.encoder.eval()
-        self.config = {"hidden_size": 512}
+        self.dim = self.MODELS_DIMS[name]
         self.freeze()
 
     # @property
@@ -279,7 +286,7 @@ class ClipConditioner2(nn.Module):
         inputs = {}
 
         inputs["input_ids"] = clip.tokenize(entries, truncate=True).to(self.device)
-        inputs["attention_mask"] = torch.ones(len(inputs)).to(self.device)  ## B
+        inputs["attention_mask"] = torch.ones((len(inputs), 1)).to(self.device)  ## B
 
         inputs["attention_mask"][empty_idx, :] = 0
 

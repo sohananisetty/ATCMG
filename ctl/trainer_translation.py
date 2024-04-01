@@ -27,6 +27,7 @@ from core.datasets.translation_dataset import (
     simple_collate,
 )
 from core.models.utils import instantiate_from_config
+import utils.rotation_conversions as geometry
 
 
 def cycle(dl):
@@ -58,7 +59,7 @@ class TranslationTransformerTrainer(nn.Module):
         self.args = args
         self.training_args = args.train
         self.dataset_args = args.dataset
-        self.model_args = args.translation_tcn
+        self.model_args = args.vqvae
 
         self.num_train_steps = self.training_args.num_train_iters
         self.output_dir = Path(self.args.output_dir)
@@ -85,18 +86,18 @@ class TranslationTransformerTrainer(nn.Module):
 
         dataset_names = {
             "animation": 0.8,
-            "humanml": 3.5,
+            "humanml": 2.0,
             "perform": 0.6,
             "GRAB": 1.0,
-            "idea400": 1.5,
+            "idea400": 1.0,
             "humman": 0.5,
-            "beat": 2.0,
+            "beat": 1.0,
             "game_motion": 0.8,
             "music": 0.5,
-            "aist": 1.5,
+            "aist": 1.0,
             "fitness": 1.0,
-            "moyo": 1.0,
-            "choreomaster": 2.0,
+            "moyo": 2.0,
+            "choreomaster": 1.0,
             "dance": 1.0,
             "kungfu": 1.0,
             "EgoBody": 0.5,
@@ -107,7 +108,7 @@ class TranslationTransformerTrainer(nn.Module):
             dataset_args=self.dataset_args,
             split="train",
             dataset_names=list(dataset_names.keys()),
-            # weight_scale=list(dataset_names.values()),
+            weight_scale=list(dataset_names.values()),
         )
         test_ds, _, _ = load_dataset(
             dataset_names=list(dataset_names.keys()),
@@ -219,6 +220,34 @@ class TranslationTransformerTrainer(nn.Module):
 
         return batch
 
+    @torch.no_grad()
+    def compute_perplexity(self, code_idx):
+        # Calculate new centres
+        code_onehot = torch.zeros(
+            self.model_args.codebook_size, code_idx.shape[0], device=code_idx.device
+        )  # nb_code, N * L
+        code_onehot.scatter_(0, code_idx.view(1, code_idx.shape[0]), 1)
+
+        code_count = code_onehot.sum(dim=-1)  # nb_code
+        prob = code_count / torch.sum(code_count)
+        perplexity = torch.exp(-torch.sum(prob * torch.log(prob + 1e-7)))
+        return perplexity
+
+    def loss_func(self, pred, gt):
+
+        rel_pos_pred = pred[..., :2]
+        r_rot_pred = pred[..., 2:]
+
+        r_rot = gt[..., :4]
+        rel_pos = gt[..., 4:]
+        if rel_pos.shape[-1] == 3:
+            rel_pos = rel_pos[..., [0, 2]]
+        r_rot = geometry.quaternion_to_matrix(r_rot)[..., [0, 0], [0, 2]]
+
+        return nn.functional.smooth_l1_loss(
+            rel_pos_pred, rel_pos
+        ) + nn.functional.smooth_l1_loss(r_rot_pred, r_rot)
+
     def train_step(self):
         steps = int(self.steps.item())
 
@@ -232,18 +261,30 @@ class TranslationTransformerTrainer(nn.Module):
             # inputs, conditions = next(self.dl_iter)
             inputs = next(self.dl_iter)
 
-            inputs = self.to_device(inputs)
+            gt_motion = inputs["motion"][0].to(self.device)
             # conditions = self.to_device(conditions)
 
-            loss, pred_orient = self.tcn_model(inputs["motion"])
-            loss = loss / self.grad_accum_every
+            out = self.tcn_model(gt_motion)
+
+            loss_motion = self.loss_func(out.decoded_motion, gt_motion)
+
+            loss = (
+                self.model_args.loss_motion * loss_motion
+                + self.model_args.commit * out.commit_loss
+            ) / self.grad_accum_every
+
+            # loss = loss / self.grad_accum_every
 
             loss.backward()
+            perplexity = self.compute_perplexity(out.indices.flatten())
 
             accum_log(
                 logs,
                 dict(
                     loss=loss.detach().cpu(),
+                    loss_motion=loss_motion.detach().cpu() / self.grad_accum_every,
+                    commit_loss=out.commit_loss.detach().cpu() / self.grad_accum_every,
+                    perplexity=perplexity.detach().cpu() / self.grad_accum_every,
                 ),
             )
 
@@ -253,7 +294,8 @@ class TranslationTransformerTrainer(nn.Module):
 
         # build pretty printed losses
 
-        losses_str = f"{steps}: model total loss: {logs['loss'].float():.3}"
+        # losses_str = f"{steps}: model total loss: {logs['loss'].float():.3}"
+        losses_str = f"{steps}: vqvae model total loss: {logs['loss'].float():.3} reconstruction loss: {logs['loss_motion'].float():.3} commit_loss: {logs['commit_loss'].float():.3} codebook usage: {logs['perplexity']}"
 
         # log
         if steps % self.wandb_every == 0:
@@ -301,14 +343,36 @@ class TranslationTransformerTrainer(nn.Module):
                 leave=True,
             ):
 
-                inputs = self.to_device(inputs)
-                # conditions = self.to_device(conditions)
-                loss_dict = {}
+                # inputs = self.to_device(inputs)
+                # # conditions = self.to_device(conditions)
+                # loss_dict = {}
 
-                loss, pred_orient = self.tcn_model(inputs["motion"])
-                loss = loss / self.grad_accum_every
+                # loss, pred_orient = self.tcn_model(inputs["motion"])
+                # loss = loss / self.grad_accum_every
 
-                loss_dict["loss"] = loss.detach().cpu()
+                # loss_dict["loss"] = loss.detach().cpu()
+                gt_motion = inputs["motion"][0].to(self.device)
+
+                out = self.tcn_model(
+                    motion=gt_motion,
+                    # mask=mask,
+                )
+
+                loss_motion = self.loss_func(out.decoded_motion, gt_motion)
+
+                loss = (
+                    self.model_args.loss_motion * loss_motion
+                    + self.model_args.commit * out.commit_loss
+                ) / self.grad_accum_every
+
+                perplexity = self.compute_perplexity(out.indices.flatten())
+
+                loss_dict = {
+                    "total_loss": loss.detach().cpu(),
+                    "loss_motion": loss_motion.detach().cpu(),
+                    "commit_loss": out.commit_loss.detach().cpu(),
+                    "perplexity": perplexity,
+                }
 
                 for key, value in loss_dict.items():
                     if key in val_loss_ae:

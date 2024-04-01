@@ -10,7 +10,7 @@ dataset:
   motion_max_length_s: 4
 train:
   resume: False
-  num_train_iters : 110001 #'Number of training steps
+  num_train_iters : 30001 #'Number of training steps
   save_steps : 10000
   logging_steps : 10
   wandb_every : 200
@@ -35,7 +35,17 @@ translation_tcn:
   causal: False
   dilation: 3
 
-
+vqvae:
+  target: "core.models.resnetVQ.vqvae.TranslationVQVAE"
+  dim : 128
+  depth: 3
+  codebook_size : 512
+  codebook_dim : 128
+  commit : 0.25
+  loss_motion: 2.0
+  recons_loss : "l1_smooth"
+  down_sampling_ratio: 4
+  motion_dim: 4
   
   
 
