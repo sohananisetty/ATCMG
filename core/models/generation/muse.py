@@ -5,14 +5,18 @@ from functools import partial
 from pathlib import Path
 from random import random
 from typing import Callable, Dict, List, Optional, Tuple
-
+import numpy as np
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
 from core import MotionTokenizerParams, PositionalEmbeddingParams
 from core.datasets.conditioner import ClassifierFreeGuidanceDropout, ConditionFuser
 from core.models.attend2 import CustomMHA
-from core.models.positional_embeddings import ScaledSinusoidalEmbedding
+from core.models.positional_embeddings import (
+    ScaledSinusoidalEmbedding,
+    ContinuousPositionBias,
+    AlibiPositionalBias,
+)
 from core.models.resnetVQ.vqvae import HumanVQVAE
 from core.models.utils import FeedForward, LayerNorm, default, exists, get_obj_from_str
 from einops import rearrange, repeat
@@ -58,6 +62,14 @@ def eval_decorator(fn):
 
 def l2norm(t):
     return F.normalize(t, dim=-1)
+
+
+def make_copy(condition):
+    copy_conditions = {}
+    for condition_modality, (embedding, mask) in condition.items():
+        copy_conditions[condition_modality] = (embedding.clone(), mask.clone())
+
+    return copy_conditions
 
 
 # tensor helpers
@@ -153,7 +165,7 @@ def FeedForward2(
 class FiLM(nn.Module):
     def __init__(self, dim, dim_cond):
         super().__init__()
-        self.to_cond = nn.Linear(dim_cond, dim * 2, bias=True)
+        self.to_cond = nn.Linear(dim_cond, dim * 2, bias=False)
 
     def forward(self, x, cond):
         gamma, beta = self.to_cond(cond).chunk(2, dim=-1)
@@ -183,9 +195,11 @@ class TransformerBlockMuseCustom(nn.Module):
         flash: bool = False,
         depth: int = 1,
         ff_mult: int = 4,
+        causal: bool = False,
     ):
         super().__init__()
         self.layers = nn.ModuleList([])
+        self.causal = causal
 
         for _ in range(depth):
             self.layers.append(
@@ -196,7 +210,7 @@ class TransformerBlockMuseCustom(nn.Module):
                             heads=heads,
                             dropout=attn_dropout,
                             add_null_kv=False,
-                            causal=False,
+                            causal=causal,
                             flash=flash,
                         ),
                         CustomMHA(
@@ -226,7 +240,7 @@ class TransformerBlockMuseCustom(nn.Module):
                     k=x,
                     v=x,
                     key_padding_mask=mask,
-                    rel_pos=rel_pos,
+                    rel_pos=rel_pos if self.causal else None,
                 )
                 + x
             )
@@ -256,9 +270,11 @@ class TransformerBlockFilmMuseCustom(nn.Module):
         depth: int = 1,
         ff_mult: int = 4,
         film_skip: int = 1,
+        causal: bool = False,
     ):
         super().__init__()
         self.layers = nn.ModuleList([])
+        self.causal = causal
 
         for d in range(depth):
             self.layers.append(
@@ -269,7 +285,7 @@ class TransformerBlockFilmMuseCustom(nn.Module):
                             heads=heads,
                             dropout=attn_dropout,
                             add_null_kv=False,
-                            causal=False,
+                            causal=causal,
                             flash=flash,
                         ),
                         CustomMHA(
@@ -280,12 +296,12 @@ class TransformerBlockFilmMuseCustom(nn.Module):
                             flash=flash,
                             causal=False,
                         ),
-                        # (
-                        #     FiLM(dim, dim)
-                        #     if (d % film_skip == 0 and d != depth - 1)
-                        #     else nn.Identity()
-                        # ),
-                        (FiLM(dim, dim) if (d % film_skip == 0) else nn.Identity()),
+                        (
+                            FiLM(dim, dim)
+                            if (d % film_skip == 0 and d != depth - 1)
+                            else nn.Identity()
+                        ),
+                        # (FiLM(dim, dim) if (d % film_skip == 0) else nn.Identity()),
                         FeedForward(dim=dim, mult=ff_mult, dropout=attn_dropout),
                     ]
                 )
@@ -314,7 +330,7 @@ class TransformerBlockFilmMuseCustom(nn.Module):
                     k=x,
                     v=x,
                     key_padding_mask=mask,
-                    rel_pos=rel_pos,
+                    rel_pos=rel_pos if self.causal else None,
                 )
                 + x
             )
@@ -353,6 +369,7 @@ class TransformerBlockMuse(nn.Module):
         flash: bool = False,
         depth: int = 1,
         ff_mult: int = 4,
+        causal: bool = False,
     ):
         super().__init__()
         self.layers = nn.ModuleList([])
@@ -431,12 +448,14 @@ class MLMModel(nn.Module):
         fuser: ConditionFuser,
         num_tokens,
         dim,
+        heads,
         n_q=3,
-        positional_embedding_type="SINE",
+        rel_pos=False,
         var_len=True,
         custom=True,
         film=False,
         film_skip=1,
+        flatten=False,
         quality_emb=False,
         emb_lr: tp.Optional[float] = None,
         bias_proj=False,
@@ -445,7 +464,6 @@ class MLMModel(nn.Module):
         post_emb_norm: bool = False,
         audio_input_dim: int = 128,
         text_input_dim: int = 768,
-        # fuse_method: Dict[str, List[str]] = {"cross": ["audio"], "prepend": ["text"]},
         proj_input=False,
         **kwargs,
     ):
@@ -459,6 +477,9 @@ class MLMModel(nn.Module):
         self.var_len = var_len
         self.quality_emb = quality_emb
         self.film = film
+        self.flatten = flatten
+
+        ## if flatten num_tokens = sum of all num_tokens
 
         self.set_token_ids(num_tokens, False)
 
@@ -470,19 +491,25 @@ class MLMModel(nn.Module):
 
             self.qual_emb = nn.Embedding(2, self.dim)
 
-        self.pos_emb = ScaledSinusoidalEmbedding(
-            PositionalEmbeddingParams(dim=self.dim)
-        )
+        self.pos_emb = ScaledSinusoidalEmbedding(dim=self.dim)
+        self.rel_pos_bias = None
+        if rel_pos:
+
+            self.rel_pos_bias = AlibiPositionalBias(heads=heads // 2, total_heads=heads)
 
         if custom:
             if film:
                 self.transformer_blocks = TransformerBlockFilmMuseCustom(
-                    dim=dim, film_skip=film_skip, **kwargs
+                    dim=dim, heads=heads, film_skip=film_skip, **kwargs
                 )
             else:
-                self.transformer_blocks = TransformerBlockMuseCustom(dim=dim, **kwargs)
+                self.transformer_blocks = TransformerBlockMuseCustom(
+                    dim=dim, heads=heads, **kwargs
+                )
         else:
-            self.transformer_blocks = TransformerBlockMuse(dim=dim, **kwargs)
+            self.transformer_blocks = TransformerBlockMuse(
+                dim=dim, heads=heads, **kwargs
+            )
         self.norm = LayerNorm(dim)
         self.post_emb_norm = LayerNorm(dim) if post_emb_norm else nn.Identity()
 
@@ -695,6 +722,10 @@ class MLMModel(nn.Module):
         ignore_index: int = -100,
         quality_list=None,
     ):
+        _, Q, _ = inputs[0].shape
+
+        # if self.flatten:
+        #     inputs, conditions = self.flatten_input(inputs, conditions, True)
 
         sequence = inputs[0]
         sequence_mask = inputs[1]
@@ -735,7 +766,10 @@ class MLMModel(nn.Module):
         context = cross_attention_input[0]
         context_padding_mask = cross_attention_input[1]
 
-        x_ = x_ + self.pos_emb(x_)
+        if self.flatten:
+            x_ = x_ + self.pos_emb(x_[:, : x_.shape[1] // Q]).repeat_interleave(Q, 0)
+        else:
+            x_ = x_ + self.pos_emb(x_)
         x_ = self.post_emb_norm(x_)
         x_ = self.emb_dropout(x_)
 
@@ -750,6 +784,7 @@ class MLMModel(nn.Module):
                 context=context,
                 context_mask=context_padding_mask,
                 film_context=film_input_,
+                rel_pos=self.rel_pos_bias,
             )
 
         else:
@@ -759,6 +794,7 @@ class MLMModel(nn.Module):
                 mask=x_padding_mask if self.var_len else None,
                 context=context,
                 context_mask=context_padding_mask,
+                rel_pos=self.rel_pos_bias,
             )
         if self.out_norm:
             embed = self.out_norm(embed)
@@ -961,6 +997,8 @@ class MotionMuse(nn.Module):
         # percentage of tokens to be [mask]ed to remain the same token, so that transformer produces better embeddings across all tokens as done in original BERT paper
         self.no_mask_token_prob = tranformer_config.pop("no_mask_token_prob")
         self.critic_loss_weight = tranformer_config.pop("critic_loss_weight")
+        self.flatten = tranformer_config.flatten
+        self.flatten_interleave = True
         self.self_token_critic = True if self.critic_loss_weight > 0 else False
 
         fuse_method = fuse_config.pop("fuse_method")
@@ -1118,6 +1156,92 @@ class MotionMuse(nn.Module):
 
         return conditions
 
+    def flatten_input(self, inputs, conditions=None, interleave=False):
+        motion, mask = inputs
+        b, q, n = motion.shape
+        offset = (
+            torch.LongTensor([i * self.model.num_tokens // q for i in range(q)])[
+                None, :, None
+            ]
+            .repeat(b, 1, n)
+            .to(motion.device)
+        )
+
+        motion = motion + offset
+
+        if interleave:
+            flat_mask = mask.repeat_interleave(q, dim=1)
+            flat_motion = torch.zeros_like(motion).reshape(b, -1)
+            inds = [np.arange(i, n * q, q) for i in range(q)]
+
+            for i, ind in enumerate(inds):
+                flat_motion[..., ind] = motion[:, i]
+
+        else:
+            flat_mask = mask.repeat(1, q)
+            flat_motion = motion.reshape(b, -1)
+
+        if conditions is not None:
+            cond = self.flatten_cond(conditions["audio"], q, interleave)
+            conditions["audio"] = cond
+            return (flat_motion[:, None, :], flat_mask), conditions
+
+        return (flat_motion[:, None, :], flat_mask)
+
+    def flatten_cond(self, inputs, q=2, interleave=False):
+        cond, mask = inputs
+        b, n, d = cond.shape
+        cond = cond.permute(0, 2, 1)  ##b d n
+        cond = cond[:, :, None].repeat(1, 1, q, 1)
+        if interleave:
+
+            flat_mask = mask.repeat_interleave(q, dim=1)
+            flat_cond = torch.zeros_like(cond).reshape(b, d, -1)
+            inds = [np.arange(i, n * q, q) for i in range(q)]
+
+            for i, ind in enumerate(inds):
+                flat_cond[..., ind] = cond[..., i, :]
+
+        else:
+            flat_mask = mask.repeat(1, q)
+            flat_cond = cond.reshape(b, d, -1)
+
+        flat_cond = flat_cond.permute(0, 2, 1)  ##b nq d
+
+        return (flat_cond, flat_mask)
+
+    def unflatten(self, ids, q=2, interleave=True):
+        b, _, n = ids.shape
+        l = n // q
+        device = ids.device
+        unflat = torch.zeros((b, q, l), dtype=torch.long, device=device)
+        if interleave:
+            inds = [np.arange(i, n, q) for i in range(q)]
+        else:
+            inds = [
+                np.arange(
+                    i * l,
+                    (i + 1) * l,
+                )
+                for i in range(q)
+            ]
+
+        for i, ind in enumerate(inds):
+            unflat[:, i, :] = ids[..., ind].squeeze()
+
+        offset = (
+            torch.LongTensor([i * (self.model.num_tokens // q) for i in range(q)])[
+                None, :, None
+            ]
+            .repeat(b, 1, l)
+            .to(device)
+        )
+        unflat = unflat - offset
+        for i in range(q):
+            unflat[:, i] = unflat[:, i].clamp(min=0, max=self.model.num_tokens // q)
+
+        return unflat
+
     @torch.no_grad()
     @eval_decorator
     def generate(
@@ -1158,7 +1282,9 @@ class MotionMuse(nn.Module):
 
             elif conditions.get("audio", None) is not None:
                 batch_size = conditions["audio"][0].shape[0]
-                seq_len = int(conditions["audio"][0].shape[1] // down_sample_ratio)
+                conditions["audio"][0] = conditions["audio"][0][:, :seq_len]
+                conditions["audio"][1] = conditions["audio"][1][:, :seq_len]
+                # seq_len = int(conditions["audio"][0].shape[1] // down_sample_ratio)
                 if (
                     neg_conditions is not None
                     and neg_conditions.get("audio", None) is not None
@@ -1188,6 +1314,16 @@ class MotionMuse(nn.Module):
             cond_scale = 1
 
         shape = (batch_size, self.num_codeboks, seq_len)
+
+        if self.flatten:
+            q = 2
+            shape = (batch_size, self.num_codeboks, seq_len * q)
+            conditions = make_copy(conditions)
+            if conditions["audio"] is not None:
+                cond = self.flatten_cond(
+                    conditions["audio"], q, self.flatten_interleave
+                )
+                conditions["audio"] = cond
 
         ids = torch.full(shape, self.mask_token_id, dtype=torch.long, device=device)
         mask = torch.ones_like(ids).to(torch.bool)
@@ -1283,6 +1419,9 @@ class MotionMuse(nn.Module):
 
         # get ids
 
+        if self.flatten:
+            ids = self.unflatten(ids, q=q, interleave=self.flatten_interleave)
+
         if not exists(self.vqvae):
             return ids
 
@@ -1300,11 +1439,23 @@ class MotionMuse(nn.Module):
         train_critic=True,
     ) -> LMOutput:
 
+        if self.flatten:
+            conditions = make_copy(conditions)
+            inputs, conditions = self.flatten_input(
+                inputs, conditions, self.flatten_interleave
+            )
+
         motions_ids = inputs[0].to(torch.long)
         input_mask = inputs[1].to(torch.bool)
+
         B, K, T = motions_ids.shape
 
+        motions_ids = motions_ids.reshape(B, 1, -1)
+
         x, labels, muse_mask = self.muse_mask(motions_ids, ignore_index)
+
+        x = x.reshape(B, K, T)
+        labels = labels.reshape(B, K, T)
 
         out: LMOutput = self.model(
             inputs=(x, input_mask),

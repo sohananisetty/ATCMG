@@ -1,0 +1,6 @@
+tar: /srv/hays-lab/flash5/sanisetty/new_joint_vecs.tar: Cannot open: No such file or directory
+tar: Error is not recoverable: exiting now
+tar: /srv/hays-lab/flash5/sanisetty/texts.tar: Cannot open: No such file or directory
+tar: Error is not recoverable: exiting now
+tar: /srv/hays-lab/flash5/sanisetty/wav.tar: Cannot open: No such file or directory
+tar: Error is not recoverable: exiting now

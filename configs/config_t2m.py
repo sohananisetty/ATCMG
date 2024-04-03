@@ -94,13 +94,16 @@ cfg.motion_generator.quality_emb = False
 cfg.motion_generator.dim = 256
 cfg.motion_generator.depth = 8
 cfg.motion_generator.heads = 8
+cfg.motion_generator.causal = False
 
 cfg.motion_generator.flash = True
 cfg.motion_generator.custom = True
 cfg.motion_generator.num_tokens = 1024
 cfg.motion_generator.ff_mult = 4
 cfg.motion_generator.post_emb_norm = False
-cfg.motion_generator.positional_embedding_type = "SINE"
+cfg.motion_generator.rel_pos = False
+cfg.motion_generator.flatten = False
+
 
 ## Conditional
 cfg.motion_generator.audio_input_dim = 128

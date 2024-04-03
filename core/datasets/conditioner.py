@@ -42,7 +42,7 @@ class ConditionProvider(nn.Module):
     - sampling_rate (int): The sampling rate for audio.
     - audio_max_length_s (int): The maximum length of audio in seconds.
     - audio_padding (str): The type of padding for audio (e.g., 'longest', 'repeat', or 'repeatpad').
-    - motion_padding (str): The type of padding for motion (e.g., 'max_length', 'longest', 'repeat', or 'repeatpad').
+    - motion_padding (str): The type of padding for motion (e.g.,  'longest', 'repeat', or 'repeatpad').
     - motion_max_length_s (int): The maximum length of motion in seconds.
     - fps (int): The frame rate for motion.
     - motion_rep (str): The representation of motion (e.g., 'full' , 'body' , 'left_hand' , 'right_hand' , 'hand').
@@ -58,9 +58,9 @@ class ConditionProvider(nn.Module):
         audio_max_length_s=None,
         audio_padding: str = "longest",
         motion_padding: str = "longest",
-        motion_max_length_s: int = 20,
+        motion_max_length_s: int = 10,
         fps: int = 30,
-        motion_rep: MotionRep = MotionRep.FULL,
+        motion_rep: Union[str, MotionRep] = MotionRep.FULL,
         pad_id: int = 0,
         only_motion=False,
     ):
@@ -68,6 +68,8 @@ class ConditionProvider(nn.Module):
 
         self.device = device
         self.audio_padding = audio_padding
+        if isinstance(motion_rep, str):
+            motion_rep = MotionRep(motion_rep)
 
         if audio_rep == AudioRep.ENCODEC:
             self.sampling_rate = 30
@@ -131,12 +133,17 @@ class ConditionProvider(nn.Module):
     ):
         audios = []
         masks = []
-        if padding == "longest" or max_length is None:
+        if padding == "longest":
+
             max_length_ = max(
                 [audio.shape[0] for audio in audio_list if audio is not None],
                 default=1,
             )
-            max_length = min(max_length_, self.audio_max_length)
+
+        if max_length is not None:
+            max_length = int(min(max_length_, max_length))
+        else:
+            max_length = max_length_
 
         if self.audio_rep == AudioRep.CLAP:
             max_length = 1
@@ -150,12 +157,6 @@ class ConditionProvider(nn.Module):
                 continue
 
             seq_len = audio_feature.shape[0]
-
-            if padding == "max_length":
-                mask = np.array([1] * seq_len)
-                audios.append(audio_feature)
-                masks.append(mask)
-                continue
 
             if seq_len >= max_length:
 
@@ -218,25 +219,18 @@ class ConditionProvider(nn.Module):
 
         padding = padding if padding is not None else self.motion_padding
 
-        if padding == "max_length":
-            assert len(motion_list) == 1, "if using max length batch size should be 1"
+        if padding == "longest":
 
-        if padding == "longest" or max_length is None:
-            # max_length_ = (
-            #     max([motion.shape[0] for motion in motion_list]) // down_sampling_factor
-            # ) * down_sampling_factor
             max_length_ = max([motion.shape[0] for motion in motion_list])
-            max_length = int(min(max_length_, self.motion_max_length))
+
+        if max_length is not None:
+            max_length = int(min(max_length_, max_length))
+        else:
+            max_length = max_length_
 
         for idx, motion in enumerate(motion_list):
 
             seq_len = motion.shape[0]
-
-            if padding == "max_length":
-                mask = np.array([1] * seq_len)
-                motions.append(motion)
-                masks.append(mask)
-                continue
 
             if seq_len >= max_length:
 

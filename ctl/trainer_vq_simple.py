@@ -90,6 +90,7 @@ class VQVAEMotionTrainer(nn.Module):
         self.register_buffer("steps", torch.Tensor([0]))
         self.motion_rep = MotionRep(self.dataset_args.motion_rep)
         self.hml_rep = self.dataset_args.hml_rep
+        self.remove_translation = self.dataset_args.remove_translation
         print(self.vqvae_args)
 
         self.vqvae_model = instantiate_from_config(self.vqvae_args).to(self.device)
@@ -167,9 +168,7 @@ class VQVAEMotionTrainer(nn.Module):
         # dataloader
 
         condition_provider = ConditionProvider(
-            motion_rep=self.dataset_args.motion_rep,
-            motion_padding=self.dataset_args.motion_padding,
-            motion_max_length_s=self.dataset_args.motion_max_length_s,
+            motion_rep=MotionRep(self.dataset_args.motion_rep),
             only_motion=True,
         )
 
@@ -259,11 +258,13 @@ class VQVAEMotionTrainer(nn.Module):
 
             gt_motion = batch["motion"][0].to(self.device)
 
-            if "g" in self.dataset_args.hml_rep:
-                l = list(range(0, gt_motion.shape[-1]))
-                ohprvc = l[:1] + l[3:]
-                gt_motion = gt_motion[..., ohprvc]
-            # mask = batch["motion"][1].to(self.device)
+            if self.remove_translation:
+
+                if "g" in self.dataset_args.hml_rep:
+                    l = list(range(0, gt_motion.shape[-1]))
+                    ohprvc = l[:1] + l[3:]
+                    gt_motion = gt_motion[..., ohprvc]
+                mask = batch["motion"][1].to(self.device)
 
             vqvae_output = self.vqvae_model(
                 motion=gt_motion,
@@ -353,11 +354,13 @@ class VQVAEMotionTrainer(nn.Module):
                 # disable=not self.accelerator.is_main_process,
             ):
                 gt_motion = batch["motion"][0].to(self.device)
-                if "g" in self.dataset_args.hml_rep:
-                    l = list(range(0, gt_motion.shape[-1]))
-                    ohprvc = l[:1] + l[3:]
-                    gt_motion = gt_motion[..., ohprvc]
-                # mask = batch["motion"][1].to(self.device)
+                if self.remove_translation:
+
+                    if "g" in self.dataset_args.hml_rep:
+                        l = list(range(0, gt_motion.shape[-1]))
+                        ohprvc = l[:1] + l[3:]
+                        gt_motion = gt_motion[..., ohprvc]
+                    mask = batch["motion"][1].to(self.device)
 
                 vqvae_output = self.vqvae_model(
                     motion=gt_motion,
@@ -427,10 +430,13 @@ class VQVAEMotionTrainer(nn.Module):
 
                 gt_motion = batch["motion"][0].to(self.device)
 
-                if "g" in self.dataset_args.hml_rep:
-                    l = list(range(0, gt_motion.shape[-1]))
-                    ohprvc = l[:1] + l[3:]
-                    gt_motion = gt_motion[..., ohprvc]
+                if self.remove_translation:
+
+                    if "g" in self.dataset_args.hml_rep:
+                        l = list(range(0, gt_motion.shape[-1]))
+                        ohprvc = l[:1] + l[3:]
+                        gt_motion = gt_motion[..., ohprvc]
+                    mask = batch["motion"][1].to(self.device)
 
                 name = str(batch["names"][0])
 
@@ -442,16 +448,20 @@ class VQVAEMotionTrainer(nn.Module):
                 pred_motion = vqvae_output.decoded_motion.squeeze().cpu()
                 gt_motion = gt_motion.squeeze().cpu()
 
-                z = torch.zeros(
-                    gt_motion.shape[:-1] + (2,),
-                    dtype=gt_motion.dtype,
-                    device=gt_motion.device,
-                )
+                if self.remove_translation:
 
-                pred_motion = torch.cat(
-                    [pred_motion[..., 0:1], z, pred_motion[..., 1:]], -1
-                )
-                gt_motion = torch.cat([gt_motion[..., 0:1], z, gt_motion[..., 1:]], -1)
+                    z = torch.zeros(
+                        gt_motion.shape[:-1] + (2,),
+                        dtype=gt_motion.dtype,
+                        device=gt_motion.device,
+                    )
+
+                    pred_motion = torch.cat(
+                        [pred_motion[..., 0:1], z, pred_motion[..., 1:]], -1
+                    )
+                    gt_motion = torch.cat(
+                        [gt_motion[..., 0:1], z, gt_motion[..., 1:]], -1
+                    )
 
                 dset.render_hml(
                     gt_motion.squeeze().cpu(),

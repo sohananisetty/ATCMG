@@ -33,6 +33,7 @@ cfg.dataset.window_size = None
 cfg.dataset.sampling_rate = 16000
 cfg.dataset.motion_padding = "longest"
 cfg.dataset.use_motion_augmentation = False
+cfg.dataset.remove_translation = False
 
 cfg.train = CN()
 cfg.train.resume = True

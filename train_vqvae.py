@@ -56,7 +56,7 @@ def main(cfg):
 
 
 if __name__ == "__main__":
-    nme = "vqvae_body_gpvc"
+    nme = "vqvae_full_gpvc"
     path = f"/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/{nme}/{nme}.yaml"
     cfg = get_cfg_defaults()
     print("loading config from:", path)
@@ -64,7 +64,9 @@ if __name__ == "__main__":
 
     cfg.vqvae.nb_joints = nb_joints(MotionRep(cfg.dataset.motion_rep))
     cfg.vqvae.motion_dim = motion_dim(
-        cfg.dataset.hml_rep, MotionRep(cfg.dataset.motion_rep), True
+        cfg.dataset.hml_rep,
+        motion_rep=MotionRep(cfg.dataset.motion_rep),
+        remove_trans=cfg.dataset.remove_translation,
     )
 
     cfg.freeze()

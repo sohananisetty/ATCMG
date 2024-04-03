@@ -199,7 +199,7 @@ def simple_collate(
 
     motion, mask = conditioner._get_motion_features(
         motion_list=motions,
-        max_length=max(lens),
+        # max_length=max(lens),
     )
 
     inputs["names"] = np.array(names)

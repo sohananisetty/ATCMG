@@ -46,7 +46,7 @@ fuser:
 
 motion_generator:
   target: "core.models.generation.motion_generator.MotionMuse"
-  n_q : 2
+  n_q : 1
   dim : 512
   depth: 6
   cond_dropout: 0.4
@@ -54,13 +54,14 @@ motion_generator:
   audio_input_dim: 128
   text_input_dim: 1024
   emb_dropout: 0.1
-  num_tokens: 512
+  num_tokens: 1024 ##512+512
   flash: True
   var_len: False
   quality_emb: False
   custom: True
   attn_dropout: 0.1
   film: False
+  flatten: True
 
 
 

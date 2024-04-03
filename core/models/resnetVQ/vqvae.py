@@ -379,7 +379,7 @@ class HumanVQVAE2(nn.Module):
         code_idx = self.vqvae.encode(motion)  # (N, T)
         return code_idx
 
-    def forward(self, motion, mask=None, temperature=0.0):
+    def forward(self, motion, mask=None, temperature=None):
         return self.vqvae(motion, mask, temperature=temperature)
 
     def decode(self, indices, mask=None):
@@ -460,27 +460,31 @@ class TranslationVQVAE(nn.Module):
 
         return motion
 
-    def predict(self, traj):
-        orient = torch.zeros_like(traj)[..., :2]
-        motion = torch.cat([traj, orient], -1)
-        out = self.vqvae(motion)
-        pred_orient = out.decoded_motion[..., -2:]
+    def cossin2quat(self, r_cs: torch.Tensor):
         mat = torch.zeros(
             (
-                pred_orient.shape[:-1]
+                r_cs.shape[:-1]
                 + (
                     3,
                     3,
                 )
             )
-        ).to(pred_orient.device)
+        ).to(r_cs.device)
         mat[..., 1, 1] = 1
-        mat[..., 0, 0] = pred_orient[..., 0]
-        mat[..., 0, 2] = pred_orient[..., 1]
-        mat[..., 2, 0] = -pred_orient[..., 0]
-        mat[..., 2, 2] = pred_orient[..., 1]
-        r_rot = geometry.matrix_to_quaternion(mat)
-        return pred_orient
+        mat[..., 0, 0] = r_cs[..., 0]
+        mat[..., 0, 2] = r_cs[..., 1]
+        mat[..., 2, 0] = -r_cs[..., 1]
+        mat[..., 2, 2] = r_cs[..., 0]
+        r_rot_quat = geometry.matrix_to_quaternion(mat)
+        return r_rot_quat
+
+    def predict(self, traj):
+        orient = torch.zeros_like(traj)[..., :2]
+        motion = torch.cat([traj, orient], -1)
+        out = self.vqvae(motion)
+        pred_orient = out.decoded_motion[..., -2:]
+        pred_quat = self.cossin2quat(pred_orient)
+        return pred_quat
 
     def forward(self, motion, mask=None):
         r_rot = motion[..., :4]
@@ -491,16 +495,16 @@ class TranslationVQVAE(nn.Module):
 
         motion = torch.cat([rel_pos, r_rot], -1)
 
-        if self.training:
-            # motion = self.mask_augment(motion)
-            b, n, d = motion.shape
-            device = motion.device
-            num_masked_d = torch.Tensor(
-                np.random.choice([0, 1, 2], size=b, p=[0.5, 0.3, 0.2])
-            ).to(device)
-            batch_randperm2 = torch.rand((b, d), device=device).argsort(dim=-1)
-            mask2 = ~(batch_randperm2 < rearrange(num_masked_d, "b -> b 1"))
-            motion[..., 2:] = motion[..., 2:] * mask2[:, None, :]
+        # if self.training:
+        #     # motion = self.mask_augment(motion)
+        #     b, n, d = motion.shape
+        #     device = motion.device
+        #     num_masked_d = torch.Tensor(
+        #         np.random.choice([0, 1, 2], size=b, p=[0.5, 0.3, 0.2])
+        #     ).to(device)
+        #     batch_randperm2 = torch.rand((b, 2), device=device).argsort(dim=-1)
+        #     mask2 = ~(batch_randperm2 < rearrange(num_masked_d, "b -> b 1"))
+        #     motion[..., 2:] = motion[..., 2:] * mask2[:, None, :]
 
         return self.vqvae(motion, mask)
 

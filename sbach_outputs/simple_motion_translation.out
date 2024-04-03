@@ -2,28 +2,41 @@ loading config from: /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpo
 output_dir:  /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/simple_motion_translation
 Sync is turned on False
 Total number of motions humanml: 16730
+Total number of motions perform: 346
 Total number of motions GRAB: 1268
 Total number of motions idea400: 10946
 Total number of motions beat: 1458
+Total number of motions game_motion: 2780
 Total number of motions aist: 1141
 Total number of motions fitness: 10902
 Total number of motions moyo: 161
 Total number of motions choreomaster: 34
+Total number of motions dance: 97
 Total number of motions humanml: 2944
+Total number of motions perform: 16
 Total number of motions GRAB: 67
 Total number of motions idea400: 577
 Total number of motions beat: 162
+Total number of motions game_motion: 130
 Total number of motions aist: 61
 Total number of motions fitness: 572
 Total number of motions moyo: 9
 Total number of motions choreomaster: 2
+Total number of motions dance: 7
 Total number of motions humanml: 1
+Total number of motions perform: 2
 Total number of motions GRAB: 2
 Total number of motions idea400: 2
 Total number of motions beat: 1
+Total number of motions game_motion: 2
 Total number of motions aist: 1
 Total number of motions fitness: 2
 Total number of motions moyo: 2
 Total number of motions choreomaster: 2
-training with training 42640 and test dataset of and 4394 samples
+Total number of motions dance: 1
+training with training 45863 and test dataset of and 4547 samples
 /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/simple_motion_translation
+0: vqvae model total loss: 1.22 reconstruction loss: 0.611 commit_loss: 0.00595 codebook usage: 429.905029296875
+1.2230279445648193 inf
+0: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/simple_motion_translation/checkpoints
+validation start

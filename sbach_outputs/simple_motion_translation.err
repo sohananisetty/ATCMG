@@ -2,28 +2,9 @@ wandb: Currently logged in as: sohananisetty (ai-choreo). Use `wandb login --rel
 wandb: wandb version 0.16.5 is available!  To upgrade, please run:
 wandb:  $ pip install wandb --upgrade
 wandb: Tracking run with wandb version 0.16.2
-wandb: Run data is saved locally in /coc/scratch/sanisetty3/music_motion/ATCMG/wandb/run-20240401_155553-lbetezjv
+wandb: Run data is saved locally in /coc/scratch/sanisetty3/music_motion/ATCMG/wandb/run-20240403_155402-ox2kiu7x
 wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run fresh-jazz-19
+wandb: Syncing run distinctive-fire-21
 wandb:  View project at https://wandb.ai/ai-choreo/simple_motion_translation
-wandb:  View run at https://wandb.ai/ai-choreo/simple_motion_translation/runs/lbetezjv
-Traceback (most recent call last):
-  File "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/train_translation.py", line 22, in <module>
-    trainer.train(cfg.train.resume)
-  File "/coc/scratch/sanisetty3/music_motion/ATCMG/ctl/trainer_translation.py", line 463, in train
-    logs = self.train_step()
-  File "/coc/scratch/sanisetty3/music_motion/ATCMG/ctl/trainer_translation.py", line 267, in train_step
-    out = self.tcn_model(gt_motion)
-  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/coc/scratch/sanisetty3/music_motion/ATCMG/core/models/resnetVQ/vqvae.py", line 503, in forward
-    motion[..., 2:] = motion[..., 2:] * mask2[:, None, :]
-RuntimeError: The size of tensor a (2) must match the size of tensor b (4) at non-singleton dimension 2
-wandb: WARNING No program path found, not creating job artifact. See https://docs.wandb.ai/guides/launch/create-job
-wandb: - 0.007 MB of 0.007 MB uploadedwandb: \ 0.012 MB of 0.012 MB uploadedwandb:  View run fresh-jazz-19 at: https://wandb.ai/ai-choreo/simple_motion_translation/runs/lbetezjv
-wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
-wandb: Find logs at: ./wandb/run-20240401_155553-lbetezjv/logs
-srun: error: alexa: task 0: Exited with exit code 1
-srun: Terminating StepId=846578.0
+wandb:  View run at https://wandb.ai/ai-choreo/simple_motion_translation/runs/ox2kiu7x
+  0%|          | 0/12 [00:00<?, ?it/s]  8%|8         | 1/12 [00:00<00:04,  2.62it/s] 17%|#6        | 2/12 [00:00<00:03,  2.69it/s] 25%|##5       | 3/12 [00:01<00:03,  2.67it/s] 33%|###3      | 4/12 [00:01<00:02,  2.67it/s] 42%|####1     | 5/12 [00:01<00:02,  2.73it/s] 50%|#####     | 6/12 [00:02<00:02,  2.78it/s] 58%|#####8    | 7/12 [00:02<00:01,  2.80it/s] 67%|######6   | 8/12 [00:02<00:01,  3.01it/s] 75%|#######5  | 9/12 [00:03<00:00,  3.29it/s] 83%|########3 | 10/12 [00:03<00:00,  2.91it/s] 92%|#########1| 11/12 [00:03<00:00,  3.18it/s]100%|##########| 12/12 [00:03<00:00,  3.90it/s]100%|##########| 12/12 [00:03<00:00,  3.10it/s]
