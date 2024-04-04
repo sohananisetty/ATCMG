@@ -115,14 +115,14 @@ class ReConsLoss(nn.Module):
 
                 if "c" in hml_rep:
                     pred_c = self.get_c_from_v(mp)
-                    loss += nn.functional.binary_cross_entropy_with_logits(
+                    loss += 0.7 * nn.functional.binary_cross_entropy_with_logits(
                         pred_c, params_gt[-1]
                     )
                 loss += self.Loss(mp, mg)
 
-            if rep == "c":
-                loss += 1.5 * nn.functional.binary_cross_entropy_with_logits(mp, mg)
-                # self.Loss(mp, mg)
+            # if rep == "c":
+            #     loss += 1.5 * nn.functional.binary_cross_entropy_with_logits(mp, mg)
+            # self.Loss(mp, mg)
 
             else:
 

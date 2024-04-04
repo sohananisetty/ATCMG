@@ -48,7 +48,7 @@ motion_generator:
   emb_dropout: 0.1
   num_tokens: 512
   flash: True
-  var_len: True
+  var_len: False
   quality_emb: False
   custom: True
   attn_dropout: 0.1

@@ -22,8 +22,8 @@ train:
   train_bs : 200
   gradient_accumulation_steps : 1
   learning_rate : 2e-4
-  weight_decay : 1e-3
-  warmup_steps : 4000
+  # weight_decay : 1e-3
+  warmup_steps : 6000
   gamma : 0.05
   lr_scheduler_type : "cosine"
 
@@ -48,7 +48,7 @@ motion_generator:
   target: "core.models.generation.motion_generator.MotionMuse"
   n_q : 2
   dim : 512
-  depth: 12
+  depth: 10
   cond_dropout: 0.4
   no_mask_token_prob: 0.3
   audio_input_dim: 128

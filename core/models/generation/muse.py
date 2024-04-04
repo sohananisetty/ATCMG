@@ -757,7 +757,6 @@ class MLMModel(nn.Module):
         ignore_index: int = -100,
         quality_list=None,
     ):
-        _, Q, _ = inputs[0].shape
 
         sequence = inputs[0]
         sequence_mask = inputs[1]
@@ -958,7 +957,7 @@ class SelfCritic(nn.Module):
     ) -> tp.Tuple[torch.Tensor, tp.List[torch.Tensor]]:
 
         B, K, T = targets.shape
-        assert logits.shape[:-1] == targets.shape
+        assert logits.shape == targets.shape
         # assert mask.shape == targets.shape
         ce = torch.zeros([], device=targets.device)
         ce_per_codebook: tp.List[torch.Tensor] = []
@@ -1005,7 +1004,8 @@ class SelfCritic(nn.Module):
                 logits,
                 labels,
             )
-        return loss
+            return loss, ce_per_codebook
+        return loss, None
 
 
 class MotionMuse(nn.Module):
@@ -1301,6 +1301,7 @@ class MotionMuse(nn.Module):
 
         device = next(self.parameters()).device
         duration = int(duration_s * (fps / down_sample_ratio))
+        timesteps = timesteps * self.num_codeboks
 
         seq_len = duration
         try:
@@ -1361,7 +1362,7 @@ class MotionMuse(nn.Module):
                 conditions["audio"] = cond
 
         ids = torch.full(shape, self.mask_token_id, dtype=torch.long, device=device)
-        mask = torch.ones_like(ids).to(torch.bool)
+        mask = torch.ones_like(ids)[:, 0, :].to(torch.bool)
         scores = torch.zeros(shape, dtype=torch.float32, device=device)
 
         starting_temperature = temperature
@@ -1508,7 +1509,7 @@ class MotionMuse(nn.Module):
         critic_input = torch.where(muse_mask, sampled_ids, x)
         critic_labels = (x != critic_input).float()
 
-        bce_loss = self.token_critic(
+        bce_loss, bce_per_codebook = self.token_critic(
             inputs=(critic_input, input_mask),
             conditions=conditions,
             labels=critic_labels,
@@ -1516,5 +1517,8 @@ class MotionMuse(nn.Module):
         )
 
         out.loss = out.loss + self.critic_loss_weight * bce_loss
+        if bce_per_codebook is not None:
+            for q in range(self.num_codeboks):
+                out.ce_per_codebook[q] += self.critic_loss_weight * bce_per_codebook[q]
 
         return out

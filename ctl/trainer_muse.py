@@ -132,17 +132,17 @@ class MotionMuseTrainer(nn.Module):
 
         dataset_names = {
             "animation": 0.7,
-            # "humanml": 3.5,
-            # "perform": 0.6,
-            # "GRAB": 1.0,
-            # "idea400": 1.5,
-            # "humman": 0.5,
-            # "beat": 2.5,
-            # "game_motion": 0.8,
-            # "music": 0.5,
-            # "aist": 1.5,
-            # "fitness": 1.0,
-            # "moyo": 1.5,
+            "humanml": 3.5,
+            "perform": 0.6,
+            "GRAB": 1.0,
+            "idea400": 1.5,
+            "humman": 0.5,
+            "beat": 2.5,
+            "game_motion": 0.8,
+            "music": 0.5,
+            "aist": 1.5,
+            "fitness": 1.0,
+            "moyo": 1.5,
             "choreomaster": 2.5,
             "dance": 1.0,
             "kungfu": 1.0,
@@ -353,7 +353,7 @@ class MotionMuseTrainer(nn.Module):
             # _ = conditions.pop("text")
 
             out = self.motion_muse(
-                (inputs["motion"][0][:, 1:, :], motion_mask),
+                (motions, motion_mask),
                 conditions,
                 quality_list=quality_list,
             )
@@ -494,7 +494,7 @@ class MotionMuseTrainer(nn.Module):
                 body_M = dset.toMotion(
                     body_motion[0],
                     motion_rep=MotionRep("body"),
-                    hml_rep=dset.hml_rep,
+                    hml_rep=self.body_cfg.dataset.hml_rep,
                 )
 
                 return body_M
@@ -506,7 +506,7 @@ class MotionMuseTrainer(nn.Module):
                 left_M = dset.toMotion(
                     left_motion[0],
                     motion_rep=MotionRep(self.left_cfg.dataset.motion_rep),
-                    hml_rep=dset.hml_rep,
+                    hml_rep=self.left_cfg.dataset.hml_rep,
                 )
                 return left_M
 
@@ -518,7 +518,7 @@ class MotionMuseTrainer(nn.Module):
                 right_M = dset.toMotion(
                     right_motion[0],
                     motion_rep=MotionRep(self.right_cfg.dataset.motion_rep),
-                    hml_rep=dset.hml_rep,
+                    hml_rep=self.right_cfg.dataset.hml_rep,
                 )
                 return right_M
 
@@ -532,16 +532,18 @@ class MotionMuseTrainer(nn.Module):
             left_M = dset.toMotion(
                 left_motion[0],
                 motion_rep=MotionRep(self.left_cfg.dataset.motion_rep),
-                hml_rep=dset.hml_rep,
+                hml_rep=self.left_cfg.dataset.hml_rep,
             )
             right_M = dset.toMotion(
                 right_motion[0],
                 motion_rep=MotionRep(self.right_cfg.dataset.motion_rep),
-                hml_rep=dset.hml_rep,
+                hml_rep=self.right_cfg.dataset.hml_rep,
             )
             hand_M = left_M + right_M
             hand_M.motion_rep = MotionRep.HAND
-            hand_M.hml_rep = "".join(set(left_M.hml_rep).intersection(right_M.hml_rep))
+            hand_M.hml_rep = "".join(
+                [i for i in left_M.hml_rep if i in right_M.hml_rep]
+            )
             return hand_M
 
         if k == 3:
@@ -550,7 +552,7 @@ class MotionMuseTrainer(nn.Module):
             body_inds = codes[:, 0]
             body_motion = self.body_model.decode(body_inds[0:1]).detach().cpu()
 
-            if self.body_cfg.remove_translation:
+            if self.body_cfg.dataset.remove_translation:
                 z = torch.zeros(
                     body_motion.shape[:-1] + (2,),
                     dtype=body_motion.dtype,
@@ -566,23 +568,21 @@ class MotionMuseTrainer(nn.Module):
             body_M = dset.toMotion(
                 body_motion[0],
                 motion_rep=MotionRep("body"),
-                hml_rep=dset.hml_rep,
+                hml_rep=self.body_cfg.dataset.hml_rep,
             )
 
             left_M = dset.toMotion(
                 left_motion[0],
                 motion_rep=MotionRep("left_hand"),
-                hml_rep=dset.hml_rep,
+                hml_rep=self.left_cfg.dataset.hml_rep,
             )
             right_M = dset.toMotion(
                 right_motion[0],
                 motion_rep=MotionRep("right_hand"),
-                hml_rep=dset.hml_rep,
+                hml_rep=self.right_cfg.dataset.hml_rep,
             )
             full_M = dset.to_full_joint_representation(body_M, left_M, right_M)
             return full_M
-
-        return body_M
 
     def sample_render_hmlvec(self, save_path):
         save_file = os.path.join(save_path, f"{int(self.steps.item())}")
@@ -607,13 +607,17 @@ class MotionMuseTrainer(nn.Module):
                 motions = inputs["motion"][0].to(torch.long)  ###  1 k n
                 motion_mask = inputs["motion"][1]
                 gt_len = int(sum(motion_mask[0]))
-                gt_len_s = gt_len // (
-                    self.dataset_args.fps / self.dataset_args.down_sampling_ratio
+                gt_len_s = round(
+                    gt_len
+                    / (self.dataset_args.fps / self.dataset_args.down_sampling_ratio)
                 )
 
-                gt_motion = self.bkn_to_motion(motions[:, :gt_len], dset)
+                print(motions.shape)
+
+                gt_motion = self.bkn_to_motion(motions[..., :gt_len], dset)
 
                 gen_ids = self.motion_muse.generate(conditions, duration_s=gt_len_s)
+                print(gen_ids.shape)
 
                 gen_motion = self.bkn_to_motion(gen_ids, dset)
 

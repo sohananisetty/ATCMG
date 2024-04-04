@@ -26,7 +26,7 @@ vqvae:
   dim : 768
   depth: 8
   codebook_size : 1024
-  codebook_dim : 256
+  codebook_dim : 512
   commit : 0.25
   loss_motion: 2.0
   recons_loss : "l1_smooth"

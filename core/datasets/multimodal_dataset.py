@@ -721,24 +721,18 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
             else:
                 audio_data, motion = self.get_windowed_data(audio_data, motion)
 
-        if self.motion_rep in ["full"]:
+        if self.motion_rep == "full":
             final_motion = [
-                motion[..., :1].reshape(-1, 1),
+                motion.reshape(-1, 1),
                 left_hand_motion.reshape(-1, 1),
                 right_hand_motion.reshape(-1, 1),
             ]
-        if self.motion_rep in ["hand"]:
+        elif self.motion_rep == "hand":
             final_motion = [
                 left_hand_motion.reshape(-1, 1),
                 right_hand_motion.reshape(-1, 1),
             ]
-            # if "g" in self.hml_rep:
-            #     final_motion.append(motion[..., 1:].reshape(-1, 2))
-        # elif self.motion_rep == "hand":
-        #     final_motion = [
-        #         left_hand_motion.reshape(-1, 1),
-        #         right_hand_motion.reshape(-1, 1),
-        #     ]
+
         else:
 
             final_motion = motion  ## n 1/3
