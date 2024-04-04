@@ -106,6 +106,7 @@ class VQVAEMotionTrainer(nn.Module):
             nb_joints=self.vqvae_args.nb_joints,
             hml_rep=self.hml_rep,
             motion_rep=self.motion_rep,
+            use_simple_loss=self.vqvae_args.use_simple_loss,
         )
 
         self.optim = get_optimizer(
@@ -264,7 +265,7 @@ class VQVAEMotionTrainer(nn.Module):
                     l = list(range(0, gt_motion.shape[-1]))
                     ohprvc = l[:1] + l[3:]
                     gt_motion = gt_motion[..., ohprvc]
-                mask = batch["motion"][1].to(self.device)
+            mask = batch["motion"][1].to(self.device)
 
             vqvae_output = self.vqvae_model(
                 motion=gt_motion,
@@ -464,11 +465,11 @@ class VQVAEMotionTrainer(nn.Module):
                     )
 
                 dset.render_hml(
-                    gt_motion.squeeze().cpu(),
+                    gt_motion,
                     os.path.join(
                         save_file, os.path.basename(name).split(".")[0] + "_gt.gif"
                     ),
-                    zero_trans=True,
+                    # zero_trans=True,
                 )
 
                 dset.render_hml(
@@ -476,7 +477,7 @@ class VQVAEMotionTrainer(nn.Module):
                     os.path.join(
                         save_file, os.path.basename(name).split(".")[0] + "_pred.gif"
                     ),
-                    zero_trans=True,
+                    # zero_trans=True,
                 )
 
         self.vqvae_model.train()

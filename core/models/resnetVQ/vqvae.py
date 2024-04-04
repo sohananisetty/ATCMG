@@ -9,6 +9,7 @@ import utils.rotation_conversions as geometry
 import random
 import numpy as np
 import math
+from core.models.utils import default
 
 
 class VQVAE(nn.Module):
@@ -300,6 +301,7 @@ class HumanVQVAE(nn.Module):
         super().__init__()
 
         self.nb_joints = args.nb_joints
+        self.sample_codebook_temp = args.sample_codebook_temp
         self.vqvae = VQVAE(
             input_dim=args.motion_dim,
             nb_code=args.codebook_size,
@@ -328,8 +330,12 @@ class HumanVQVAE(nn.Module):
         code_idx = self.vqvae.encode(motion)  # (N, T)
         return code_idx
 
-    def forward(self, motion, mask=None):
-        return self.vqvae(motion, mask)
+    def forward(self, motion, mask=None, sample_temperature=None):
+        return self.vqvae(
+            motion,
+            mask,
+            temperature=default(sample_temperature, self.sample_codebook_temp),
+        )
 
     def decode(self, indices, mask=None):
         x_out = self.vqvae.forward_decoder(indices, mask)
@@ -344,6 +350,7 @@ class HumanVQVAE2(nn.Module):
         super().__init__()
 
         self.nb_joints = args.nb_joints
+        self.sample_codebook_temp = args.sample_codebook_temp
         self.vqvae = VQVAE2(
             input_dim=args.motion_dim,
             nb_code=args.codebook_size,
@@ -380,7 +387,9 @@ class HumanVQVAE2(nn.Module):
         return code_idx
 
     def forward(self, motion, mask=None, temperature=None):
-        return self.vqvae(motion, mask, temperature=temperature)
+        return self.vqvae(
+            motion, mask, temperature=default(temperature, self.sample_codebook_temp)
+        )
 
     def decode(self, indices, mask=None):
         ##indices: b n

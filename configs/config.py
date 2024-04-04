@@ -78,7 +78,7 @@ cfg.vqvae.kmeans_iters = None
 cfg.vqvae.num_quantizers = 2
 cfg.vqvae.quantize_dropout_prob = 0.2
 cfg.vqvae.shared_codebook = False
-cfg.vqvae.sample_codebook_temp = 0.4
+cfg.vqvae.sample_codebook_temp = 0.2
 
 ## Loss
 cfg.vqvae.commit = 1.0  # "hyper-parameter for the commitment loss"
@@ -86,6 +86,7 @@ cfg.vqvae.loss_vel = 1.0
 cfg.vqvae.loss_motion = 1.0
 cfg.vqvae.recons_loss = "l1_smooth"  # l1_smooth , l1 , l2
 cfg.vqvae.use_geodesic_loss = False
+cfg.vqvae.use_simple_loss = True
 
 
 def get_cfg_defaults():

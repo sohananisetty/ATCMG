@@ -12,11 +12,12 @@ class ReConsLoss(nn.Module):
         self,
         recons_loss: str = "l1_smooth",
         use_geodesic_loss: bool = False,
+        use_simple_loss=True,
         nb_joints: int = 52,
         hml_rep: str = "gprvc",
         motion_rep: MotionRep = MotionRep.FULL,
     ):
-        super(ReConsLoss, self).__init__()
+        super().__init__()
 
         if recons_loss == "l1":
             self.Loss = torch.nn.L1Loss()
@@ -35,6 +36,7 @@ class ReConsLoss(nn.Module):
         self.nb_joints = nb_joints
         self.hml_rep = hml_rep
         self.motion_rep = motion_rep
+        self.use_simple_loss = use_simple_loss
 
         split_seq = []
 
@@ -57,18 +59,24 @@ class ReConsLoss(nn.Module):
 
         self.split_seq = split_seq
 
+    def get_c_from_v(self, vel_param):
+        fid_r, fid_l = [8, 11], [7, 10]
+        vel = vel_param.contiguous().view(vel_param.shape[:2] + (self.nb_joints, 3))
+        pred_cl = torch.sum(vel[:, :, fid_l] ** 2, dim=-1) - 0.002
+        pred_cr = torch.sum(vel[:, :, fid_r] ** 2, dim=-1) - 0.002
+        pred_c = 1e3 * torch.cat([pred_cl, pred_cr], -1)
+        return pred_c
+
     def forward(self, motion_pred, motion_gt, mask=None):
+
+        if self.use_simple_loss:
+            return self.Loss(motion_pred, motion_gt)
+
         hml_rep = self.hml_rep
 
         loss = 0
-
-        if self.use_geodesic_loss is False:
-            return self.Loss(motion_pred, motion_gt)
-
-        params_pred = torch.split(motion_pred, self.split_seq, -1)[0]
-        params_gt = torch.split(motion_gt, self.split_seq, -1)[0]
-
-        loss = self.Loss(motion_pred, motion_gt)
+        params_pred = torch.split(motion_pred, self.split_seq, -1)
+        params_gt = torch.split(motion_gt, self.split_seq, -1)
 
         if mask is not None:
             mask_split = torch.split(mask, self.split_seq, -1)[0]
@@ -83,29 +91,33 @@ class ReConsLoss(nn.Module):
                 mp = mp * msk[..., None]
                 mg = mg * msk[..., None]
 
-            if rep == "r":
-                if self.use_geodesic_loss:
+            if rep == "r" and self.use_geodesic_loss:
 
-                    if (
-                        self.motion_rep == MotionRep.BODY
-                        or self.motion_rep == MotionRep.FULL
-                    ):
-                        nb_joints = self.nb_joints - 1
-                    else:
-                        nb_joints = self.nb_joints
-
-                    mp = geometry.rotation_6d_to_matrix(
-                        mp.view(-1, nb_joints, 6).contiguous()
-                    ).view(-1, 3, 3)
-                    mg = geometry.rotation_6d_to_matrix(
-                        mg.view(-1, nb_joints, 6).contiguous()
-                    ).view(-1, 3, 3)
-
-                    loss += self.geodesic_loss(mp, mg)
-
+                if (
+                    self.motion_rep == MotionRep.BODY
+                    or self.motion_rep == MotionRep.FULL
+                ):
+                    nb_joints = self.nb_joints - 1
                 else:
+                    nb_joints = self.nb_joints
 
-                    loss += self.Loss(mp, mg)
+                mp = geometry.rotation_6d_to_matrix(
+                    mp.view(-1, nb_joints, 6).contiguous()
+                ).view(-1, 3, 3)
+                mg = geometry.rotation_6d_to_matrix(
+                    mg.view(-1, nb_joints, 6).contiguous()
+                ).view(-1, 3, 3)
+
+                loss += self.geodesic_loss(mp, mg)
+
+            if rep == "v":
+
+                if "c" in hml_rep:
+                    pred_c = self.get_c_from_v(mp)
+                    loss += nn.functional.binary_cross_entropy_with_logits(
+                        pred_c, params_gt[-1]
+                    )
+                loss += self.Loss(mp, mg)
 
             else:
 
