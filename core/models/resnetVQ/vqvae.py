@@ -397,6 +397,9 @@ class HumanVQVAE2(nn.Module):
         return x_out
 
 
+from scipy.ndimage import gaussian_filter1d
+
+
 class TranslationVQVAE(nn.Module):
     def __init__(
         self,
@@ -487,11 +490,20 @@ class TranslationVQVAE(nn.Module):
         r_rot_quat = geometry.matrix_to_quaternion(mat)
         return r_rot_quat
 
+    @torch.no_grad()
     def predict(self, traj):
+        self.vqvae = self.vqvae.eval()
         orient = torch.zeros_like(traj)[..., :2]
         motion = torch.cat([traj, orient], -1)
         out = self.vqvae(motion)
-        pred_orient = out.decoded_motion[..., -2:]
+        pred_orient = out.decoded_motion[..., -2:].clamp(min=-1, max=1)
+        pred_orient[:, 0, 0] = 1
+        pred_orient[:, 0, 1] = 0
+        pred_orient[..., 1:2] = torch.Tensor(
+            gaussian_filter1d(
+                pred_orient[..., 1:2].cpu().numpy(), 4, axis=-1, mode="nearest"
+            )
+        )
         pred_quat = self.cossin2quat(pred_orient)
         return pred_quat
 
@@ -504,16 +516,18 @@ class TranslationVQVAE(nn.Module):
 
         motion = torch.cat([rel_pos, r_rot], -1)
 
-        # if self.training:
-        #     # motion = self.mask_augment(motion)
-        #     b, n, d = motion.shape
-        #     device = motion.device
-        #     num_masked_d = torch.Tensor(
-        #         np.random.choice([0, 1, 2], size=b, p=[0.5, 0.3, 0.2])
-        #     ).to(device)
-        #     batch_randperm2 = torch.rand((b, 2), device=device).argsort(dim=-1)
-        #     mask2 = ~(batch_randperm2 < rearrange(num_masked_d, "b -> b 1"))
-        #     motion[..., 2:] = motion[..., 2:] * mask2[:, None, :]
+        if self.training:
+            # motion = self.mask_augment(motion)
+            b, n, d = motion.shape
+            device = motion.device
+            num_masked_d = torch.Tensor(
+                np.random.choice([0, 1, 2], size=b, p=[0.4, 0.3, 0.3])
+            ).to(device)
+            batch_randperm2 = torch.rand((b, 2), device=device).argsort(dim=-1)
+            mask2 = ~(batch_randperm2 < rearrange(num_masked_d, "b -> b 1"))
+            aug_motion = motion.clone()
+            aug_motion[..., 2:] = aug_motion[..., 2:] * mask2[:, None, :]
+            return self.vqvae(aug_motion, mask)
 
         return self.vqvae(motion, mask)
 

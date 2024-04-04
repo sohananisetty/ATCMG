@@ -16,6 +16,7 @@ class ReConsLoss(nn.Module):
         nb_joints: int = 52,
         hml_rep: str = "gprvc",
         motion_rep: MotionRep = MotionRep.FULL,
+        remove_translation=False,
     ):
         super().__init__()
 
@@ -41,7 +42,7 @@ class ReConsLoss(nn.Module):
         split_seq = []
 
         if "g" in hml_rep:
-            split_seq.append(4)
+            split_seq.append(4 if not remove_translation else 2)
         if "p" in hml_rep:
             if motion_rep == MotionRep.BODY or motion_rep == MotionRep.FULL:
                 split_seq.append((self.nb_joints - 1) * 3)
@@ -62,9 +63,9 @@ class ReConsLoss(nn.Module):
     def get_c_from_v(self, vel_param):
         fid_r, fid_l = [8, 11], [7, 10]
         vel = vel_param.contiguous().view(vel_param.shape[:2] + (self.nb_joints, 3))
-        pred_cl = torch.sum(vel[:, :, fid_l] ** 2, dim=-1) - 0.002
-        pred_cr = torch.sum(vel[:, :, fid_r] ** 2, dim=-1) - 0.002
-        pred_c = 1e3 * torch.cat([pred_cl, pred_cr], -1)
+        pred_cl = 0.002 - torch.sum(vel[:, :, fid_l] ** 2, dim=-1)
+        pred_cr = 0.002 - torch.sum(vel[:, :, fid_r] ** 2, dim=-1)
+        pred_c = torch.cat([pred_cl, pred_cr], -1)
         return pred_c
 
     def forward(self, motion_pred, motion_gt, mask=None):
@@ -118,6 +119,10 @@ class ReConsLoss(nn.Module):
                         pred_c, params_gt[-1]
                     )
                 loss += self.Loss(mp, mg)
+
+            if rep == "c":
+                loss += 1.5 * nn.functional.binary_cross_entropy_with_logits(mp, mg)
+                # self.Loss(mp, mg)
 
             else:
 

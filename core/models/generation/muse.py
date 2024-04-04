@@ -25,6 +25,14 @@ from tqdm.auto import tqdm
 
 from .streaming_transformer.codebooks_patterns import CodebooksPatternProvider
 
+dropout_add_layer_norm = fused_mlp_func = memory_efficient_attention = (
+    flash_attn_func
+) = None
+try:
+    from flash_attn.ops.layer_norm import dropout_add_layer_norm
+    from flash_attn.ops.fused_dense import fused_mlp_func
+except ImportError:
+    pass
 ConditionType = Tuple[torch.Tensor, torch.Tensor]
 ConditionTensors = tp.Dict[str, ConditionType]
 CFGConditions = tp.Union[ConditionTensors, tp.Tuple[ConditionTensors, ConditionTensors]]
@@ -147,19 +155,46 @@ def FeedForward(
     )
 
 
-def FeedForward2(
-    dim,
-    mult=4,
-    dropout=0.1,
-):
+class FFN(nn.Module):
+    def __init__(
+        self,
+        in_features,
+        hidden_features=None,
+        out_features=None,
+        drop=0.0,
+        fused_if_available=True,
+    ):
+        super().__init__()
+        self.fused_mlp_func = fused_mlp_func if fused_if_available else None
+        out_features = out_features or in_features
+        hidden_features = hidden_features or in_features
+        self.fc1 = nn.Linear(in_features, hidden_features, bias=False)
+        self.act = nn.GELU(approximate="tanh")
+        self.fc2 = nn.Linear(hidden_features, out_features, bias=False)
+        self.drop = nn.Dropout(drop, inplace=True) if drop > 0 else nn.Identity()
 
-    inner_dim = int(dim * mult)
-    return nn.Sequential(
-        nn.Linear(dim, inner_dim, bias=False),
-        nn.GELU(),
-        nn.Dropout(dropout),
-        nn.Linear(inner_dim, dim, bias=False),
-    )
+    def forward(self, x):
+        if self.fused_mlp_func is not None:
+            return self.drop(
+                self.fused_mlp_func(
+                    x=x,
+                    weight1=self.fc1.weight,
+                    weight2=self.fc2.weight,
+                    bias1=self.fc1.bias,
+                    bias2=self.fc2.bias,
+                    activation="gelu_approx",
+                    save_pre_act=self.training,
+                    return_residual=False,
+                    checkpoint_lvl=0,
+                    heuristic=0,
+                    process_group=None,
+                )
+            )
+        else:
+            return self.drop(self.fc2(self.act(self.fc1(x))))
+
+    def extra_repr(self) -> str:
+        return f"fused_mlp_func={self.fused_mlp_func is not None}"
 
 
 class FiLM(nn.Module):
@@ -724,9 +759,6 @@ class MLMModel(nn.Module):
     ):
         _, Q, _ = inputs[0].shape
 
-        # if self.flatten:
-        #     inputs, conditions = self.flatten_input(inputs, conditions, True)
-
         sequence = inputs[0]
         sequence_mask = inputs[1]
         B, K, S = sequence.shape
@@ -766,10 +798,7 @@ class MLMModel(nn.Module):
         context = cross_attention_input[0]
         context_padding_mask = cross_attention_input[1]
 
-        if self.flatten:
-            x_ = x_ + self.pos_emb(x_[:, : x_.shape[1] // Q]).repeat_interleave(Q, 0)
-        else:
-            x_ = x_ + self.pos_emb(x_)
+        x_ = x_ + self.pos_emb(x_)
         x_ = self.post_emb_norm(x_)
         x_ = self.emb_dropout(x_)
 
@@ -805,9 +834,6 @@ class MLMModel(nn.Module):
             or self.quality_emb
         ):
             logits = logits[:, :, -S:]
-
-        # if return_embed:
-        #     return logits, embed
 
         if not exists(labels):
             return MuseOutput(logits=logits, embed=embed)  ## B K N num_tokens
@@ -1046,21 +1072,28 @@ class MotionMuse(nn.Module):
         self.load_state_dict(state_dict)
 
     def muse_mask(self, motion_ids: torch.Tensor, ignore_index: int = -100):
-        batch, K, seq_len, device = (
-            *motion_ids.shape,
-            motion_ids.device,
-        )
+        batch, K, T = motion_ids.shape
+        motion_ids = motion_ids.contiguous().view(batch, 1, -1)
+        seq_len = K * T
+        device = motion_ids.device
+        # batch, K, seq_len, device = (
+        #     *motion_ids.shape,
+        #     motion_ids.device,
+        # )
 
         code_ids = motion_ids.clone()
 
         rand_time = uniform((batch,), device=device)
         rand_mask_probs = self.noise_schedule(rand_time)
-        num_token_masked = (seq_len * K * rand_mask_probs).round().clamp(min=1)
+        # num_token_masked = (seq_len * K * rand_mask_probs).round().clamp(min=1)
+        # batch_randperm = torch.rand((batch, K * seq_len), device=device).argsort(dim=-1)
+        num_token_masked = (seq_len * 1 * rand_mask_probs).round().clamp(min=1)
 
         # mask_id = self.mask_token_id
-        batch_randperm = torch.rand((batch, K * seq_len), device=device).argsort(dim=-1)
+        batch_randperm = torch.rand((batch, 1 * seq_len), device=device).argsort(dim=-1)
         mask = batch_randperm < rearrange(num_token_masked, "b -> b 1")
-        mask = mask.reshape(batch, K, seq_len)
+        # mask = mask.reshape(batch, K, seq_len)
+        mask = mask.reshape(batch, 1, seq_len)
         mask[code_ids == self.model.pad_token_id] = False
 
         # mask_id = self.transformer.mask_token_id
@@ -1071,8 +1104,10 @@ class MotionMuse(nn.Module):
             mask &= ~no_mask_mask
 
         x = torch.where(mask, self.mask_token_id, code_ids)
+        x = x.view(batch, K, T)
+        labels = labels.reshape(batch, K, T)
 
-        return x, labels, mask
+        return x, labels, mask.reshape(batch, K, T)
 
     def muse_mask_legacy(self, motion_ids: torch.Tensor, ignore_index: int = -100):
         batch, K, seq_len, device = (
@@ -1238,7 +1273,7 @@ class MotionMuse(nn.Module):
         )
         unflat = unflat - offset
         for i in range(q):
-            unflat[:, i] = unflat[:, i].clamp(min=0, max=self.model.num_tokens // q)
+            unflat[:, i] = unflat[:, i].clamp(min=0, max=self.model.num_tokens // q - 1)
 
         return unflat
 
@@ -1450,12 +1485,7 @@ class MotionMuse(nn.Module):
 
         B, K, T = motions_ids.shape
 
-        motions_ids = motions_ids.reshape(B, 1, -1)
-
         x, labels, muse_mask = self.muse_mask(motions_ids, ignore_index)
-
-        x = x.reshape(B, K, T)
-        labels = labels.reshape(B, K, T)
 
         out: LMOutput = self.model(
             inputs=(x, input_mask),

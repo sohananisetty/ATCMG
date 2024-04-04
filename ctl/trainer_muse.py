@@ -132,17 +132,17 @@ class MotionMuseTrainer(nn.Module):
 
         dataset_names = {
             "animation": 0.7,
-            "humanml": 3.5,
-            "perform": 0.6,
-            "GRAB": 1.0,
-            "idea400": 1.5,
-            "humman": 0.5,
-            "beat": 2.5,
-            "game_motion": 0.8,
-            "music": 0.5,
-            "aist": 1.5,
-            "fitness": 1.0,
-            "moyo": 1.5,
+            # "humanml": 3.5,
+            # "perform": 0.6,
+            # "GRAB": 1.0,
+            # "idea400": 1.5,
+            # "humman": 0.5,
+            # "beat": 2.5,
+            # "game_motion": 0.8,
+            # "music": 0.5,
+            # "aist": 1.5,
+            # "fitness": 1.0,
+            # "moyo": 1.5,
             "choreomaster": 2.5,
             "dance": 1.0,
             "kungfu": 1.0,
@@ -358,8 +358,13 @@ class MotionMuseTrainer(nn.Module):
                 quality_list=quality_list,
             )
             loss = out.loss
-            # if out.ce_per_codebook is not None:
-            #     loss + out.ce_per_codebook[0] + 1.5*out.ce_per_codebook[1] + out.ce_per_codebook[2]
+            if out.ce_per_codebook is not None and len(out.ce_per_codebook) == 3:
+                loss = (
+                    loss
+                    + 2 * out.ce_per_codebook[0]
+                    + out.ce_per_codebook[1]
+                    + out.ce_per_codebook[2]
+                )
 
             loss = loss / self.grad_accum_every
 
@@ -433,6 +438,13 @@ class MotionMuseTrainer(nn.Module):
 
                 out = self.motion_muse((motions, motion_mask), conditions)
                 loss = out.loss
+                if out.ce_per_codebook is not None and len(out.ce_per_codebook) == 3:
+                    loss = (
+                        loss
+                        + 2 * out.ce_per_codebook[0]
+                        + out.ce_per_codebook[1]
+                        + out.ce_per_codebook[2]
+                    )
 
                 loss_dict["loss"] = loss.detach().cpu()
 
@@ -461,26 +473,54 @@ class MotionMuseTrainer(nn.Module):
         # codes b k n
 
         k = codes.shape[1]
-        body_inds = codes[:, 0]
+        mrep = dset.motion_rep
 
-        if self.body_model is not None:
-            body_motion = self.body_model.decode(body_inds[0:1]).detach().cpu()
+        if k == 1:
+            if mrep == "body":
 
-            if "g" in self.dataset_args.hml_rep:
-                z = torch.zeros(
-                    body_motion.shape[:-1] + (2,),
-                    dtype=body_motion.dtype,
-                    device=body_motion.device,
+                body_inds = codes[:, 0]
+                body_motion = self.body_model.decode(body_inds[0:1]).detach().cpu()
+
+                if self.dataset_args.remove_translation:
+                    z = torch.zeros(
+                        body_motion.shape[:-1] + (2,),
+                        dtype=body_motion.dtype,
+                        device=body_motion.device,
+                    )
+                    body_motion = torch.cat(
+                        [body_motion[..., 0:1], z, body_motion[..., 1:]], -1
+                    )
+
+                body_M = dset.toMotion(
+                    body_motion[0],
+                    motion_rep=MotionRep("body"),
+                    hml_rep=dset.hml_rep,
                 )
-                body_motion = torch.cat(
-                    [body_motion[..., 0:1], z, body_motion[..., 1:]], -1
-                )
 
-            body_M = dset.toMotion(
-                body_motion[0],
-                motion_rep=MotionRep(self.body_cfg.dataset.motion_rep),
-                hml_rep=self.body_cfg.dataset.hml_rep,
-            )
+                return body_M
+
+            elif mrep == "left_hand":
+
+                left_inds = codes[:, 0]
+                left_motion = self.left_hand_model.decode(left_inds[0:1]).detach().cpu()
+                left_M = dset.toMotion(
+                    left_motion[0],
+                    motion_rep=MotionRep(self.left_cfg.dataset.motion_rep),
+                    hml_rep=dset.hml_rep,
+                )
+                return left_M
+
+            elif mrep == "right_hand":
+                right_inds = codes[:, 0]
+                right_motion = (
+                    self.right_hand_model.decode(right_inds[0:1]).detach().cpu()
+                )
+                right_M = dset.toMotion(
+                    right_motion[0],
+                    motion_rep=MotionRep(self.right_cfg.dataset.motion_rep),
+                    hml_rep=dset.hml_rep,
+                )
+                return right_M
 
         if k == 2:
             left_inds = codes[:, 0]
@@ -492,12 +532,12 @@ class MotionMuseTrainer(nn.Module):
             left_M = dset.toMotion(
                 left_motion[0],
                 motion_rep=MotionRep(self.left_cfg.dataset.motion_rep),
-                hml_rep=self.left_cfg.dataset.hml_rep,
+                hml_rep=dset.hml_rep,
             )
             right_M = dset.toMotion(
                 right_motion[0],
                 motion_rep=MotionRep(self.right_cfg.dataset.motion_rep),
-                hml_rep=self.right_cfg.dataset.hml_rep,
+                hml_rep=dset.hml_rep,
             )
             hand_M = left_M + right_M
             hand_M.motion_rep = MotionRep.HAND
@@ -507,19 +547,37 @@ class MotionMuseTrainer(nn.Module):
         if k == 3:
             left_inds = codes[:, 1]
             right_inds = codes[:, 2]
+            body_inds = codes[:, 0]
+            body_motion = self.body_model.decode(body_inds[0:1]).detach().cpu()
+
+            if self.body_cfg.remove_translation:
+                z = torch.zeros(
+                    body_motion.shape[:-1] + (2,),
+                    dtype=body_motion.dtype,
+                    device=body_motion.device,
+                )
+                body_motion = torch.cat(
+                    [body_motion[..., 0:1], z, body_motion[..., 1:]], -1
+                )
 
             left_motion = self.left_hand_model.decode(left_inds[0:1]).detach().cpu()
             right_motion = self.right_hand_model.decode(right_inds[0:1]).detach().cpu()
 
+            body_M = dset.toMotion(
+                body_motion[0],
+                motion_rep=MotionRep("body"),
+                hml_rep=dset.hml_rep,
+            )
+
             left_M = dset.toMotion(
                 left_motion[0],
-                motion_rep=MotionRep(self.left_cfg.dataset.motion_rep),
-                hml_rep=self.left_cfg.dataset.hml_rep,
+                motion_rep=MotionRep("left_hand"),
+                hml_rep=dset.hml_rep,
             )
             right_M = dset.toMotion(
                 right_motion[0],
-                motion_rep=MotionRep(self.right_cfg.dataset.motion_rep),
-                hml_rep=self.right_cfg.dataset.hml_rep,
+                motion_rep=MotionRep("right_hand"),
+                hml_rep=dset.hml_rep,
             )
             full_M = dset.to_full_joint_representation(body_M, left_M, right_M)
             return full_M

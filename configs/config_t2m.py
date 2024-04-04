@@ -103,7 +103,7 @@ cfg.motion_generator.ff_mult = 4
 cfg.motion_generator.post_emb_norm = False
 cfg.motion_generator.rel_pos = False
 cfg.motion_generator.flatten = False
-
+cfg.motion_generator.proj_input = False
 
 ## Conditional
 cfg.motion_generator.audio_input_dim = 128

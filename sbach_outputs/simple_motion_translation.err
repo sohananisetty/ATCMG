@@ -1,13 +1,26 @@
 wandb: Currently logged in as: sohananisetty (ai-choreo). Use `wandb login --relogin` to force relogin
-wandb: wandb version 0.16.5 is available!  To upgrade, please run:
+wandb: wandb version 0.16.6 is available!  To upgrade, please run:
 wandb:  $ pip install wandb --upgrade
 wandb: Tracking run with wandb version 0.16.2
-wandb: Run data is saved locally in /coc/scratch/sanisetty3/music_motion/ATCMG/wandb/run-20240403_155402-ox2kiu7x
+wandb: Run data is saved locally in /coc/scratch/sanisetty3/music_motion/ATCMG/wandb/run-20240404_020208-baum1m23
 wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run distinctive-fire-21
+wandb: Syncing run chocolate-haze-22
 wandb:  View project at https://wandb.ai/ai-choreo/simple_motion_translation
-wandb:  View run at https://wandb.ai/ai-choreo/simple_motion_translation/runs/ox2kiu7x
-  0%|          | 0/12 [00:00<?, ?it/s]  8%|8         | 1/12 [00:00<00:04,  2.62it/s] 17%|#6        | 2/12 [00:00<00:03,  2.69it/s] 25%|##5       | 3/12 [00:01<00:03,  2.67it/s] 33%|###3      | 4/12 [00:01<00:02,  2.67it/s] 42%|####1     | 5/12 [00:01<00:02,  2.73it/s] 50%|#####     | 6/12 [00:02<00:02,  2.78it/s] 58%|#####8    | 7/12 [00:02<00:01,  2.80it/s] 67%|######6   | 8/12 [00:02<00:01,  3.01it/s] 75%|#######5  | 9/12 [00:03<00:00,  3.29it/s] 83%|########3 | 10/12 [00:03<00:00,  2.91it/s] 92%|#########1| 11/12 [00:03<00:00,  3.18it/s]100%|##########| 12/12 [00:03<00:00,  3.90it/s]100%|##########| 12/12 [00:03<00:00,  3.10it/s]
-  0%|          | 0/12 [00:00<?, ?it/s]  8%|8         | 1/12 [00:00<00:04,  2.73it/s] 17%|#6        | 2/12 [00:00<00:03,  2.76it/s] 25%|##5       | 3/12 [00:01<00:03,  2.78it/s] 33%|###3      | 4/12 [00:01<00:02,  2.82it/s] 42%|####1     | 5/12 [00:01<00:02,  2.80it/s] 50%|#####     | 6/12 [00:02<00:02,  2.80it/s] 58%|#####8    | 7/12 [00:02<00:01,  2.82it/s] 67%|######6   | 8/12 [00:02<00:01,  2.86it/s] 75%|#######5  | 9/12 [00:03<00:01,  2.88it/s] 83%|########3 | 10/12 [00:03<00:00,  2.49it/s] 92%|#########1| 11/12 [00:04<00:00,  2.57it/s]100%|##########| 12/12 [00:04<00:00,  3.19it/s]100%|##########| 12/12 [00:04<00:00,  2.86it/s]
-  0%|          | 0/12 [00:00<?, ?it/s]  8%|8         | 1/12 [00:00<00:03,  2.83it/s] 17%|#6        | 2/12 [00:00<00:03,  2.88it/s] 25%|##5       | 3/12 [00:01<00:03,  2.88it/s] 33%|###3      | 4/12 [00:01<00:02,  2.87it/s] 42%|####1     | 5/12 [00:01<00:02,  2.84it/s] 50%|#####     | 6/12 [00:02<00:02,  2.84it/s] 58%|#####8    | 7/12 [00:02<00:01,  2.85it/s] 67%|######6   | 8/12 [00:02<00:01,  2.85it/s] 75%|#######5  | 9/12 [00:03<00:01,  2.87it/s] 83%|########3 | 10/12 [00:03<00:00,  2.46it/s] 92%|#########1| 11/12 [00:04<00:00,  2.56it/s]100%|##########| 12/12 [00:04<00:00,  3.19it/s]100%|##########| 12/12 [00:04<00:00,  2.88it/s]
-  0%|          | 0/12 [00:00<?, ?it/s]  8%|8         | 1/12 [00:00<00:03,  2.97it/s] 17%|#6        | 2/12 [00:00<00:03,  2.91it/s] 25%|##5       | 3/12 [00:01<00:03,  2.89it/s] 33%|###3      | 4/12 [00:01<00:02,  2.88it/s] 42%|####1     | 5/12 [00:01<00:02,  2.84it/s] 50%|#####     | 6/12 [00:02<00:02,  2.84it/s] 58%|#####8    | 7/12 [00:02<00:01,  2.84it/s] 67%|######6   | 8/12 [00:02<00:01,  2.83it/s] 75%|#######5  | 9/12 [00:03<00:01,  2.82it/s] 83%|########3 | 10/12 [00:03<00:00,  2.45it/s] 92%|#########1| 11/12 [00:04<00:00,  2.53it/s]100%|##########| 12/12 [00:04<00:00,  3.13it/s]100%|##########| 12/12 [00:04<00:00,  2.86it/s]
+wandb:  View run at https://wandb.ai/ai-choreo/simple_motion_translation/runs/baum1m23
+Traceback (most recent call last):
+  File "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/train_translation.py", line 22, in <module>
+    trainer.train(cfg.train.resume)
+  File "/coc/scratch/sanisetty3/music_motion/ATCMG/ctl/trainer_translation.py", line 460, in train
+    self.load(save_path)
+  File "/coc/scratch/sanisetty3/music_motion/ATCMG/ctl/trainer_translation.py", line 208, in load
+    self.tcn_model.load_state_dict(pkg["model"])
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 2153, in load_state_dict
+    raise RuntimeError('Error(s) in loading state_dict for {}:\n\t{}'.format(
+RuntimeError: Error(s) in loading state_dict for TranslationVQVAE:
+	Unexpected key(s) in state_dict: "vqvae.quantizer._codebook.batch_mean", "vqvae.quantizer._codebook.batch_variance". 
+wandb: WARNING No program path found, not creating job artifact. See https://docs.wandb.ai/guides/launch/create-job
+wandb: - 0.014 MB of 0.014 MB uploadedwandb: \ 0.020 MB of 0.020 MB uploadedwandb:  View run chocolate-haze-22 at: https://wandb.ai/ai-choreo/simple_motion_translation/runs/baum1m23
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20240404_020208-baum1m23/logs
+srun: error: major: task 0: Exited with exit code 1
+srun: Terminating StepId=848197.0

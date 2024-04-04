@@ -9,8 +9,8 @@ dataset:
   motion_min_length_s: 4
   motion_max_length_s: 4
 train:
-  resume: False
-  num_train_iters : 50001 #'Number of training steps
+  resume: True
+  num_train_iters : 800001 #'Number of training steps
   save_steps : 10000
   logging_steps : 10
   wandb_every : 200

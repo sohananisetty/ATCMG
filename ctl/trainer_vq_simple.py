@@ -107,6 +107,7 @@ class VQVAEMotionTrainer(nn.Module):
             hml_rep=self.hml_rep,
             motion_rep=self.motion_rep,
             use_simple_loss=self.vqvae_args.use_simple_loss,
+            remove_translation=self.remove_translation,
         )
 
         self.optim = get_optimizer(

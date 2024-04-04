@@ -294,7 +294,9 @@ class BaseMotionDataset(data.Dataset):
 
         split_seq = []
 
-        if "g" in hml_rep:
+        if "g" in hml_rep and (
+            motion_rep == MotionRep.BODY or motion_rep == MotionRep.FULL
+        ):
             split_seq.append(4)
         if "p" in hml_rep:
             if motion_rep == MotionRep.BODY or motion_rep == MotionRep.FULL:
@@ -308,7 +310,9 @@ class BaseMotionDataset(data.Dataset):
                 split_seq.append((joint_num) * 6)
         if "v" in hml_rep:
             split_seq.append(joint_num * 3)
-        if "c" in hml_rep:
+        if "c" in hml_rep and (
+            motion_rep == MotionRep.BODY or motion_rep == MotionRep.FULL
+        ):
             split_seq.append(4)
 
         params = np.split(motion, np.cumsum(split_seq), -1)[:-1]
