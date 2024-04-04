@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from random import random
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -346,6 +346,7 @@ class TransformerBlockFilmMuseCustom(nn.Module):
         self.norm_cross = LayerNorm(dim)
         self.norm_film = LayerNorm(dim)
         self.norm_out = LayerNorm(dim)
+        # self.norm_film_context = LayerNorm(dim)
 
     def forward(
         self,
@@ -389,6 +390,107 @@ class TransformerBlockFilmMuseCustom(nn.Module):
                     )
                     + x
                 )
+
+            x = self.norm_out(ff1(x) + x)
+
+        return x
+
+
+class TransformerBlockFilmMuseCustom2(nn.Module):
+    def __init__(
+        self,
+        dim: int = 768,
+        heads: int = 8,
+        attn_dropout: float = 0.0,
+        flash: bool = False,
+        depth: int = 1,
+        ff_mult: int = 4,
+        film_skip: int = 1,
+        causal: bool = False,
+    ):
+        super().__init__()
+        self.layers = nn.ModuleList([])
+        self.causal = causal
+
+        for d in range(depth):
+            self.layers.append(
+                nn.ModuleList(
+                    [
+                        CustomMHA(
+                            dim=dim,
+                            heads=heads,
+                            dropout=attn_dropout,
+                            add_null_kv=False,
+                            causal=causal,
+                            flash=flash,
+                        ),
+                        CustomMHA(
+                            dim=dim,
+                            heads=heads,
+                            dropout=attn_dropout,
+                            add_null_kv=True,
+                            flash=flash,
+                            causal=False,
+                        ),
+                        (
+                            FiLM(dim, dim)
+                            if (d % film_skip == 0 and d != depth - 1)
+                            else nn.Identity()
+                        ),
+                        # (FiLM(dim, dim) if (d % film_skip == 0) else nn.Identity()),
+                        FeedForward(dim=dim, mult=ff_mult, dropout=attn_dropout),
+                    ]
+                )
+            )
+
+        self.norm_sa = LayerNorm(dim)
+        self.norm_cross = LayerNorm(dim)
+        self.norm_film = LayerNorm(dim)
+        self.norm_out = LayerNorm(dim)
+        # self.norm_film_context = LayerNorm(dim)
+
+    def forward(
+        self,
+        x,
+        mask=None,
+        context=None,
+        context_mask=None,
+        film_context=None,
+        rel_pos=None,
+    ):
+        for attn, cross_attn, film, ff1 in self.layers:
+
+            x = self.norm_sa(x)
+            x = (
+                attn(
+                    q=x,
+                    k=x,
+                    v=x,
+                    key_padding_mask=mask,
+                    rel_pos=rel_pos if self.causal else None,
+                )
+                + x
+            )
+
+            if not isinstance(film, nn.Identity):
+
+                x = (
+                    film(
+                        self.norm_film(x),
+                        cond=film_context,
+                    )
+                    + x
+                )
+
+            x = (
+                cross_attn(
+                    q=self.norm_cross(x),
+                    k=context,
+                    v=context,
+                    key_padding_mask=context_mask,
+                )
+                + x
+            )
 
             x = self.norm_out(ff1(x) + x)
 
@@ -1283,6 +1385,7 @@ class MotionMuse(nn.Module):
         self,
         conditions: Dict[str, ConditionType],
         neg_conditions: Optional[Dict[str, ConditionType]] = None,
+        prime_frames=None,
         duration_s: int = 8,
         temperature=1.0,
         topk_filter_thres=0.9,
@@ -1292,6 +1395,11 @@ class MotionMuse(nn.Module):
         critic_noise_scale=1,
         force_not_use_token_critic=False,
     ):
+
+        has_prime = exists(prime_frames)
+        if has_prime:
+            prime_token_ids = prime_frames
+            prime_token_length = prime_token_ids.shape[-1]
 
         # begin with all image token ids masked
 
@@ -1334,7 +1442,7 @@ class MotionMuse(nn.Module):
                     x for x in list(conditions.keys()) if x not in ["audio", "text"]
                 ]
                 batch_size = conditions[rem_keys[0]][0].shape[0]
-                seq_len = int(conditions[rem_keys[0]][0].shape[1])
+                # seq_len = int(conditions[rem_keys[0]][0].shape[1])
                 if (
                     neg_conditions is not None
                     and neg_conditions.get(rem_keys[0], None) is not None
@@ -1407,6 +1515,10 @@ class MotionMuse(nn.Module):
             ids = ids.scatter(-1, masked_indices, self.mask_token_id)
 
             # print(ids.shape, mask.shape)
+            if has_prime:
+                # ids = torch.cat(prime_token_ids , ids)
+                ids[..., :prime_token_length] = prime_token_ids
+                scores[..., :prime_token_length] = -1e5
 
             logits, embed = demask_fn(
                 inputs=(ids, mask.squeeze(1)),
@@ -1522,3 +1634,72 @@ class MotionMuse(nn.Module):
                 out.ce_per_codebook[q] += self.critic_loss_weight * bce_per_codebook[q]
 
         return out
+
+
+def generate_animation(
+    motion_gen: MotionMuse,
+    condition_provider,
+    duration_s: int = 4,
+    aud_file: Optional[str] = None,
+    text: Optional[Union[List[str], str]] = None,
+):
+
+    _, conditions = condition_provider(
+        raw_audio=aud_file, raw_text=text, audio_max_length_s=-1
+    )
+    if (
+        aud_file is not None
+        and (conditions["audio"][0].shape[1] // condition_provider.sampling_rate)
+        < duration_s
+    ):
+        duration_s = conditions["audio"][0].shape[1] // condition_provider.sampling_rate
+
+    if isinstance(text, list):
+        num_iters = len(text)
+    else:
+
+        num_iters = int((duration_s * 7.5 - 30) / 20) + 1
+
+    all_ids = []
+    prime_frames = None
+    for i in range(num_iters):
+        new_conditions = {}
+
+        if aud_file is not None:
+
+            st = max(0, 20 * i - 10)
+            end = st + 120
+            new_conditions["audio"] = (
+                conditions["audio"][0][:, st:end],
+                conditions["audio"][1][:, st:end],
+            )
+
+        else:
+            new_conditions["audio"] = conditions["audio"]
+        if isinstance(text, list):
+            new_conditions["text"] = (
+                conditions["text"][0][i : i + 1],
+                conditions["text"][1][i : i + 1],
+            )
+        else:
+            new_conditions["text"] = conditions["text"]
+
+        gen_ids = motion_gen.generate(
+            conditions=new_conditions,
+            neg_conditions=None,
+            prime_frames=prime_frames,
+            duration_s=4,
+            temperature=1.0,
+            timesteps=24,
+            cond_scale=8,
+            force_not_use_token_critic=False,
+        )
+        prime_frames = gen_ids[..., -10:]
+
+        if i == 0:
+            all_ids.append(gen_ids)
+        else:
+            all_ids.append(gen_ids[..., 10:])
+
+    all_ids = torch.cat(all_ids, -1)
+    return all_ids

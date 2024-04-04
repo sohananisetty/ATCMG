@@ -110,3 +110,330 @@ torch.Size([1, 2, 30])
 torch.Size([1, 2, 30])
 torch.Size([1, 2, 30])
 torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+200: model cross entropy loss: 5.92 
+400: model cross entropy loss: 5.15 
+600: model cross entropy loss: 4.75 
+800: model cross entropy loss: 4.36 
+1000: model cross entropy loss: 4.04 
+1200: model cross entropy loss: 3.89 
+1400: model cross entropy loss: 3.78 
+1600: model cross entropy loss: 3.92 
+1800: model cross entropy loss: 3.86 
+2000: model cross entropy loss: 3.52 
+2200: model cross entropy loss: 3.42 
+2400: model cross entropy loss: 3.3 
+2600: model cross entropy loss: 3.33 
+2800: model cross entropy loss: 3.18 
+3000: model cross entropy loss: 3.19 
+3200: model cross entropy loss: 3.14 
+3400: model cross entropy loss: 3.22 
+3600: model cross entropy loss: 3.03 
+3800: model cross entropy loss: 3.11 
+4000: model cross entropy loss: 2.95 
+4200: model cross entropy loss: 2.91 
+4400: model cross entropy loss: 2.91 
+4600: model cross entropy loss: 3.01 
+4800: model cross entropy loss: 2.88 
+5000: model cross entropy loss: 2.75 
+5200: model cross entropy loss: 2.79 
+5400: model cross entropy loss: 2.8 
+5600: model cross entropy loss: 2.85 
+5800: model cross entropy loss: 2.89 
+6000: model cross entropy loss: 2.8 
+6200: model cross entropy loss: 2.88 
+6400: model cross entropy loss: 2.77 
+6600: model cross entropy loss: 2.81 
+6800: model cross entropy loss: 2.77 
+7000: model cross entropy loss: 2.7 
+7200: model cross entropy loss: 2.66 
+7400: model cross entropy loss: 2.61 
+7600: model cross entropy loss: 2.7 
+7800: model cross entropy loss: 2.66 
+8000: model cross entropy loss: 2.72 
+8200: model cross entropy loss: 2.68 
+8400: model cross entropy loss: 2.65 
+8600: model cross entropy loss: 2.62 
+8800: model cross entropy loss: 2.43 
+9000: model cross entropy loss: 2.53 
+9200: model cross entropy loss: 2.54 
+9400: model cross entropy loss: 2.58 
+9600: model cross entropy loss: 2.42 
+9800: model cross entropy loss: 2.46 
+10000: model cross entropy loss: 2.41 
+2.4055659770965576 tensor(6.3981)
+10000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_hands/checkpoints
+validation start
+val/ce_loss tensor(2.5460)
+render start
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+10200: model cross entropy loss: 2.48 
+10400: model cross entropy loss: 2.34 
+10600: model cross entropy loss: 2.43 
+10800: model cross entropy loss: 2.43 
+11000: model cross entropy loss: 2.39 
+11200: model cross entropy loss: 2.39 
+11400: model cross entropy loss: 2.35 
+11600: model cross entropy loss: 2.41 
+11800: model cross entropy loss: 2.36 
+12000: model cross entropy loss: 2.31 
+12200: model cross entropy loss: 2.41 
+12400: model cross entropy loss: 2.34 
+12600: model cross entropy loss: 2.29 
+12800: model cross entropy loss: 2.29 
+13000: model cross entropy loss: 2.2 
+13200: model cross entropy loss: 2.4 
+13400: model cross entropy loss: 2.33 
+13600: model cross entropy loss: 2.36 
+13800: model cross entropy loss: 2.34 
+14000: model cross entropy loss: 2.27 
+14200: model cross entropy loss: 2.16 
+14400: model cross entropy loss: 2.3 
+14600: model cross entropy loss: 2.27 
+14800: model cross entropy loss: 2.33 
+15000: model cross entropy loss: 2.11 
+15200: model cross entropy loss: 2.11 
+15400: model cross entropy loss: 2.34 
+15600: model cross entropy loss: 2.29 
+15800: model cross entropy loss: 2.22 
+16000: model cross entropy loss: 2.18 
+16200: model cross entropy loss: 2.24 
+16400: model cross entropy loss: 2.26 
+16600: model cross entropy loss: 2.45 
+16800: model cross entropy loss: 2.12 
+17000: model cross entropy loss: 2.16 
+17200: model cross entropy loss: 2.24 
+17400: model cross entropy loss: 2.24 
+17600: model cross entropy loss: 2.16 
+17800: model cross entropy loss: 2.19 
+18000: model cross entropy loss: 2.23 
+18200: model cross entropy loss: 2.19 
+18400: model cross entropy loss: 2.16 
+18600: model cross entropy loss: 2.23 
+18800: model cross entropy loss: 2.18 
+19000: model cross entropy loss: 2.12 
+19200: model cross entropy loss: 2.13 
+19400: model cross entropy loss: 2.0 
+19600: model cross entropy loss: 1.95 
+19800: model cross entropy loss: 2.1 
+20000: model cross entropy loss: 2.0 
+1.9993207454681396 tensor(2.4056)
+20000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_hands/checkpoints
+validation start
+val/ce_loss tensor(2.4084)
+render start
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+20200: model cross entropy loss: 2.18 
+20400: model cross entropy loss: 2.17 
+20600: model cross entropy loss: 2.11 
+20800: model cross entropy loss: 2.08 
+21000: model cross entropy loss: 2.12 
+21200: model cross entropy loss: 2.22 
+21400: model cross entropy loss: 1.98 
+21600: model cross entropy loss: 2.0 
+21800: model cross entropy loss: 2.2 
+22000: model cross entropy loss: 2.04 
+22200: model cross entropy loss: 2.07 
+22400: model cross entropy loss: 2.09 
+22600: model cross entropy loss: 2.04 
+22800: model cross entropy loss: 2.14 
+23000: model cross entropy loss: 1.9 
+23200: model cross entropy loss: 2.07 
+23400: model cross entropy loss: 2.17 
+23600: model cross entropy loss: 2.09 
+23800: model cross entropy loss: 2.02 
+24000: model cross entropy loss: 2.2 
+24200: model cross entropy loss: 1.96 
+24400: model cross entropy loss: 2.09 
+24600: model cross entropy loss: 2.09 
+24800: model cross entropy loss: 2.03 
+25000: model cross entropy loss: 2.03 
+25200: model cross entropy loss: 2.01 
+25400: model cross entropy loss: 2.0 
+25600: model cross entropy loss: 2.02 
+25800: model cross entropy loss: 2.05 
+26000: model cross entropy loss: 2.04 
+26200: model cross entropy loss: 2.02 
+26400: model cross entropy loss: 1.89 
+26600: model cross entropy loss: 1.95 
+26800: model cross entropy loss: 2.06 
+27000: model cross entropy loss: 1.99 
+27200: model cross entropy loss: 2.01 
+27400: model cross entropy loss: 2.01 
+27600: model cross entropy loss: 2.02 
+27800: model cross entropy loss: 2.09 
+28000: model cross entropy loss: 2.04 
+28200: model cross entropy loss: 1.98 
+28400: model cross entropy loss: 2.0 
+28600: model cross entropy loss: 1.86 
+28800: model cross entropy loss: 1.82 
+29000: model cross entropy loss: 1.95 
+29200: model cross entropy loss: 1.97 
+29400: model cross entropy loss: 1.93 
+29600: model cross entropy loss: 2.04 
+29800: model cross entropy loss: 1.79 
+30000: model cross entropy loss: 1.9 
+1.8965425491333008 tensor(1.9993)
+30000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_hands/checkpoints
+validation start
+val/ce_loss tensor(2.3434)
+render start
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])
+torch.Size([1, 2, 30])

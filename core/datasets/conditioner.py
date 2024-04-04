@@ -296,20 +296,22 @@ class ConditionProvider(nn.Module):
         raw_text: Optional[Union[str, List[str]]] = None,
         audio_padding: Optional[str] = None,
         motion_padding: Optional[str] = None,
-        motion_max_length: Optional[int] = None,
-        audio_max_length: Optional[int] = None,
+        motion_max_length_s: Optional[int] = None,
+        audio_max_length_s: Optional[int] = None,
     ) -> tp.Tuple[BatchFeature, BatchFeature]:
 
         audio_padding = audio_padding if audio_padding else self.audio_padding
         motion_padding = motion_padding if motion_padding else self.motion_padding
 
         audio_max_length = (
-            audio_max_length if audio_max_length is not None else self.audio_max_length
+            self.audio_max_length
+            if audio_max_length_s is None
+            else audio_max_length_s * self.sampling_rate
         )
         motion_max_length = (
-            motion_max_length
-            if motion_max_length is not None
-            else self.motion_max_length
+            self.motion_max_length
+            if motion_max_length_s is None
+            else motion_max_length_s * self.fps
         )
 
         input_features = {}
@@ -330,9 +332,11 @@ class ConditionProvider(nn.Module):
 
             return BatchFeature(input_features), BatchFeature(condition_features)
 
-        assert (
-            audio_max_length // self.sampling_rate == motion_max_length // self.fps
-        ), "need both max length to be same"
+        if raw_motion is not None:
+
+            assert (
+                audio_max_length // self.sampling_rate == motion_max_length // self.fps
+            ), "need both max length to be same"
 
         max_length_s = motion_max_length // self.fps
 
@@ -352,6 +356,7 @@ class ConditionProvider(nn.Module):
                         raw_audio[i] = self.audio_encoder(raw_audio[i]).cpu().numpy()
 
             padded_audio, audio_mask = self._get_audio_features(
+                max_length=audio_max_length if audio_max_length > 0 else None,
                 audio_list=raw_audio,
                 padding="longest",
             )
