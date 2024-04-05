@@ -22,6 +22,7 @@ from core.models.utils import FeedForward, LayerNorm, default, exists, get_obj_f
 from einops import rearrange, repeat
 from torch import einsum, nn
 from tqdm.auto import tqdm
+from einops.layers.torch import Rearrange
 
 from .streaming_transformer.codebooks_patterns import CodebooksPatternProvider
 
@@ -80,25 +81,6 @@ def make_copy(condition):
     return copy_conditions
 
 
-# tensor helpers
-
-
-# def get_mask_subset_prob(mask, prob, min_mask=0):
-#     batch, seq, device = *mask.shape, mask.device
-#     num_to_mask = (mask.sum(dim=-1, keepdim=True) * prob).clamp(min=min_mask)
-#     logits = torch.rand((batch, seq), device=device)
-#     logits = logits.masked_fill(~mask, -1)
-
-#     randperm = logits.argsort(dim=-1).argsort(dim=-1).float()
-
-#     num_padding = (~mask).sum(dim=-1, keepdim=True)
-#     randperm -= num_padding
-
-#     subset_mask = randperm < num_to_mask
-#     subset_mask.masked_fill_(~mask, False)
-#     return subset_mask
-
-
 def get_mask_subset_prob(mask, prob, min_mask=0):
     batch, K, seq, device = *mask.shape, mask.device
     num_to_mask = (mask.sum(dim=-1, keepdim=True) * prob).clamp(min=min_mask)
@@ -116,6 +98,15 @@ def get_mask_subset_prob(mask, prob, min_mask=0):
 
 
 # classes
+class ScaleNorm(nn.Module):
+    def __init__(self, dim, eps=1e-5):
+        super().__init__()
+        self.eps = eps
+        self.g = nn.Parameter(torch.ones(1) * (dim**-0.5))
+
+    def forward(self, x):
+        norm = torch.norm(x, dim=-1, keepdim=True)
+        return x / norm.clamp(min=self.eps) * self.g
 
 
 class LayerNorm(nn.Module):
@@ -230,80 +221,6 @@ class TransformerBlockMuseCustom(nn.Module):
         flash: bool = False,
         depth: int = 1,
         ff_mult: int = 4,
-        causal: bool = False,
-    ):
-        super().__init__()
-        self.layers = nn.ModuleList([])
-        self.causal = causal
-
-        for _ in range(depth):
-            self.layers.append(
-                nn.ModuleList(
-                    [
-                        CustomMHA(
-                            dim=dim,
-                            heads=heads,
-                            dropout=attn_dropout,
-                            add_null_kv=False,
-                            causal=causal,
-                            flash=flash,
-                        ),
-                        CustomMHA(
-                            dim=dim,
-                            heads=heads,
-                            dropout=attn_dropout,
-                            add_null_kv=True,
-                            flash=flash,
-                            causal=False,
-                        ),
-                        FeedForward(dim=dim, mult=ff_mult, dropout=attn_dropout),
-                    ]
-                )
-            )
-
-        self.norm_sa = LayerNorm(dim)
-        self.norm_cross = LayerNorm(dim)
-        self.norm_out = LayerNorm(dim)
-
-    def forward(self, x, mask=None, context=None, context_mask=None, rel_pos=None):
-        for attn, cross_attn, ff1 in self.layers:
-
-            x = self.norm_sa(x)
-            x = (
-                attn(
-                    q=x,
-                    k=x,
-                    v=x,
-                    key_padding_mask=mask,
-                    rel_pos=rel_pos if self.causal else None,
-                )
-                + x
-            )
-
-            x = (
-                cross_attn(
-                    q=self.norm_cross(x),
-                    k=context,
-                    v=context,
-                    key_padding_mask=context_mask,
-                )
-                + x
-            )
-
-            x = self.norm_out(ff1(x) + x)
-
-        return x
-
-
-class TransformerBlockFilmMuseCustom(nn.Module):
-    def __init__(
-        self,
-        dim: int = 768,
-        heads: int = 8,
-        attn_dropout: float = 0.0,
-        flash: bool = False,
-        depth: int = 1,
-        ff_mult: int = 4,
         film_skip: int = 1,
         causal: bool = False,
     ):
@@ -338,7 +255,6 @@ class TransformerBlockFilmMuseCustom(nn.Module):
                             )
                             else nn.Identity()
                         ),
-                        # (FiLM(dim, dim) if (d % film_skip == 0) else nn.Identity()),
                         FeedForward(dim=dim, mult=ff_mult, dropout=attn_dropout),
                     ]
                 )
@@ -348,7 +264,7 @@ class TransformerBlockFilmMuseCustom(nn.Module):
         self.norm_cross = LayerNorm(dim)
         self.norm_film = LayerNorm(dim)
         self.norm_out = LayerNorm(dim)
-        # self.norm_film_context = LayerNorm(dim)
+        self.norm_film_context = LayerNorm(dim)
 
     def forward(
         self,
@@ -388,7 +304,7 @@ class TransformerBlockFilmMuseCustom(nn.Module):
                 x = (
                     film(
                         self.norm_film(x),
-                        cond=film_context,
+                        cond=self.norm_film_context(film_context),
                     )
                     + x
                 )
@@ -398,7 +314,7 @@ class TransformerBlockFilmMuseCustom(nn.Module):
         return x
 
 
-class TransformerBlockSpatialFilmMuseCustom(nn.Module):
+class TransformerBlockMuseSpatialCustom(nn.Module):
     def __init__(
         self,
         dim: int = 768,
@@ -407,8 +323,8 @@ class TransformerBlockSpatialFilmMuseCustom(nn.Module):
         flash: bool = False,
         depth: int = 1,
         ff_mult: int = 4,
-        film_skip: int = 1,
         causal: bool = False,
+        film_skip: int = 0,
     ):
         super().__init__()
         self.layers = nn.ModuleList([])
@@ -449,18 +365,17 @@ class TransformerBlockSpatialFilmMuseCustom(nn.Module):
                             )
                             else nn.Identity()
                         ),
-                        # (FiLM(dim, dim) if (d % film_skip == 0) else nn.Identity()),
                         FeedForward(dim=dim, mult=ff_mult, dropout=attn_dropout),
                     ]
                 )
             )
 
-        self.norm_sp = LayerNorm(dim)
-        self.norm_tp = LayerNorm(dim)
+        self.norm_spatial_attn = LayerNorm(dim)
+        self.norm_temporal_attn = LayerNorm(dim)
         self.norm_cross = LayerNorm(dim)
-        self.norm_film = LayerNorm(dim)
         self.norm_out = LayerNorm(dim)
-        # self.norm_film_context = LayerNorm(dim)
+        self.norm_film = LayerNorm(dim)
+        self.norm_film_context = LayerNorm(dim)
 
     def forward(
         self,
@@ -471,21 +386,44 @@ class TransformerBlockSpatialFilmMuseCustom(nn.Module):
         film_context=None,
         rel_pos=None,
     ):
+
+        b, n, c, d = x.shape
+        x = rearrange(x, "b n c d -> (b c) n d", b=b, n=n, c=c, d=d)
+
+        mask = None if mask is None else repeat(mask, "b n -> (b c) n", c=c)
+        film_context = (
+            None
+            if film_context is None
+            else repeat(film_context, "b n d -> (b c) n d", c=c)
+        )
+        context = (
+            None if context is None else repeat(context, "b n d -> (b c) n d", c=c)
+        )
+        context_mask = (
+            None
+            if context_mask is None
+            else repeat(context_mask, "b n -> (b c) n", c=c)
+        )
+
         for sp_attn, tp_attn, cross_attn, film, ff1 in self.layers:
 
-            x = self.norm_sp(x)
-            x = (
-                sp_attn(
-                    q=x,
-                    k=x,
-                    v=x,
-                    key_padding_mask=mask,
-                    rel_pos=rel_pos if self.causal else None,
-                )
-                + x
-            )
+            if not isinstance(sp_attn, nn.Identity):
+                x = rearrange(x, "(b c) n d -> (b n) c d", b=b, n=n, c=c, d=d)
 
-            x = self.norm_tp(x)
+                x = self.norm_spatial_attn(x)
+                x = (
+                    sp_attn(
+                        q=x,
+                        k=x,
+                        v=x,
+                        key_padding_mask=mask,
+                        rel_pos=rel_pos if self.causal else None,
+                    )
+                    + x
+                )
+                x = rearrange(x, "(b n) c d -> (b c) n d", b=b, n=n, c=c, d=d)
+
+            x = self.norm_temporal_attn(x)
             x = (
                 tp_attn(
                     q=x,
@@ -500,125 +438,26 @@ class TransformerBlockSpatialFilmMuseCustom(nn.Module):
             x = (
                 cross_attn(
                     q=self.norm_cross(x),
-                    k=context,
-                    v=context,
+                    k=(context),
+                    v=(context),
                     key_padding_mask=context_mask,
                 )
                 + x
             )
 
-            if not isinstance(film, nn.Identity):
+            if not isinstance(film, nn.Identity) and film_context is not None:
 
                 x = (
                     film(
                         self.norm_film(x),
-                        cond=film_context,
+                        cond=self.norm_film_context(film_context),
                     )
                     + x
                 )
 
             x = self.norm_out(ff1(x) + x)
 
-        return x
-
-
-class TransformerBlockFilmMuseCustom2(nn.Module):
-    def __init__(
-        self,
-        dim: int = 768,
-        heads: int = 8,
-        attn_dropout: float = 0.0,
-        flash: bool = False,
-        depth: int = 1,
-        ff_mult: int = 4,
-        film_skip: int = 1,
-        causal: bool = False,
-    ):
-        super().__init__()
-        self.layers = nn.ModuleList([])
-        self.causal = causal
-
-        for d in range(depth):
-            self.layers.append(
-                nn.ModuleList(
-                    [
-                        CustomMHA(
-                            dim=dim,
-                            heads=heads,
-                            dropout=attn_dropout,
-                            add_null_kv=False,
-                            causal=causal,
-                            flash=flash,
-                        ),
-                        CustomMHA(
-                            dim=dim,
-                            heads=heads,
-                            dropout=attn_dropout,
-                            add_null_kv=True,
-                            flash=flash,
-                            causal=False,
-                        ),
-                        (
-                            FiLM(dim, dim)
-                            if (d % film_skip == 0 and d != depth - 1)
-                            else nn.Identity()
-                        ),
-                        # (FiLM(dim, dim) if (d % film_skip == 0) else nn.Identity()),
-                        FeedForward(dim=dim, mult=ff_mult, dropout=attn_dropout),
-                    ]
-                )
-            )
-
-        self.norm_sa = LayerNorm(dim)
-        self.norm_cross = LayerNorm(dim)
-        self.norm_film = LayerNorm(dim)
-        self.norm_out = LayerNorm(dim)
-        # self.norm_film_context = LayerNorm(dim)
-
-    def forward(
-        self,
-        x,
-        mask=None,
-        context=None,
-        context_mask=None,
-        film_context=None,
-        rel_pos=None,
-    ):
-        for attn, cross_attn, film, ff1 in self.layers:
-
-            x = self.norm_sa(x)
-            x = (
-                attn(
-                    q=x,
-                    k=x,
-                    v=x,
-                    key_padding_mask=mask,
-                    rel_pos=rel_pos if self.causal else None,
-                )
-                + x
-            )
-
-            if not isinstance(film, nn.Identity):
-
-                x = (
-                    film(
-                        self.norm_film(x),
-                        cond=film_context,
-                    )
-                    + x
-                )
-
-            x = (
-                cross_attn(
-                    q=self.norm_cross(x),
-                    k=context,
-                    v=context,
-                    key_padding_mask=context_mask,
-                )
-                + x
-            )
-
-            x = self.norm_out(ff1(x) + x)
+        x = rearrange(x, "(b c) n d -> b c n d", b=b, n=n, c=c, d=d)
 
         return x
 
@@ -716,8 +555,8 @@ class MLMModel(nn.Module):
         rel_pos=False,
         var_len=True,
         custom=True,
-        film=False,
         spatial=False,
+        film=False,
         film_skip=1,
         flatten=False,
         quality_emb=False,
@@ -740,8 +579,10 @@ class MLMModel(nn.Module):
         self.pattern_provider = pattern_provider
         self.var_len = var_len
         self.quality_emb = quality_emb
-        self.film = film
+        self.spatial = spatial
         self.flatten = flatten
+        self.film_skip = film_skip
+        self.film = film_skip > 0
 
         ## if flatten num_tokens = sum of all num_tokens
 
@@ -762,13 +603,14 @@ class MLMModel(nn.Module):
             self.rel_pos_bias = AlibiPositionalBias(heads=heads // 2, total_heads=heads)
 
         if custom:
-            if film:
-                self.transformer_blocks = TransformerBlockFilmMuseCustom2(
+            if self.spatial:
+                self.transformer_blocks = TransformerBlockMuseSpatialCustom(
                     dim=dim, heads=heads, film_skip=film_skip, **kwargs
                 )
             else:
+
                 self.transformer_blocks = TransformerBlockMuseCustom(
-                    dim=dim, heads=heads, **kwargs
+                    dim=dim, heads=heads, film_skip=film_skip, **kwargs
                 )
         else:
             self.transformer_blocks = TransformerBlockMuse(
@@ -796,20 +638,33 @@ class MLMModel(nn.Module):
             if self.audio_input_dim != self.dim
             else nn.Identity()
         )
+        self.downsample_audio = nn.Sequential(
+            Rearrange("b n d -> b d n"),
+            nn.Conv1d(
+                self.audio_input_dim,
+                self.audio_input_dim,
+                3,
+                2,
+                1,
+                dilation=1,
+                bias=False,
+            ),
+            nn.Conv1d(self.audio_input_dim, self.audio_input_dim, 3, 2, 1, bias=False),
+            Rearrange("b d n -> b n d"),
+        )
+
         self.project_text = (
             nn.Linear(self.text_input_dim, self.dim, bias=False)
             if self.text_input_dim != self.dim
             else nn.Identity()
         )
 
-        self.project_translation = (
-            nn.Linear(2, self.dim, bias=False)
-            if self.translation_present
-            else nn.Identity()
-        )
-
-        self.linears = nn.ModuleList(
-            [nn.Linear(dim, self.num_tokens, bias=bias_proj) for _ in range(n_q)]
+        self.linears = (
+            nn.Linear(dim, self.num_tokens, bias=bias_proj)
+            if self.spatial
+            else nn.ModuleList(
+                [nn.Linear(dim, self.num_tokens, bias=bias_proj) for _ in range(n_q)]
+            )
         )
         self.out_norm = LayerNorm(dim)
 
@@ -864,14 +719,16 @@ class MLMModel(nn.Module):
             ce_per_codebook.append(q_ce)
         # average cross entropy across codebooks
         ce = ce / K
-        return (ce, ce_per_codebook)
+        return ce, ce_per_codebook
 
     def _prepare_inputs(self, input, conditions):
         new_conditions = {}
 
         if conditions.get("audio", None) is not None:
-            audio_embed = self.project_audio(conditions["audio"][0])
+            audio_embed = self.downsample_audio(conditions["audio"][0])
+            audio_embed = self.project_audio(audio_embed)
             new_conditions["audio"] = (audio_embed, conditions["audio"][1])
+
         if conditions.get("text", None) is not None:
             text_embed = self.project_text(conditions["text"][0])
             new_conditions["text"] = (text_embed, conditions["text"][1])
@@ -881,37 +738,21 @@ class MLMModel(nn.Module):
         for k in rem_keys:
             new_conditions[k] = conditions[k]
 
-        # audio_embed = self.project_audio(conditions["audio"][0])
-        # text_embed = self.project_text(conditions["text"][0])
-
-        # new_conditions = {
-        #     "audio": (audio_embed, conditions["audio"][1]),
-        #     "text": (text_embed, conditions["text"][1]),
-        # }
-        # if self.translation_present:
-        #     translation_embed = self.project_translation(conditions["translation"][0])
-        #     new_conditions = {
-        #         "translation": (translation_embed, conditions["translation"][1]),
-        #         "audio": (audio_embed, conditions["audio"][1]),
-        #         "text": (text_embed, conditions["text"][1]),
-        #     }
         inputs_, cross_inputs = self.condition_fuser(input, new_conditions)
 
         if self.film:
-            input_seq_len = input[0].shape[1]
-            film_cond = F.interpolate(
-                audio_embed.permute(0, 2, 1), size=input_seq_len
-            ).permute(0, 2, 1)
             film_cond_mask = (
                 F.interpolate(
                     conditions["audio"][1].unsqueeze(1).to(torch.float),
-                    size=input_seq_len,
+                    size=input[0].shape[1],
                 )
                 .squeeze(1)
                 .to(torch.bool)
             )
 
-            return inputs_, cross_inputs, film_cond * film_cond_mask[..., None]
+            film_cond = audio_embed * film_cond_mask[..., None]
+
+            return inputs_, cross_inputs, film_cond
 
         return inputs_, cross_inputs
 
@@ -998,15 +839,26 @@ class MLMModel(nn.Module):
             K == self.num_codebooks
         ), "Sequence shape must match the specified number of codebooks"
 
-        if isinstance(self.project_input, nn.Identity):
-            input_ = sum([self.token_emb[k](sequence[:, k]) for k in range(K)])
-        else:
-
-            input_ = torch.cat(
+        if self.spatial:
+            input_ = torch.stack(
                 [self.token_emb[k](sequence[:, k]) for k in range(K)], -1
             )
 
-            input_ = self.project_input(input_)
+            input_ = rearrange(input_, "b n d c -> b n c d")
+
+        else:
+
+            if isinstance(self.project_input, nn.Identity):
+
+                input_ = sum([self.token_emb[k](sequence[:, k]) for k in range(K)])
+            else:
+
+                input_ = torch.stack(
+                    [self.token_emb[k](sequence[:, k]) for k in range(K)], -1
+                )
+                input_ = input_.reshape(B, S, -1)
+
+                input_ = self.project_input(input_)
 
         # classifier free guidance
         cond_drop_prob = default(cond_drop_prob, self.cond_dropout)
@@ -1026,7 +878,15 @@ class MLMModel(nn.Module):
         context = cross_attention_input[0]
         context_padding_mask = cross_attention_input[1]
 
-        x_ = x_ + self.pos_emb(x_)
+        if self.spatial:
+            # x_ = rearrange(x_, "b n (c d) -> b n c d", c=K)
+            pos_emb_spatial = self.pos_emb(pos=torch.arange(K, device=x_.device))
+            pos_emb_tmp = self.pos_emb(x_)
+            x_ = x_ + pos_emb_spatial[None, None, :, :]
+            x_ = x_ + pos_emb_tmp[None, :, None, :]
+        else:
+            x_ = x_ + self.pos_emb(x_)
+
         x_ = self.post_emb_norm(x_)
         x_ = self.emb_dropout(x_)
 
@@ -1055,7 +915,13 @@ class MLMModel(nn.Module):
             )
         if self.out_norm:
             embed = self.out_norm(embed)
-        logits = torch.stack([self.linears[k](embed) for k in range(K)], dim=1)
+
+        if self.spatial:
+            logits = self.linears(embed)
+
+        else:
+
+            logits = torch.stack([self.linears[k](embed) for k in range(K)], dim=1)
 
         if (
             len(self.condition_fuser.fuse2cond.get("prepend", [])) > 0
@@ -1273,9 +1139,6 @@ class MotionMuse(nn.Module):
 
         pattern_provider = pattern_providers[modeling](
             n_q=tranformer_config.n_q,
-            # delays=pattern_config.delays,
-            # flatten_first=pattern_config.flatten_first,
-            # empty_initial=pattern_config.empty_initial,
         )
 
         self.model = MLMModel(
@@ -1305,27 +1168,19 @@ class MotionMuse(nn.Module):
         motion_ids = motion_ids.contiguous().view(batch, 1, -1)
         seq_len = K * T
         device = motion_ids.device
-        # batch, K, seq_len, device = (
-        #     *motion_ids.shape,
-        #     motion_ids.device,
-        # )
 
         code_ids = motion_ids.clone()
 
         rand_time = uniform((batch,), device=device)
         rand_mask_probs = self.noise_schedule(rand_time)
-        # num_token_masked = (seq_len * K * rand_mask_probs).round().clamp(min=1)
-        # batch_randperm = torch.rand((batch, K * seq_len), device=device).argsort(dim=-1)
+
         num_token_masked = (seq_len * 1 * rand_mask_probs).round().clamp(min=1)
 
-        # mask_id = self.mask_token_id
         batch_randperm = torch.rand((batch, 1 * seq_len), device=device).argsort(dim=-1)
         mask = batch_randperm < rearrange(num_token_masked, "b -> b 1")
-        # mask = mask.reshape(batch, K, seq_len)
         mask = mask.reshape(batch, 1, seq_len)
         mask[code_ids == self.model.pad_token_id] = False
 
-        # mask_id = self.transformer.mask_token_id
         labels = torch.where(mask, code_ids, ignore_index)
 
         if self.no_mask_token_prob > 0.0:
@@ -1337,34 +1192,6 @@ class MotionMuse(nn.Module):
         labels = labels.reshape(batch, K, T)
 
         return x, labels, mask.reshape(batch, K, T)
-
-    def muse_mask_legacy(self, motion_ids: torch.Tensor, ignore_index: int = -100):
-        batch, K, seq_len, device = (
-            *motion_ids.shape,
-            motion_ids.device,
-        )
-
-        code_ids = motion_ids.clone()
-
-        rand_time = uniform((batch,), device=device)
-        rand_mask_probs = self.noise_schedule(rand_time)
-        num_token_masked = (seq_len * K * rand_mask_probs).round().clamp(min=1)
-
-        # mask_id = self.mask_token_id
-        batch_randperm = torch.rand((batch, K, seq_len), device=device).argsort(dim=-1)
-        mask = batch_randperm < rearrange(num_token_masked, "b -> b 1 1")
-        mask[code_ids == self.model.pad_token_id] = False
-
-        # mask_id = self.transformer.mask_token_id
-        labels = torch.where(mask, code_ids, ignore_index)
-
-        if self.no_mask_token_prob > 0.0:
-            no_mask_mask = get_mask_subset_prob(mask, self.no_mask_token_prob)
-            mask &= ~no_mask_mask
-
-        x = torch.where(mask, self.mask_token_id, code_ids)
-
-        return x, labels
 
     def bert_muse_mask(self, motion_ids: torch.Tensor, ignore_index: int = -100):
         batch, K, seq_len, device = (

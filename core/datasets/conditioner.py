@@ -537,7 +537,12 @@ class ConditionFuser(nn.Module):
 
         input = input_[0]
         input_padding_mask = input_[1]
-        B, T, _ = input.shape
+        spatial = False
+        if len(input.shape) == 3:
+            B, T, _ = input.shape
+        elif len(input.shape) == 4:
+            spatial = True
+            B, T, C, _ = input.shape
 
         assert set(conditions.keys()).issubset(set(self.cond2fuse.keys())), (
             f"given conditions contain unknown attributes for fuser, "
@@ -551,9 +556,13 @@ class ConditionFuser(nn.Module):
             if op is None:
                 continue
             if op == "sum":
-                input += cond * cond_mask[..., None]
-                # input_padding_mask = input_padding_mask
-                # & cond_mask
+                if spatial:
+                    input += (
+                        einops.rearrange(cond, "b t d -> b t 1 d")
+                        * cond_mask[..., None, None]
+                    )
+                else:
+                    input += cond * cond_mask[..., None]
 
             elif op == "input_interpolate":
                 cond = einops.rearrange(cond, "b t d -> b d t")
@@ -566,9 +575,15 @@ class ConditionFuser(nn.Module):
                     .squeeze(1)
                     .to(torch.bool)
                 )
-                input += einops.rearrange(cond, "b d t -> b t d") * cond_mask[..., None]
-                # input_padding_mask = input_padding_mask
-                # & cond_mask
+                if spatial:
+                    input += (
+                        einops.rearrange(cond, "b d t -> b t 1 d")
+                        * cond_mask[..., None, None]
+                    )
+                else:
+                    input += (
+                        einops.rearrange(cond, "b d t -> b t d") * cond_mask[..., None]
+                    )
 
             elif op == "prepend":
                 if len(cond.shape) == 2:

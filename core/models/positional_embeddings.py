@@ -121,11 +121,14 @@ class ScaledSinusoidalEmbedding(nn.Module):
         inv_freq = theta**-freq_seq
         self.register_buffer("inv_freq", inv_freq, persistent=False)
 
-    def forward(self, x, pos=None):
-        seq_len, device = x.shape[1], x.device
+    def forward(self, x=None, pos=None):
 
         if not exists(pos):
+            seq_len, device = x.shape[1], x.device
             pos = torch.arange(seq_len, device=device)
+
+        else:
+            device = pos.device
 
         emb = einsum("i, j -> i j", pos, self.inv_freq.to(device))
         emb = torch.cat((emb.sin(), emb.cos()), dim=-1)

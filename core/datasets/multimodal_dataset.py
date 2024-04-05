@@ -20,6 +20,7 @@ from core.datasets.conditioner import ConditionProvider
 from torch.utils import data
 from torch.utils.data.dataloader import default_collate
 from tqdm import tqdm
+import random
 
 genre_dict = {
     "mBR": "Break",
@@ -33,6 +34,7 @@ genre_dict = {
     "mJS": "Street_Jazz",
     "mJB": "Ballet_Jazz",
 }
+inv_genre_dict = {v: k for k, v in genre_dict.items()}
 
 dataset_names_default = [
     "animation",
@@ -664,22 +666,26 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
             right_hand_motion = right_hand_motion[:min_length]
 
         text = self.text_list[item]
+        audio_name = name
         try:
+
+            if "aist" in audio_name:
+                for i in genre_dict.values():
+                    if i in audio_name:
+                        audio_name = (
+                            f"aist/{(inv_genre_dict[i])}{str(random.randint(0, 5))}"
+                        )
 
             if self.audio_rep in ["wav", "clap"]:
 
-                # wav, sr = torchaudio.load(
-                #     os.path.join(self.audio_dir, self.audio_rep, name + ".wav")
-                # )
-                # audio_data = np.array(convert_audio(wav, sr, self.sampling_rate, 1))
                 audio_data, _ = librosa.load(
-                    os.path.join(self.audio_dir, "wav", name + ".wav"),
+                    os.path.join(self.audio_dir, "wav", audio_name + ".wav"),
                     sr=self.sampling_rate,
                 )  # sample rate should be 48000
                 audio_data = audio_data.reshape(-1, 1)  ## T 1
             elif self.audio_rep in ["encodec", "librosa"]:
                 audio_data = np.load(
-                    os.path.join(self.audio_dir, self.audio_rep, name + ".npy")
+                    os.path.join(self.audio_dir, self.audio_rep, audio_name + ".npy")
                 )
 
             motion_s = (motion.shape[0]) // self.fps

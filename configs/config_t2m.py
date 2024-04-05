@@ -100,10 +100,11 @@ cfg.motion_generator.flash = True
 cfg.motion_generator.custom = True
 cfg.motion_generator.num_tokens = 1024
 cfg.motion_generator.ff_mult = 4
-cfg.motion_generator.post_emb_norm = False
+cfg.motion_generator.post_emb_norm = True
 cfg.motion_generator.rel_pos = False
 cfg.motion_generator.flatten = False
 cfg.motion_generator.proj_input = False
+cfg.motion_generator.spatial = False
 
 ## Conditional
 cfg.motion_generator.audio_input_dim = 128
