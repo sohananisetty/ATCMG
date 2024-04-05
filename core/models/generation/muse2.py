@@ -826,6 +826,7 @@ class MLMModel(nn.Module):
         cond_drop_prob: float = None,
         ignore_index: int = -100,
         quality_list=None,
+        return_embed=False,
     ):
 
         sequence = inputs[0]
@@ -916,6 +917,9 @@ class MLMModel(nn.Module):
         if self.out_norm:
             embed = self.out_norm(embed)
 
+        if return_embed:
+            return MuseOutput(embed=embed)
+
         if self.spatial:
             logits = self.linears(embed)
 
@@ -995,10 +999,18 @@ class SelfCritic(nn.Module):
     def __init__(self, net):
         super().__init__()
         self.net = net
+        self.spatial = self.net.spatial
         self.num_codebooks = self.net.num_codebooks
-        self.to_preds = nn.ModuleList(
-            [nn.Linear(net.dim, 1) for _ in range(self.num_codebooks)]
+        self.to_preds = (
+            nn.Linear(net.dim, 1)
+            if self.spatial
+            else nn.ModuleList(
+                [nn.Linear(net.dim, 1) for _ in range(self.num_codebooks)]
+            )
         )
+        # self.to_preds = nn.ModuleList(
+        #     [nn.Linear(net.dim, 1) for _ in range(self.num_codebooks)]
+        # )
 
     def forward_with_cond_scale(
         self,
@@ -1077,10 +1089,15 @@ class SelfCritic(nn.Module):
         labels: Optional[torch.IntTensor] = None,
         **kwargs,
     ):
-        out = self.net(inputs, conditions, **kwargs)
-        logits = torch.stack(
-            [self.to_preds[k](out.embed) for k in range(self.num_codebooks)], dim=1
-        )
+        out = self.net(inputs, conditions, return_embed=True, **kwargs)
+        if self.spatial:
+            logits = self.to_preds(out.embed)
+
+        else:
+
+            logits = torch.stack(
+                [self.to_preds[k](out.embed) for k in range(self.num_codebooks)], dim=1
+            )
 
         if not exists(labels):
             return logits
@@ -1119,6 +1136,7 @@ class MotionMuse(nn.Module):
         self.no_mask_token_prob = tranformer_config.pop("no_mask_token_prob")
         self.critic_loss_weight = tranformer_config.pop("critic_loss_weight")
         self.flatten = tranformer_config.flatten
+        self.spatial = tranformer_config.spatial
         self.flatten_interleave = True
         self.self_token_critic = True if self.critic_loss_weight > 0 else False
 

@@ -60,7 +60,7 @@ motion_generator:
   spatial: True
   film: True ##Film2
   film_skip: 2
-  critic_loss_weight: 0.0
+  critic_loss_weight: 1.0
 
 
 
