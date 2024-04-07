@@ -5,8 +5,12 @@ from typing import Dict, List, Optional
 
 import torch
 from core.models.generation.streaming_transformer.codebooks_patterns import (
-    CoarseFirstPattern, DelayedPatternProvider, MusicLMPattern,
-    ParallelPatternProvider, UnrolledPatternProvider)
+    CoarseFirstPattern,
+    DelayedPatternProvider,
+    MusicLMPattern,
+    ParallelPatternProvider,
+    UnrolledPatternProvider,
+)
 
 
 class PositionalEmbeddingType(Enum):
@@ -28,6 +32,7 @@ class MotionRep(Enum):
 class TextRep(Enum):
     POOLED_TEXT_EMBED = "pooled_text_embed"
     FULL_TEXT_EMBED = "full_text_embed"
+    NONE = "none"
 
 
 class AudioRep(Enum):
@@ -35,6 +40,7 @@ class AudioRep(Enum):
     LIBROSA = "librosa"
     WAV = "wav"
     CLAP = "clap"
+    NONE = "none"
 
 
 pattern_providers = {

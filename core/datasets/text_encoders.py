@@ -20,6 +20,7 @@ from transformers import (
     T5EncoderModel,
     T5Tokenizer,
 )
+from transformers import AutoTokenizer, AutoModel
 
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
 CACHE_DIR = "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/pretrained/"
@@ -414,6 +415,72 @@ class BERTConditioner(BaseTextConditioner):
             embeds = self.encoding(**inputs).last_hidden_state
 
         encoding = embeds[:, 0] * mask.unsqueeze(-1)
+
+        return encoding, mask
+
+
+class MPNETConditioner(BaseTextConditioner):
+    def __init__(
+        self,
+        device: str = "cuda" if torch.cuda.is_available() else "cpu",
+        name: str = "sentence-transformers/all-mpnet-base-v2",
+    ):
+        super().__init__()
+        self.device = device
+
+        self.tokenizer = AutoTokenizer.from_pretrained(name)
+        self.encoder = (
+            AutoModel.from_pretrained(name, cache_dir=CACHE_DIR).to(device).eval()
+        )
+        self.config = self.encoder.config
+        self.dim = self.config.hidden_size
+
+        self.freeze()
+
+    # @property
+    # def device(self):
+    #     return next(self.encoder.parameters()).device
+
+    def freeze(self):
+        for p in self.encoder.parameters():
+            p.requires_grad = False
+
+    def tokenize(self, x: Union[str, List[str]]):
+
+        if x is not None and isinstance(x, str):
+            x = [x]
+        entries: tp.List[str] = [xi if xi is not None else "" for xi in x]
+
+        empty_idx = torch.LongTensor([i for i, xi in enumerate(entries) if xi == ""])
+
+        inputs = self.tokenizer(
+            entries,
+            truncation=True,
+            return_tensors="pt",
+            padding=True,
+        ).to(self.device)
+        inputs["attention_mask"][empty_idx, :] = 0
+
+        return inputs
+
+    def forward(self, inputs: tp.Dict[str, torch.Tensor]) -> ConditionType:
+        mask = inputs["attention_mask"]
+        with torch.no_grad():
+            embeds = self.encoder(**inputs).last_hidden_state
+        embeds = embeds * mask.unsqueeze(-1)
+        return embeds, mask
+
+    def get_text_embedding(self, inputs: tp.Dict[str, torch.Tensor]) -> ConditionType:
+
+        mask = inputs["attention_mask"]
+
+        with torch.no_grad():
+            embeds = self.encoder(**inputs).last_hidden_state
+
+        encoding = self.mean_pooling(embeds, mask)
+        encoding = nn.functional.normalize(encoding, p=2, dim=1)
+
+        mask = mask[:, 0:1]
 
         return encoding, mask
 

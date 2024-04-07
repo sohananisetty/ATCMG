@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 from torch import Tensor
 
 import torch
@@ -55,7 +55,10 @@ class TMR(TEMOS):
         vae: bool,
         fact: Optional[float] = None,
         sample_mean: Optional[bool] = False,
-        lmd: Dict = {"recons": 1.0, "latent": 1.0e-5, "kl": 1.0e-5, "contrastive": 0.1},
+        recons=1.0,
+        latent=1.0e-5,
+        kl=1.0e-5,
+        contrastive=0.1,
         lr: float = 1e-4,
         temperature: float = 0.7,
         threshold_selfsim: float = 0.80,
@@ -69,7 +72,12 @@ class TMR(TEMOS):
             vae=vae,
             fact=fact,
             sample_mean=sample_mean,
-            lmd=lmd,
+            lmd={
+                "recons": recons,
+                "latent": latent,
+                "kl": kl,
+                "contrastive": contrastive,
+            },
             lr=lr,
         )
 
@@ -85,21 +93,46 @@ class TMR(TEMOS):
         self.validation_step_m_latents = []
         self.validation_step_sent_emb = []
 
-    def compute_loss(self, batch: Dict, return_all=False) -> Dict:
-        text_x_dict = batch["text_x_dict"]
-        motion_x_dict = batch["motion_x_dict"]
+    def mean_pooling(self, token_embeddings, attention_mask):
 
-        mask = motion_x_dict["mask"]
+        input_mask_expanded = (
+            attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+        )
+        return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(
+            input_mask_expanded.sum(1), min=1e-9
+        )  ## b d
+
+    def compute_loss(self, inputs: Tuple, conditions: Dict, return_all=False) -> Dict:
+
+        text_conds = conditions["text"]
+
+        text_x_dict = {"x": text_conds[0], "mask": text_conds[1].to(torch.bool)}
+        motion_x_dict = {"x": inputs[0], "mask": inputs[1].to(torch.bool)}
+        # batch["text_x_dict"]
+        # motion_x_dict = batch["motion_x_dict"]
+
+        motion_mask = motion_x_dict["mask"]
+        text_mask = text_x_dict["mask"]
         ref_motions = motion_x_dict["x"]
 
         # sentence embeddings
-        sent_emb = batch["sent_emb"]
+
+        if conditions.get("sent_emb", None) is None:
+            sent_emb = self.mean_pooling(text_conds[0], text_conds[1].to(torch.bool))
+            if len(sent_emb.shape) > 2:
+                sent_emb = sent_emb.squeeze(1)  ##b d
+        else:
+            sent_emb = conditions["sent_emb"][0]
 
         # text -> motion
-        t_motions, t_latents, t_dists = self(text_x_dict, mask=mask, return_all=True)
+        t_motions, t_latents, t_dists = self(
+            text_x_dict, mask=motion_mask, return_all=True
+        )
 
         # motion -> motion
-        m_motions, m_latents, m_dists = self(motion_x_dict, mask=mask, return_all=True)
+        m_motions, m_latents, m_dists = self(
+            motion_x_dict, mask=motion_mask, return_all=True
+        )
 
         # Store all losses
         losses = {}

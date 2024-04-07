@@ -3,9 +3,8 @@ from typing import List, Dict, Optional
 import torch
 import torch.nn as nn
 from torch import Tensor
-from pytorch_lightning import LightningModule
 
-from src.model.losses import KLLoss
+from core.models.TMR.losses import KLLoss
 
 
 def length_to_mask(length: List[int], device: torch.device = None) -> Tensor:
@@ -22,7 +21,7 @@ def length_to_mask(length: List[int], device: torch.device = None) -> Tensor:
     return mask
 
 
-class TEMOS(LightningModule):
+class TEMOS(nn.Module):
     r"""TEMOS: Generating diverse human motions
     from textual descriptions
     Find more information about the model on the following website:

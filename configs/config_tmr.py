@@ -28,6 +28,7 @@ cfg.dataset.fps = 30
 cfg.dataset.down_sampling_ratio = 4
 
 cfg.dataset.text_rep = "pooled_text_embed"
+cfg.dataset.audio_rep = "none"
 cfg.dataset.motion_rep = "full"
 cfg.dataset.hml_rep = "gprvc"  ## global pos rot6d vel contact
 cfg.dataset.motion_min_length_s = 2
@@ -95,7 +96,6 @@ cfg.motion_decoder.activation = "gelu"
 cfg.tmr = CN()
 cfg.tmr.target = "core.models.TMR.TMR"
 cfg.tmr.temperature = 0.1
-
 cfg.tmr.recons = 1.0
 cfg.tmr.latent = 1.0e-5
 cfg.tmr.kl = 1.0e-5
@@ -103,6 +103,7 @@ cfg.tmr.contrastive = 0.1
 cfg.tmr.vae = True
 cfg.tmr.threshold_selfsim = 0.80
 cfg.tmr.threshold_selfsim_metrics = 0.95
+cfg.tmr.fact = None
 
 
 def get_cfg_defaults():

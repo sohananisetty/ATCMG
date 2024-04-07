@@ -239,7 +239,12 @@ def instantiate_from_config(config=None, target=None, parameters=None):
     target = target if target is not None else config["target"]
 
     if parameters is None:
-        return get_obj_from_str(target)(config)
+        try:
+            return get_obj_from_str(target)(config)
+        except:
+            _ = config.pop("target")
+            return get_obj_from_str(target)(**config)
+
     else:
         return get_obj_from_str(target)(**parameters)
 

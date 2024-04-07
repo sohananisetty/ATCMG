@@ -53,7 +53,7 @@ def load_dataset(
     weights = []
     for dataset_name in dataset_names:
         dataset_list.append(
-            MotionTextDataset(
+            TMRDataset(
                 dataset_name,
                 dataset_root=dataset_args.dataset_root,
                 split=split,
@@ -89,7 +89,7 @@ def default(val, d):
     return val if val is not None else d
 
 
-class MotionTextDataset(BaseMotionDataset):
+class TMRDataset(BaseMotionDataset):
     def __init__(
         self,
         dataset_name: str,
@@ -98,7 +98,7 @@ class MotionTextDataset(BaseMotionDataset):
         hml_rep: str = "gprvc",
         motion_min_length_s=2,
         motion_max_length_s=10,
-        window_size=None,
+        window_size_s=None,
         fps: int = 30,
         split: str = "train",
     ):
@@ -107,7 +107,9 @@ class MotionTextDataset(BaseMotionDataset):
         self.split = split
         self.fps = fps
 
-        self.window_size = window_size
+        self.window_size = (
+            int(window_size_s * self.fps) if window_size_s is not None else None
+        )
 
         self.min_motion_length = motion_min_length_s * fps
         self.max_motion_length = motion_max_length_s * fps
@@ -235,6 +237,21 @@ class MotionTextDataset(BaseMotionDataset):
         if to_ - f_ > self.min_motion_length:
             motion = motion[f_:to_]
 
+        if self.window_size is not None:
+            if self.window_size == -1:
+                mot_len = (motion).shape[0]
+            else:
+                mot_len = self.window_size
+
+            idx = random.randint(0, motion.shape[0] - mot_len)
+
+            motion = motion[idx : idx + mot_len]
+
+        else:
+            if motion.shape[0] > self.max_motion_length:
+                idx = random.randint(0, motion.shape[0] - self.max_motion_length)
+                motion = motion[idx : idx + self.max_motion_length]
+
         processed_motion = self.get_processed_motion(
             motion, motion_rep=self.motion_rep, hml_rep=self.hml_rep
         )
@@ -252,22 +269,35 @@ def simple_collate(
 ) -> Dict[str, torch.Tensor]:
 
     inputs = {}
+    conditions = {}
 
     names = []
     lens = []
     motions = []
+    texts = []
+
+    device = conditioner.device
 
     for sample in samples:
         names.append(sample["name"])
         motions.append(sample["motion"]())
         lens.append(len(sample["motion"]))
+        texts.append(sample["text"])
 
     motion, mask = conditioner._get_motion_features(
         motion_list=motions,
-        # max_length=max(lens),
+    )
+    text, text_mask = conditioner._get_text_features(
+        raw_text=texts,
     )
 
     inputs["names"] = np.array(names)
-    inputs["motion"] = (torch.Tensor(motion), torch.Tensor(mask))
+    inputs["texts"] = np.array(texts)
+    inputs["motion"] = (torch.Tensor(motion).to(device), torch.Tensor(mask).to(device))
+    inputs["lens"] = torch.Tensor(lens)
+    conditions["text"] = (
+        torch.Tensor(text).to(device),
+        torch.Tensor(text_mask).to(device),
+    )
 
-    return inputs
+    return inputs, conditions
