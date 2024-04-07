@@ -234,7 +234,7 @@ class TMRDataset(BaseMotionDataset):
 
         text = self.text_list[item]
 
-        if to_ - f_ > self.min_motion_length:
+        if to_ - f_ > default(self.window_size, self.min_motion_length):
             motion = motion[f_:to_]
 
         if self.window_size is not None:

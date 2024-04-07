@@ -177,26 +177,18 @@ class TMR(TEMOS):
 
         return losses
 
-    def validation_step(self, batch: Dict, batch_idx: int) -> Tensor:
-        bs = len(batch["motion_x_dict"]["x"])
-        losses, t_latents, m_latents = self.compute_loss(batch, return_all=True)
+    def validation_step(self, inputs: Tuple, conditions: Dict) -> Tensor:
+        bs = len(inputs[0])
+        losses, t_latents, m_latents = self.compute_loss(
+            inputs, conditions, return_all=True
+        )
 
         # Store the latent vectors
         self.validation_step_t_latents.append(t_latents)
         self.validation_step_m_latents.append(m_latents)
-        self.validation_step_sent_emb.append(batch["sent_emb"])
+        self.validation_step_sent_emb.append(conditions["sent_emb"][0])
 
-        for loss_name in sorted(losses):
-            loss_val = losses[loss_name]
-            self.log(
-                f"val_{loss_name}",
-                loss_val,
-                on_epoch=True,
-                on_step=True,
-                batch_size=bs,
-            )
-
-        return losses["loss"]
+        return losses
 
     def on_validation_epoch_end(self):
         # Compute contrastive metrics on the whole batch
@@ -213,15 +205,8 @@ class TMR(TEMOS):
             threshold=self.threshold_selfsim_metrics,
         )
 
-        for loss_name in sorted(contrastive_metrics):
-            loss_val = contrastive_metrics[loss_name]
-            self.log(
-                f"val_{loss_name}_epoch",
-                loss_val,
-                on_epoch=True,
-                on_step=False,
-            )
-
         self.validation_step_t_latents.clear()
         self.validation_step_m_latents.clear()
         self.validation_step_sent_emb.clear()
+
+        return contrastive_metrics

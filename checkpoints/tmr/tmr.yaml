@@ -52,6 +52,8 @@ tmr:
   kl: 1.0e-5
   contrastive: 0.1
   temperature: 0.1
+  threshold_selfsim: 0.8
+  threshold_selfsim_metrics: 0.95
   
 
 
