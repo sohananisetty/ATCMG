@@ -22,6 +22,7 @@ from transformers import (
 )
 
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
+CACHE_DIR = "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/pretrained/"
 
 
 class TorchAutocast:
@@ -132,8 +133,8 @@ class T5Conditioner(BaseTextConditioner):
 
     def __init__(
         self,
-        name: str,
-        device: str,
+        name: str = "t5-base",
+        device: str = "cuda",
         autocast_dtype: tp.Optional[str] = "float32",
         word_dropout: float = 0.0,
     ):
@@ -164,10 +165,10 @@ class T5Conditioner(BaseTextConditioner):
             warnings.simplefilter("ignore")
             try:
                 self.t5_tokenizer = T5Tokenizer.from_pretrained(
-                    name, cache_dir="./pretrained/"
+                    name, cache_dir=CACHE_DIR
                 )
                 self.t5 = (
-                    T5EncoderModel.from_pretrained(name, cache_dir="./pretrained/")
+                    T5EncoderModel.from_pretrained(name, cache_dir=CACHE_DIR)
                     .eval()
                     .to(device)
                 )
@@ -216,13 +217,8 @@ class T5Conditioner(BaseTextConditioner):
             embeds = self.t5(**inputs).last_hidden_state
 
         encoding = self.mean_pooling(embeds, mask)
-
-        # Normalize embeddings
         encoding = nn.functional.normalize(encoding, p=2, dim=1)
 
-        # embeds = embeds * mask.unsqueeze(-1)
-
-        # encoding = torch.mean(embeds, -2)
         mask = mask[:, 0:1]
 
         return encoding, mask
@@ -239,13 +235,9 @@ class ClipConditioner(BaseTextConditioner):
 
     def __init__(self, version="openai/clip-vit-large-patch14", device="cuda"):
         super().__init__()
-        self.tokenizer = CLIPTokenizer.from_pretrained(
-            version, cache_dir="./pretrained/"
-        )
+        self.tokenizer = CLIPTokenizer.from_pretrained(version, cache_dir=CACHE_DIR)
         self.transformer = (
-            CLIPTextModelWithProjection.from_pretrained(
-                version, cache_dir="./pretrained/"
-            )
+            CLIPTextModelWithProjection.from_pretrained(version, cache_dir=CACHE_DIR)
             .to(device)
             .eval()
         )
@@ -367,10 +359,10 @@ class BERTConditioner(BaseTextConditioner):
         super().__init__()
         self.device = device
 
-        self.config = BertConfig.from_pretrained(name, cache_dir="./pretrained/")
+        self.config = BertConfig.from_pretrained(name, cache_dir=CACHE_DIR)
         self.tokenizer = AutoTokenizer.from_pretrained(name)
         self.encoder = (
-            BertModel.from_pretrained(name, cache_dir="./pretrained/").to(device).eval()
+            BertModel.from_pretrained(name, cache_dir=CACHE_DIR).to(device).eval()
         )
 
         self.freeze()
@@ -431,13 +423,9 @@ class ClapTextConditioner(BaseTextConditioner):
 
     def __init__(self, version="laion/larger_clap_music_and_speech", device="cuda"):
         super().__init__()
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            version, cache_dir="./pretrained/"
-        )
+        self.tokenizer = AutoTokenizer.from_pretrained(version, cache_dir=CACHE_DIR)
         self.transformer = (
-            ClapTextModelWithProjection.from_pretrained(
-                version, cache_dir="./pretrained/"
-            )
+            ClapTextModelWithProjection.from_pretrained(version, cache_dir=CACHE_DIR)
             .to(device)
             .eval()
         )
