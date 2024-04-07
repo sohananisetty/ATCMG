@@ -17,7 +17,9 @@ from configs.config_t2m import get_cfg_defaults as muse_get_cfg_defaults
 from core import AudioRep, MotionRep, MotionTokenizerParams, TextRep
 from core.datasets.conditioner import ConditionProvider
 from core.datasets.multimodal_dataset import load_dataset_gen, simple_collate
-from core.models.generation.muse import MLMModel, MotionMuse
+from core.models.generation.muse import MotionMuse
+from core.models.generation.muse2 import MotionMuse as MotionMuse2
+
 from core.models.resnetVQ.vqvae import HumanVQVAE
 from core.models.utils import get_obj_from_str, instantiate_from_config
 from core.optimizer import get_optimizer
@@ -93,9 +95,13 @@ class MotionMuseTrainer(nn.Module):
         pattern_config = self.args.codebooks_pattern
         vqvae_config = self.args.vqvae
 
-        self.motion_muse = MotionMuse(self.model_args, fuse_config, pattern_config).to(
+        print(self.model_args)
+
+        self.motion_muse = MotionMuse2(self.model_args, fuse_config, pattern_config).to(
             self.device
         )
+        total = sum(p.numel() for p in self.motion_muse.parameters() if p.requires_grad)
+        print("Total training params: %.2fM" % (total / 1e6))
         self.load_vqvae(vqvae_config)
 
         # if self.motion_rep == "hand":
@@ -132,7 +138,7 @@ class MotionMuseTrainer(nn.Module):
 
         dataset_names = {
             "animation": 0.7,
-            "humanml": 3.5,
+            "humanml": 3.0,
             "perform": 0.6,
             "GRAB": 1.0,
             "idea400": 1.5,
@@ -140,7 +146,7 @@ class MotionMuseTrainer(nn.Module):
             "beat": 2.5,
             "game_motion": 0.8,
             "music": 0.5,
-            "aist": 1.5,
+            "aist": 2.0,
             "fitness": 1.0,
             "moyo": 1.5,
             "choreomaster": 2.5,
@@ -612,12 +618,9 @@ class MotionMuseTrainer(nn.Module):
                     / (self.dataset_args.fps / self.dataset_args.down_sampling_ratio)
                 )
 
-                print(motions.shape)
-
                 gt_motion = self.bkn_to_motion(motions[..., :gt_len], dset)
 
                 gen_ids = self.motion_muse.generate(conditions, duration_s=gt_len_s)
-                print(gen_ids.shape)
 
                 gen_motion = self.bkn_to_motion(gen_ids, dset)
 

@@ -1770,6 +1770,7 @@ def generate_animation(
     aud_file: Optional[str] = None,
     text: Optional[Union[List[str], str]] = None,
     overlap=5,
+    use_token_critic=True,
 ):
 
     _, conditions = condition_provider(
@@ -1820,7 +1821,7 @@ def generate_animation(
             temperature=1.0,
             timesteps=24,
             cond_scale=8,
-            force_not_use_token_critic=False,
+            force_not_use_token_critic=~use_token_critic,
         )
         prime_frames = gen_ids[..., -overlap:]
 

@@ -22,10 +22,10 @@ train:
   gamma : 0.05
   lr_scheduler_type : "cosine"
 vqvae:
-  target: "core.models.resnetVQ.vqvae.HumanVQVAE2"
+  target: "core.models.resnetVQ.rq_vqvae.HumanRVQVAE"
   dim : 768
   depth: 8
-  codebook_size : 1024
+  codebook_size : 512
   codebook_dim : 512
   commit : 0.25
   loss_motion: 2.0
@@ -35,6 +35,7 @@ vqvae:
   down_sampling_ratio: 4
   motion_dim: 317
   nb_joints: 52
-  
+  num_quantizers: 2
+  sample_codebook_temp: 0.2
   
 

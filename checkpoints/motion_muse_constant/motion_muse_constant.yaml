@@ -40,7 +40,7 @@ fuser:
   #
 
 motion_generator:
-  target: "core.models.generation.motion_generator.MotionMuse"
+  target: "core.models.generation.muse.MotionMuse"
   n_q : 1
   dim : 512
   depth: 8
@@ -55,6 +55,8 @@ motion_generator:
   quality_emb: False
   custom: True
   attn_dropout: 0.1
+  post_emb_norm: False
+
   
 
 

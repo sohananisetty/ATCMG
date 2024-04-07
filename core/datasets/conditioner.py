@@ -913,16 +913,12 @@ class ClassifierFreeGuidanceDropout(nn.Module):
                 drop_mask = self.prob_mask_like((b, 1), 1.0 - drop_prob, mask.device)
                 new_mask = mask & drop_mask
                 new_embedding = embedding * new_mask.unsqueeze(-1)
-                # if condition_modality == "audio":
 
                 if not keep_len:
                     new_embedding = new_embedding[:, :1, :]
                     new_mask = new_mask[:, :1]
                 conditions_[condition_modality] = (new_embedding, new_mask)
-
-            elif drop_prob > 0.0 and (
-                condition_modality != "audio" or not self.training
-            ):
+            elif drop_prob > 0.0 and not self.training:
                 drop_mask = self.prob_mask_like((b, 1), 1.0 - drop_prob, mask.device)
                 new_mask = mask & drop_mask
 

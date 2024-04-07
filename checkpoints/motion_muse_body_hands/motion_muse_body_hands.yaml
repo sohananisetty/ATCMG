@@ -37,15 +37,12 @@ codebooks_pattern:
 
 fuser:
   fuse_method: [{"cross": ["text"], "input_interpolate": ["audio"]}]
-  #[{"cross": ["audio"], "prepend": ["text"]}]
-  # [{"cross": ["text"], "input_interpolate": ["audio"] , "sum":[ "translation"]}]
-  #
 
 motion_generator:
-  target: "core.models.generation.motion_generator.MotionMuse"
+  target: "core.models.generation.muse2.MotionMuse"
   n_q : 3
   dim : 512
-  depth: 6
+  depth: 8
   cond_dropout: 0.4
   no_mask_token_prob: 0.3
   audio_input_dim: 128
@@ -58,8 +55,7 @@ motion_generator:
   custom: True
   attn_dropout: 0.1
   spatial: True
-  film: True ##Film2
-  film_skip: 2
+  film_skip: 3
   critic_loss_weight: 1.0
 
 

@@ -9,6 +9,7 @@ from core.models.resnetVQ.quantizer import QuantizeEMAReset
 from core.models.resnetVQ.residual_vq import ResidualVQ
 from core.models.resnetVQ.resnet import Resnet1D
 from core.models.resnetVQ.vqvae import HumanVQVAE
+from core.models.utils import default
 
 
 class RVQVAE(nn.Module):
@@ -87,18 +88,19 @@ class RVQVAE(nn.Module):
         return quantized_out, code_idx, all_codes
 
     def forward(self, x, sample_codebook_temp=0.0):
+        # x b n d
         x_in = self.preprocess(x)
         # Encode
         x_encoder = self.encoder(x_in)
 
         x_quantized, code_idx, commit_loss, perplexity = self.quantizer(
             x_encoder, sample_codebook_temp=sample_codebook_temp
-        )
+        )  ## b d n , b n q
 
-        # print(code_idx[0, :, 1])
         ## decoder
         x_decoder = self.decoder(x_quantized)
-        x_out = self.postprocess(x_decoder)
+        x_out = self.postprocess(x_decoder)  ## b n d
+
         return VQVAEOutput(
             decoded_motion=x_out,
             indices=code_idx,
@@ -160,9 +162,11 @@ class HumanRVQVAE(nn.Module):
         _, code_idx, all_codes = self.rvqvae.encode(motion)  # (N, T)
         return code_idx
 
-    def forward(self, motion):
+    def forward(self, motion, temperature=None):
 
-        return self.rvqvae(motion, sample_codebook_temp=self.sample_codebook_temp)
+        return self.rvqvae(
+            motion, sample_codebook_temp=default(temperature, self.sample_codebook_temp)
+        )
 
     def forward_decoder(self, indices):
         # indices shape 'b n q'

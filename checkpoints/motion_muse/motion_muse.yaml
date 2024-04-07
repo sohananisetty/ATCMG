@@ -38,7 +38,7 @@ fuser:
   #[{"cross": ["audio"], "prepend": ["text"]}]
 
 motion_generator:
-  target: "core.models.generation.motion_generator.MotionMuse"
+  target: "core.models.generation.muse.MotionMuse"
   n_q : 1
   dim : 512
   depth: 8

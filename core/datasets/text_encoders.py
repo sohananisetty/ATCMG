@@ -8,7 +8,6 @@ from typing import List, Union
 import clip
 import torch
 import torch.nn as nn
-from core.models.utils import TorchAutocast
 from transformers import (
     AutoTokenizer,
     BertConfig,
@@ -25,11 +24,54 @@ from transformers import (
 ConditionType = tp.Tuple[torch.Tensor, torch.Tensor]  # condition, mask
 
 
+class TorchAutocast:
+    """TorchAutocast utility class.
+    Allows you to enable and disable autocast. This is specially useful
+    when dealing with different architectures and clusters with different
+    levels of support.
+
+    Args:
+        enabled (bool): Whether to enable torch.autocast or not.
+        args: Additional args for torch.autocast.
+        kwargs: Additional kwargs for torch.autocast
+    """
+
+    def __init__(self, enabled: bool, *args, **kwargs):
+        self.autocast = torch.autocast(*args, **kwargs) if enabled else None
+
+    def __enter__(self):
+        if self.autocast is None:
+            return
+        try:
+            self.autocast.__enter__()
+        except RuntimeError:
+            device = self.autocast.device
+            dtype = self.autocast.fast_dtype
+            raise RuntimeError(
+                f"There was an error autocasting with dtype={dtype} device={device}\n"
+                "If you are on the FAIR Cluster, you might need to use autocast_dtype=float16"
+            )
+
+    def __exit__(self, *args, **kwargs):
+        if self.autocast is None:
+            return
+        self.autocast.__exit__(*args, **kwargs)
+
+
 class BaseTextConditioner(ABC, nn.Module):
     """Base model for all text conditioner modules."""
 
     def __init__(self):
         super().__init__()
+
+    def mean_pooling(self, token_embeddings, attention_mask):
+
+        input_mask_expanded = (
+            attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+        )
+        return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(
+            input_mask_expanded.sum(1), min=1e-9
+        )
 
     @abstractmethod
     def tokenize(self, *args, **kwargs) -> tp.Dict[str, torch.Tensor]:
@@ -173,9 +215,14 @@ class T5Conditioner(BaseTextConditioner):
         with torch.no_grad(), self.autocast:
             embeds = self.t5(**inputs).last_hidden_state
 
-        embeds = embeds * mask.unsqueeze(-1)
+        encoding = self.mean_pooling(embeds, mask)
 
-        encoding = torch.mean(embeds, -2)
+        # Normalize embeddings
+        encoding = nn.functional.normalize(encoding, p=2, dim=1)
+
+        # embeds = embeds * mask.unsqueeze(-1)
+
+        # encoding = torch.mean(embeds, -2)
         mask = mask[:, 0:1]
 
         return encoding, mask

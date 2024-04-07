@@ -278,38 +278,38 @@ class TorchAutocast:
         self.autocast.__exit__(*args, **kwargs)
 
 
-def nb_joints(motion_rep):
-    if motion_rep == MotionRep.FULL:
-        return 52
-    elif motion_rep == MotionRep.BODY:
-        return 22
-    elif motion_rep == MotionRep.HAND:
-        return 30
-    elif motion_rep == MotionRep.LEFT_HAND:
-        return 15
-    elif motion_rep == MotionRep.RIGHT_HAND:
-        return 15
+# def nb_joints(motion_rep):
+#     if motion_rep == MotionRep.FULL:
+#         return 52
+#     elif motion_rep == MotionRep.BODY:
+#         return 22
+#     elif motion_rep == MotionRep.HAND:
+#         return 30
+#     elif motion_rep == MotionRep.LEFT_HAND:
+#         return 15
+#     elif motion_rep == MotionRep.RIGHT_HAND:
+#         return 15
 
 
-def motion_dim(hml_rep, motion_rep):
-    dim = 0
-    joints = nb_joints(motion_rep)
+# def motion_dim(hml_rep, motion_rep):
+#     dim = 0
+#     joints = nb_joints(motion_rep)
 
-    if "g" in hml_rep:
-        dim += 4
-    if "p" in hml_rep:
-        if motion_rep == MotionRep.BODY or motion_rep == MotionRep.FULL:
-            dim += (joints - 1) * 3
-        else:
-            dim += (joints) * 3
-    if "r" in hml_rep:
-        if motion_rep == MotionRep.BODY or motion_rep == MotionRep.FULL:
-            dim += (joints - 1) * 6
-        else:
-            dim += (joints) * 6
-    if "v" in hml_rep:
-        dim += joints * 3
-    if "c" in hml_rep:
-        dim += 4
+#     if "g" in hml_rep:
+#         dim += 4
+#     if "p" in hml_rep:
+#         if motion_rep == MotionRep.BODY or motion_rep == MotionRep.FULL:
+#             dim += (joints - 1) * 3
+#         else:
+#             dim += (joints) * 3
+#     if "r" in hml_rep:
+#         if motion_rep == MotionRep.BODY or motion_rep == MotionRep.FULL:
+#             dim += (joints - 1) * 6
+#         else:
+#             dim += (joints) * 6
+#     if "v" in hml_rep:
+#         dim += joints * 3
+#     if "c" in hml_rep:
+#         dim += 4
 
-    return dim
+#     return dim

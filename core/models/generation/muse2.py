@@ -1212,21 +1212,21 @@ class MotionMuse(nn.Module):
         return x, labels, mask.reshape(batch, K, T)
 
     def bert_muse_mask(self, motion_ids: torch.Tensor, ignore_index: int = -100):
-        batch, K, seq_len, device = (
-            *motion_ids.shape,
-            motion_ids.device,
-        )
+        batch, K, T = motion_ids.shape
+        motion_ids = motion_ids.contiguous().view(batch, 1, -1)
+        seq_len = K * T
+        device = motion_ids.device
 
         code_ids = motion_ids.clone()
 
         rand_time = uniform((batch,), device=device)
         rand_mask_probs = self.noise_schedule(rand_time)
-        num_token_masked = (seq_len * K * rand_mask_probs).round().clamp(min=1)
+        num_token_masked = (seq_len * 1 * rand_mask_probs).round().clamp(min=1)
 
         # mask_id = self.mask_token_id
-        batch_randperm = torch.rand((batch, K * seq_len), device=device).argsort(dim=-1)
+        batch_randperm = torch.rand((batch, 1 * seq_len), device=device).argsort(dim=-1)
         mask = batch_randperm < rearrange(num_token_masked, "b -> b 1")
-        mask = mask.reshape(batch, K, seq_len)
+        mask = mask.reshape(batch, 1, seq_len)
         mask[code_ids == self.model.pad_token_id] = False
 
         # mask_id = self.transformer.mask_token_id
@@ -1235,7 +1235,7 @@ class MotionMuse(nn.Module):
         indices_replaced = (
             torch.bernoulli(torch.full(code_ids.shape, 0.8)).bool().to(device) & mask
         )
-        code_ids[indices_replaced] = self.model.mask_token_id
+        code_ids[indices_replaced] = self.mask_token_id
 
         # 10% of the time, we replace masked input tokens with random word
         indices_random = (
@@ -1248,7 +1248,10 @@ class MotionMuse(nn.Module):
         ).to(device)
         code_ids[indices_random] = random_words[indices_random]
 
-        return code_ids, labels
+        code_ids = code_ids.view(batch, K, T)
+        labels = labels.reshape(batch, K, T)
+
+        return code_ids, labels, mask.reshape(batch, K, T)
 
     def get_null_context(self, B, device, dtype=torch.float):
         cond_list = list(self.model.condition_fuser.cond2fuse.keys())
@@ -1614,12 +1617,20 @@ def generate_animation(
     duration_s: int = 4,
     aud_file: Optional[str] = None,
     text: Optional[Union[List[str], str]] = None,
+    neg_text=None,
     overlap=5,
+    timesteps=24,
+    use_token_critic=True,
 ):
 
     _, conditions = condition_provider(
         raw_audio=aud_file, raw_text=text, audio_max_length_s=-1
     )
+    neg_conditions = None
+    if neg_text is not None:
+        _, neg_conditions = condition_provider(
+            raw_audio=None, raw_text=text, audio_max_length_s=-1
+        )
     if (
         aud_file is not None
         and (conditions["audio"][0].shape[1] // condition_provider.sampling_rate)
@@ -1659,13 +1670,13 @@ def generate_animation(
 
         gen_ids = motion_gen.generate(
             conditions=new_conditions,
-            neg_conditions=None,
+            neg_conditions=neg_conditions,
             prime_frames=prime_frames,
             duration_s=4,
             temperature=1.0,
-            timesteps=24,
+            timesteps=timesteps,
             cond_scale=8,
-            force_not_use_token_critic=False,
+            force_not_use_token_critic=~use_token_critic,
         )
         prime_frames = gen_ids[..., -overlap:]
 

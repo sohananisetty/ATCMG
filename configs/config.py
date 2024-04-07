@@ -76,7 +76,7 @@ cfg.vqvae.codebook_size = 1024
 cfg.vqvae.kmeans_iters = None
 
 cfg.vqvae.num_quantizers = 2
-cfg.vqvae.quantize_dropout_prob = 0.2
+cfg.vqvae.quantize_dropout_prob = 0.0
 cfg.vqvae.shared_codebook = False
 cfg.vqvae.sample_codebook_temp = 0.2
 
