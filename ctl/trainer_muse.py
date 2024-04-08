@@ -303,6 +303,7 @@ class MotionMuseTrainer(nn.Module):
             optim=self.optim.state_dict(),
             steps=self.steps,
             total_loss=self.best_loss if loss is None else loss,
+            config=dict(self.args),
         )
         torch.save(pkg, path)
 

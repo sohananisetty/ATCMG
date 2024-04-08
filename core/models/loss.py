@@ -92,7 +92,10 @@ class ReConsLoss(nn.Module):
                 mp = mp * msk[..., None]
                 mg = mg * msk[..., None]
 
-            if rep == "r" and self.use_geodesic_loss:
+            if rep == "g":
+                loss += 2 * self.Loss(mp, mg)
+
+            elif rep == "r" and self.use_geodesic_loss:
 
                 if (
                     self.motion_rep == MotionRep.BODY
@@ -111,13 +114,16 @@ class ReConsLoss(nn.Module):
 
                 loss += self.geodesic_loss(mp, mg)
 
-            if rep == "v":
+            elif rep == "v":
 
                 if "c" in hml_rep:
                     pred_c = self.get_c_from_v(mp)
-                    loss += 0.7 * nn.functional.binary_cross_entropy_with_logits(
-                        pred_c, params_gt[-1]
-                    )
+                    print(pred_c[-1])
+                    print(params_gt[-1][-1])
+                    # loss += 0.7 * nn.functional.binary_cross_entropy_with_logits(
+                    #     pred_c, params_gt[-1]
+                    # )
+                    loss += 1.0 * self.Loss(pred_c, params_gt[-1])
                 loss += self.Loss(mp, mg)
 
             # if rep == "c":

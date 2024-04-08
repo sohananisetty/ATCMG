@@ -116,12 +116,12 @@ class VQVAEMotionTrainer(nn.Module):
             wd=self.training_args.weight_decay,
         )
 
-        # self.lr_scheduler = get_scheduler(
-        #     name=self.training_args.lr_scheduler_type,
-        #     optimizer=self.optim,
-        #     num_warmup_steps=self.training_args.warmup_steps,
-        #     num_training_steps=self.num_train_steps,
-        # )
+        self.lr_scheduler = get_scheduler(
+            name=self.training_args.lr_scheduler_type,
+            optimizer=self.optim,
+            num_warmup_steps=self.training_args.warmup_steps,
+            num_training_steps=self.num_train_steps,
+        )
 
         self.max_grad_norm = self.training_args.max_grad_norm
 
@@ -219,6 +219,7 @@ class VQVAEMotionTrainer(nn.Module):
             optim=self.optim.state_dict(),
             steps=self.steps,
             total_loss=self.best_loss if loss is None else loss,
+            config=dict(self.args),
         )
         torch.save(pkg, path)
 
@@ -301,7 +302,7 @@ class VQVAEMotionTrainer(nn.Module):
             )
 
         self.optim.step()
-        # self.lr_scheduler.step()
+        self.lr_scheduler.step()
         self.optim.zero_grad()
 
         # build pretty printed losses

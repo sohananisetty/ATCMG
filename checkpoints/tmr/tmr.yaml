@@ -8,17 +8,17 @@ dataset:
   text_rep: "full_text_embed"
   hml_rep: "gpvc"
   motion_min_length_s: 4
-  motion_max_length_s: 4
-  window_size_s: 4
+  motion_max_length_s: 12
+  # window_size_s: 4
 train:
-  resume: False
+  resume: True
   num_train_iters : 110001 #'Number of training steps
   save_steps : 10000
   logging_steps : 10
   wandb_every : 200
   evaluate_every : 10000
-  eval_bs : 400
-  train_bs : 400
+  eval_bs : 32
+  train_bs : 200
   gradient_accumulation_steps : 1
   learning_rate : 3e-4
   weight_decay : 1e-3

@@ -278,6 +278,7 @@ class TMRTrainer(nn.Module):
             optim=self.optim.state_dict(),
             steps=self.steps,
             total_loss=self.best_loss if loss is None else loss,
+            config=dict(self.args),
         )
         torch.save(pkg, path)
 
@@ -414,12 +415,13 @@ class TMRTrainer(nn.Module):
 
         for loss_name in sorted(contrastive_metrics):
             loss_val = contrastive_metrics[loss_name]
-            val_loss_ae[f"val_{loss_name}"] = loss_val
+            print(f"val_{loss_name}", loss_val)
 
         for key, value in val_loss_ae.items():
-            wandb.log({f"val_/{key}": value})
-            print({f"val_/{key}", value})
+            wandb.log({f"val_/{key}": value.float()})
 
+        losses_str = f"model total loss: {val_loss_ae['loss'].float():.3}, recons: {val_loss_ae['recons'].float():.3}, kl: {val_loss_ae['kl'].float():.3} contrastive: {val_loss_ae['contrastive'].float():.3} latent: {val_loss_ae['latent'].float():.3}"
+        print(losses_str)
         self.tmr.train()
 
     # def bkn_to_motion(self, codes, dset):

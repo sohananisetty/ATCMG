@@ -37,5 +37,6 @@ vqvae:
   nb_joints: 52
   num_quantizers: 2
   sample_codebook_temp: 0.2
+  quantize_dropout_prob: 0.0
   
 
