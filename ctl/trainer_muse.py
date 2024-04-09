@@ -630,8 +630,8 @@ class MotionMuseTrainer(nn.Module):
                     os.path.join(
                         save_file, os.path.basename(name).split(".")[0] + "_gt.gif"
                     ),
-                    zero_trans=True,
-                    zero_orient=True,
+                    # zero_trans=True,
+                    # zero_orient=True,
                 )
 
                 dset.render_hml(
@@ -639,8 +639,8 @@ class MotionMuseTrainer(nn.Module):
                     os.path.join(
                         save_file, os.path.basename(name).split(".")[0] + "_gen.gif"
                     ),
-                    zero_trans=True,
-                    zero_orient=True,
+                    # zero_trans=True,
+                    # zero_orient=True,
                 )
 
         self.motion_muse.train()

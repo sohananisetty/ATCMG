@@ -191,6 +191,7 @@ def simple_collate(
     names = []
     lens = []
     motions = []
+    device = conditioner.device
 
     for sample in samples:
         names.append(sample["name"])
@@ -203,6 +204,6 @@ def simple_collate(
     )
 
     inputs["names"] = np.array(names)
-    inputs["motion"] = (torch.Tensor(motion), torch.Tensor(mask))
+    inputs["motion"] = (torch.Tensor(motion).to(device), torch.Tensor(mask).to(device))
 
     return inputs

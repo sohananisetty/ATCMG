@@ -17,6 +17,7 @@ class ReConsLoss(nn.Module):
         hml_rep: str = "gprvc",
         motion_rep: MotionRep = MotionRep.FULL,
         remove_translation=False,
+        skel=None,
     ):
         super().__init__()
 
@@ -30,6 +31,13 @@ class ReConsLoss(nn.Module):
         self.use_geodesic_loss = use_geodesic_loss
 
         self.geodesic_loss = GeodesicLoss()
+        self.skel = skel
+        if self.skel:
+            self.offset_ref = torch.Tensor(
+                np.load(
+                    "/srv/hays-lab/scratch/sanisetty3/motionx/motion_data/000021_full_offsets.npy"
+                )
+            )
 
         # 4 global motion associated to root
         # 12 motion ( 3 positions ,6 rot6d, 3 vel xyz, )
@@ -68,6 +76,36 @@ class ReConsLoss(nn.Module):
         pred_c = torch.cat([pred_cl, pred_cr], -1)
         return pred_c
 
+    def joint_offset_loss(self, pos):
+
+        pos = pos.reshape(-1, self.nb_joints - 1, 3)
+        all_pos = torch.cat(
+            [
+                torch.zeros_like(pos)[
+                    :,
+                    :1,
+                ],
+                pos.reshape(-1, self.nb_joints - 1, 3),
+            ],
+            1,
+        )
+
+        def get_offset(mot):
+            b, j, d = mot.shape
+            _offsets = self.skel._raw_offset.expand(mot.shape[0], -1, -1).clone()
+            for i in range(1, self.skel._raw_offset.shape[0]):
+                _offsets[:, i] = (
+                    torch.norm(mot[:, i] - mot[:, self.skel._parents[i]], p=2, dim=1)[
+                        :, None
+                    ]
+                    * _offsets[:, i]
+                )
+            return _offsets
+
+        pred_offset = get_offset(all_pos)
+        gt_offset = self.offset_ref[None].repeat(all_pos.shape[0], 1, 1)
+        return self.Loss(pred_offset, gt_offset)
+
     def forward(self, motion_pred, motion_gt, mask=None):
 
         if self.use_simple_loss:
@@ -95,6 +133,11 @@ class ReConsLoss(nn.Module):
             if rep == "g":
                 loss += 2 * self.Loss(mp, mg)
 
+            elif rep == "p":
+                loss += self.Loss(mp, mg)
+                if self.skel is not None:
+                    loss += self.joint_offset_loss(mp)
+
             elif rep == "r" and self.use_geodesic_loss:
 
                 if (
@@ -114,17 +157,20 @@ class ReConsLoss(nn.Module):
 
                 loss += self.geodesic_loss(mp, mg)
 
-            elif rep == "v":
+            # elif rep == "v":
 
-                if "c" in hml_rep:
-                    pred_c = self.get_c_from_v(mp)
-                    print(pred_c[-1])
-                    print(params_gt[-1][-1])
-                    # loss += 0.7 * nn.functional.binary_cross_entropy_with_logits(
-                    #     pred_c, params_gt[-1]
-                    # )
-                    loss += 1.0 * self.Loss(pred_c, params_gt[-1])
-                loss += self.Loss(mp, mg)
+            #     if "c" in hml_rep:
+            #         pred_c = self.get_c_from_v(mp).clamp(-1, 1)
+            #         gt_c = 2 * params_gt[-1] - 1
+            #         prm_pred_c = (2 * params_pred[-1] - 1).clamp(-1, 1)
+            #         # loss += 0.7 * nn.functional.binary_cross_entropy_with_logits(
+            #         #     pred_c, params_gt[-1]
+            #         # )
+            #         loss += 0.8 * (1 - ((pred_c).reshape(-1) * gt_c.reshape(-1)).mean())
+            #         loss += 0.8 * (
+            #             1 - ((pred_c).reshape(-1) * prm_pred_c.reshape(-1)).mean()
+            #         )
+            #     loss += self.Loss(mp, mg)
 
             # if rep == "c":
             #     loss += 1.5 * nn.functional.binary_cross_entropy_with_logits(mp, mg)

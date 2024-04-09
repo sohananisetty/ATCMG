@@ -625,6 +625,7 @@ class VectorQuantize(nn.Module):
         codebook_input_dim = codebook_dim
 
         requires_projection = codebook_input_dim != dim
+        self.has_projections = requires_projection
         self.project_in = (
             nn.Linear(dim, codebook_input_dim) if requires_projection else nn.Identity()
         )

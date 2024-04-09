@@ -386,7 +386,7 @@ class HumanVQVAE2(nn.Module):
         code_idx = self.vqvae.encode(motion)  # (N, T)
         return code_idx
 
-    def forward(self, motion, mask=None, temperature=None):
+    def forward(self, motion, mask=None, temperature=0.0):
         return self.vqvae(
             motion, mask, temperature=default(temperature, self.sample_codebook_temp)
         )

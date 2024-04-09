@@ -254,6 +254,10 @@ class TMRDataset(BaseMotionDataset):
                 idx = random.randint(0, motion.shape[0] - self.max_motion_length)
                 motion = motion[idx : idx + self.max_motion_length]
 
+            rand_len = random.randint(self.min_motion_length, self.max_motion_length)
+            idx = random.randint(0, motion.shape[0] - rand_len)
+            motion = motion[idx : idx + self.max_motion_length]
+
         processed_motion = self.get_processed_motion(
             motion, motion_rep=self.motion_rep, hml_rep=self.hml_rep
         )

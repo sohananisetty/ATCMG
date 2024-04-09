@@ -36,5 +36,5 @@ vqvae:
   motion_dim: 263
   nb_joints: 22
   use_simple_loss: False
-  sample_codebook_temp: 0.2
+  sample_codebook_temp: 0.0
 

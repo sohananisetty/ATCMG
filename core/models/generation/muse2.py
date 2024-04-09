@@ -651,7 +651,7 @@ class MLMModel(nn.Module):
             ),
             nn.Conv1d(self.audio_input_dim, self.audio_input_dim, 3, 2, 1, bias=False),
             Rearrange("b d n -> b n d"),
-        )
+        )  ## downsample factor 4 hard coded. assert audio sampling rate is equal to fps
 
         self.project_text = (
             nn.Linear(self.text_input_dim, self.dim, bias=False)
