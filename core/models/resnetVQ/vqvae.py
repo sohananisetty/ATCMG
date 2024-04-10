@@ -491,10 +491,15 @@ class TranslationVQVAE(nn.Module):
         return r_rot_quat
 
     @torch.no_grad()
-    def predict(self, traj):
-        self.vqvae = self.vqvae.eval()
-        orient = torch.zeros_like(traj)[..., :2]
-        motion = torch.cat([traj, orient], -1)
+    def predict(self, rel_pos):
+        ## traj xy rel positions transformed
+        # self.vqvae = self.vqvae.eval()
+
+        orient = torch.zeros_like(rel_pos)[..., :2]
+        motion = torch.cat([rel_pos, orient], -1)
+
+        # print(motion.shape)
+
         out = self.vqvae(motion)
         pred_orient = out.decoded_motion[..., -2:].clamp(min=-1, max=1)
         pred_orient[:, 0, 0] = 1

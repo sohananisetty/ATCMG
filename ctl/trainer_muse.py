@@ -137,16 +137,16 @@ class MotionMuseTrainer(nn.Module):
         )
 
         dataset_names = {
-            "animation": 0.7,
-            "humanml": 3.0,
+            "animation": 0.5,
+            "humanml": 3.5,
             "perform": 0.6,
             "GRAB": 1.0,
-            "idea400": 1.5,
+            "idea400": 2.0,
             "humman": 0.5,
             "beat": 2.5,
             "game_motion": 0.8,
             "music": 0.5,
-            "aist": 2.0,
+            "aist": 2.5,
             "fitness": 1.0,
             "moyo": 1.5,
             "choreomaster": 2.5,
@@ -483,7 +483,7 @@ class MotionMuseTrainer(nn.Module):
         mrep = dset.motion_rep
 
         if k == 1:
-            if mrep == "body":
+            if mrep == MotionRep("body"):
 
                 body_inds = codes[:, 0]
                 body_motion = self.body_model.decode(body_inds[0:1]).detach().cpu()
@@ -506,7 +506,7 @@ class MotionMuseTrainer(nn.Module):
 
                 return body_M
 
-            elif mrep == "left_hand":
+            elif mrep == MotionRep("left_hand"):
 
                 left_inds = codes[:, 0]
                 left_motion = self.left_hand_model.decode(left_inds[0:1]).detach().cpu()
@@ -517,7 +517,7 @@ class MotionMuseTrainer(nn.Module):
                 )
                 return left_M
 
-            elif mrep == "right_hand":
+            elif mrep == MotionRep("right_hand"):
                 right_inds = codes[:, 0]
                 right_motion = (
                     self.right_hand_model.decode(right_inds[0:1]).detach().cpu()

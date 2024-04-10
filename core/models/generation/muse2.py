@@ -1642,7 +1642,7 @@ def generate_animation(
         num_iters = len(text)
     else:
 
-        num_iters = int((duration_s * 7.5 - 30) / (30 - overlap)) + 1
+        num_iters = math.ceil((duration_s * 7.5 - 30) / (30 - overlap) + 1)
 
     all_ids = []
     prime_frames = None
@@ -1686,4 +1686,4 @@ def generate_animation(
             all_ids.append(gen_ids[..., overlap:])
 
     all_ids = torch.cat(all_ids, -1)
-    return all_ids
+    return all_ids[..., : int(duration_s * 7.5)]

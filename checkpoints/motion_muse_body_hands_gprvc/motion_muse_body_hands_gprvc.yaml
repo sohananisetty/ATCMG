@@ -18,8 +18,8 @@ train:
   logging_steps : 20
   wandb_every : 200
   evaluate_every : 10000
-  eval_bs : 4
-  train_bs : 4
+  eval_bs : 150
+  train_bs : 150
   gradient_accumulation_steps : 1
   learning_rate : 3e-4
   # weight_decay : 1e-3
@@ -41,8 +41,8 @@ fuser:
 motion_generator:
   target: "core.models.generation.muse2.MotionMuse"
   n_q : 3
-  dim : 512
-  depth: 4
+  dim : 768
+  depth: 8
   cond_dropout: 0.4
   no_mask_token_prob: 0.3
   audio_input_dim: 128
