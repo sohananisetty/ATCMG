@@ -127,18 +127,18 @@ class VQVAEMotionTrainer(nn.Module):
 
         dataset_names = {
             "animation": 0.8,
-            "humanml": 2.5,
+            "humanml": 3.0,
             "perform": 0.6,
             "GRAB": 1.0,
-            "idea400": 1.5,
+            "idea400": 2.0,
             "humman": 0.5,
-            "beat": 1.5,
+            "beat": 2.5,
             "game_motion": 0.8,
             "music": 0.5,
-            "aist": 1.5,
+            "aist": 2.0,
             "fitness": 1.0,
             "moyo": 1.5,
-            "choreomaster": 1.5,
+            "choreomaster": 2.5,
             "dance": 1.0,
             "kungfu": 1.0,
             "EgoBody": 0.5,
@@ -149,7 +149,7 @@ class VQVAEMotionTrainer(nn.Module):
             dataset_names=list(dataset_names.keys()),
             dataset_args=self.dataset_args,
             split="train",
-            # weight_scale=list(dataset_names.values()),
+            weight_scale=list(dataset_names.values()),
         )
         test_ds, _, _ = load_dataset(
             dataset_names=list(dataset_names.keys()),
@@ -228,7 +228,7 @@ class VQVAEMotionTrainer(nn.Module):
         assert path.exists()
 
         pkg = torch.load(str(path), map_location="cuda")
-        self.vqvae_model.load_state_dict(pkg["model"])
+        self.vqvae_model.load(str(path))
 
         self.optim.load_state_dict(pkg["optim"])
         self.steps = pkg["steps"]
@@ -335,8 +335,9 @@ class VQVAEMotionTrainer(nn.Module):
             )
 
         if steps % self.evaluate_every == 0:
-            self.validation_step()
-            self.sample_render_hmlvec(os.path.join(self.output_dir, "samples"))
+            pass
+            # self.validation_step()
+            # self.sample_render_hmlvec(os.path.join(self.output_dir, "samples"))
 
         self.steps += 1
         return logs

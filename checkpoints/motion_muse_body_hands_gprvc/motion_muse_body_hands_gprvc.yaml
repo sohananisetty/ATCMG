@@ -12,21 +12,21 @@ dataset:
   motion_max_length_s: 4
   window_size_s: 4
 train:
-  resume: False
-  num_train_iters : 110001 #'Number of training steps
+  resume: True
+  num_train_iters : 210001 #'Number of training steps
   save_steps : 10000
   logging_steps : 20
   wandb_every : 200
   evaluate_every : 10000
-  eval_bs : 150
-  train_bs : 150
+  eval_bs : 300
+  train_bs : 300
   gradient_accumulation_steps : 1
   learning_rate : 3e-4
   # weight_decay : 1e-3
-  warmup_steps : 8000
+  warmup_steps : 10000
   gamma : 0.05
   lr_scheduler_type : "cosine"
-
+ 
 vqvae:
   body_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gprvc/vqvae_body_gprvc.yaml"
   left_hand_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_left_hand/vqvae_left_hand.yaml"
@@ -41,14 +41,14 @@ fuser:
 motion_generator:
   target: "core.models.generation.muse2.MotionMuse"
   n_q : 3
-  dim : 768
+  dim : 512
   depth: 8
   cond_dropout: 0.4
   no_mask_token_prob: 0.3
   audio_input_dim: 128
   text_input_dim: 1024
   emb_dropout: 0.1
-  num_tokens: 512
+  num_tokens: 1024
   flash: True
   var_len: False
   quality_emb: False

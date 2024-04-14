@@ -79,64 +79,230 @@ Total number of motions kungfu: 2 and texts 2
 Total number of motions EgoBody: 2 and texts 2
 training with training 84143 and test dataset of 10667 and render 27 samples
 /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_body_hands_gprvc
-0: model cross entropy loss: 35.6 
-35.632911682128906 inf
-0: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_body_hands_gprvc/checkpoints
+resuming from  /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_body_hands_gprvc/motion_muse.pt
+60000: model cross entropy loss: 9.61 
+9.610329627990723 tensor(10.3169, device='cuda:0')
+60000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_body_hands_gprvc/checkpoints
 validation start
-val/ce_loss tensor(35.7067)
+val/ce_loss tensor(23.2738)
 render start
-200: model cross entropy loss: 31.1 
-400: model cross entropy loss: 25.5 
-600: model cross entropy loss: 22.5 
-800: model cross entropy loss: 20.4 
-1000: model cross entropy loss: 19.5 
-1200: model cross entropy loss: 20.0 
-1400: model cross entropy loss: 19.6 
-1600: model cross entropy loss: 19.1 
-1800: model cross entropy loss: 18.9 
-2000: model cross entropy loss: 19.3 
-2200: model cross entropy loss: 18.6 
-2400: model cross entropy loss: 18.9 
-2600: model cross entropy loss: 18.9 
-2800: model cross entropy loss: 18.2 
-3000: model cross entropy loss: 18.7 
-3200: model cross entropy loss: 17.6 
-3400: model cross entropy loss: 18.7 
-3600: model cross entropy loss: 18.1 
-3800: model cross entropy loss: 17.9 
-4000: model cross entropy loss: 17.0 
-4200: model cross entropy loss: 16.9 
-4400: model cross entropy loss: 16.0 
-4600: model cross entropy loss: 16.4 
-4800: model cross entropy loss: 17.2 
-5000: model cross entropy loss: 17.3 
-5200: model cross entropy loss: 16.2 
-5400: model cross entropy loss: 16.7 
-5600: model cross entropy loss: 16.0 
-5800: model cross entropy loss: 15.7 
-6000: model cross entropy loss: 15.7 
-6200: model cross entropy loss: 16.1 
-6400: model cross entropy loss: 15.3 
-6600: model cross entropy loss: 16.1 
-6800: model cross entropy loss: 15.3 
-7000: model cross entropy loss: 16.3 
-7200: model cross entropy loss: 15.8 
-7400: model cross entropy loss: 15.4 
-7600: model cross entropy loss: 15.2 
-7800: model cross entropy loss: 15.2 
-8000: model cross entropy loss: 15.0 
-8200: model cross entropy loss: 14.9 
-8400: model cross entropy loss: 15.3 
-8600: model cross entropy loss: 14.7 
-8800: model cross entropy loss: 14.2 
-9000: model cross entropy loss: 14.7 
-9200: model cross entropy loss: 14.5 
-9400: model cross entropy loss: 14.2 
-9600: model cross entropy loss: 14.9 
-9800: model cross entropy loss: 14.5 
-10000: model cross entropy loss: 14.4 
-14.426715850830078 tensor(35.6329)
-10000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_body_hands_gprvc/checkpoints
+60200: model cross entropy loss: 10.3 
+60400: model cross entropy loss: 9.54 
+60600: model cross entropy loss: 9.5 
+60800: model cross entropy loss: 9.93 
+61000: model cross entropy loss: 9.4 
+61200: model cross entropy loss: 9.6 
+61400: model cross entropy loss: 9.61 
+61600: model cross entropy loss: 8.7 
+61800: model cross entropy loss: 9.05 
+62000: model cross entropy loss: 10.1 
+62200: model cross entropy loss: 10.1 
+62400: model cross entropy loss: 10.0 
+62600: model cross entropy loss: 9.09 
+62800: model cross entropy loss: 8.38 
+63000: model cross entropy loss: 9.28 
+63200: model cross entropy loss: 9.32 
+63400: model cross entropy loss: 10.4 
+63600: model cross entropy loss: 9.68 
+63800: model cross entropy loss: 10.0 
+64000: model cross entropy loss: 9.88 
+64200: model cross entropy loss: 9.77 
+64400: model cross entropy loss: 9.61 
+64600: model cross entropy loss: 8.88 
+64800: model cross entropy loss: 10.6 
+65000: model cross entropy loss: 10.3 
+65200: model cross entropy loss: 9.76 
+65400: model cross entropy loss: 9.7 
+65600: model cross entropy loss: 10.3 
+65800: model cross entropy loss: 10.1 
+66000: model cross entropy loss: 9.61 
+66200: model cross entropy loss: 10.2 
+66400: model cross entropy loss: 9.03 
+66600: model cross entropy loss: 9.93 
+66800: model cross entropy loss: 10.3 
+67000: model cross entropy loss: 10.8 
+67200: model cross entropy loss: 11.1 
+67400: model cross entropy loss: 10.9 
+67600: model cross entropy loss: 10.1 
+67800: model cross entropy loss: 10.4 
+68000: model cross entropy loss: 10.4 
+68200: model cross entropy loss: 10.2 
+68400: model cross entropy loss: 10.7 
+68600: model cross entropy loss: 10.3 
+68800: model cross entropy loss: 10.0 
+69000: model cross entropy loss: 10.6 
+69200: model cross entropy loss: 11.0 
+69400: model cross entropy loss: 10.7 
+69600: model cross entropy loss: 10.2 
+69800: model cross entropy loss: 11.0 
+70000: model cross entropy loss: 10.9 
+10.872764587402344 tensor(9.6103)
+70000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_body_hands_gprvc/checkpoints
 validation start
-val/ce_loss tensor(24.8680)
+val/ce_loss tensor(23.4595)
+render start
+70200: model cross entropy loss: 10.4 
+70400: model cross entropy loss: 10.8 
+70600: model cross entropy loss: 10.1 
+70800: model cross entropy loss: 10.7 
+71000: model cross entropy loss: 10.5 
+71200: model cross entropy loss: 10.1 
+71400: model cross entropy loss: 10.0 
+71600: model cross entropy loss: 10.5 
+71800: model cross entropy loss: 10.2 
+72000: model cross entropy loss: 10.8 
+72200: model cross entropy loss: 10.4 
+72400: model cross entropy loss: 10.3 
+72600: model cross entropy loss: 10.3 
+72800: model cross entropy loss: 10.3 
+73000: model cross entropy loss: 10.3 
+73200: model cross entropy loss: 10.2 
+73400: model cross entropy loss: 10.2 
+73600: model cross entropy loss: 10.1 
+73800: model cross entropy loss: 10.8 
+74000: model cross entropy loss: 10.5 
+74200: model cross entropy loss: 10.5 
+74400: model cross entropy loss: 10.4 
+74600: model cross entropy loss: 9.84 
+74800: model cross entropy loss: 10.3 
+75000: model cross entropy loss: 10.2 
+75200: model cross entropy loss: 11.0 
+75400: model cross entropy loss: 10.5 
+75600: model cross entropy loss: 10.5 
+75800: model cross entropy loss: 10.6 
+76000: model cross entropy loss: 10.6 
+76200: model cross entropy loss: 10.0 
+76400: model cross entropy loss: 11.3 
+76600: model cross entropy loss: 10.3 
+76800: model cross entropy loss: 10.5 
+77000: model cross entropy loss: 10.5 
+77200: model cross entropy loss: 10.8 
+77400: model cross entropy loss: 10.2 
+77600: model cross entropy loss: 10.5 
+77800: model cross entropy loss: 10.1 
+78000: model cross entropy loss: 9.88 
+78200: model cross entropy loss: 10.8 
+78400: model cross entropy loss: 9.89 
+78600: model cross entropy loss: 10.1 
+78800: model cross entropy loss: 10.3 
+79000: model cross entropy loss: 10.4 
+79200: model cross entropy loss: 10.5 
+79400: model cross entropy loss: 10.1 
+79600: model cross entropy loss: 10.6 
+79800: model cross entropy loss: 10.1 
+80000: model cross entropy loss: 10.5 
+10.510859489440918 tensor(9.6103)
+80000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_body_hands_gprvc/checkpoints
+validation start
+val/ce_loss tensor(25.1902)
+render start
+80200: model cross entropy loss: 10.4 
+80400: model cross entropy loss: 10.5 
+80600: model cross entropy loss: 10.1 
+80800: model cross entropy loss: 10.2 
+81000: model cross entropy loss: 11.4 
+81200: model cross entropy loss: 9.22 
+81400: model cross entropy loss: 10.5 
+81600: model cross entropy loss: 10.1 
+81800: model cross entropy loss: 10.6 
+82000: model cross entropy loss: 10.2 
+82200: model cross entropy loss: 9.92 
+82400: model cross entropy loss: 10.1 
+82600: model cross entropy loss: 10.5 
+82800: model cross entropy loss: 10.1 
+83000: model cross entropy loss: 10.8 
+83200: model cross entropy loss: 11.0 
+83400: model cross entropy loss: 11.1 
+83600: model cross entropy loss: 9.68 
+83800: model cross entropy loss: 11.0 
+84000: model cross entropy loss: 10.6 
+84200: model cross entropy loss: 10.1 
+84400: model cross entropy loss: 9.84 
+84600: model cross entropy loss: 9.61 
+84800: model cross entropy loss: 10.6 
+85000: model cross entropy loss: 9.94 
+85200: model cross entropy loss: 9.64 
+85400: model cross entropy loss: 9.94 
+85600: model cross entropy loss: 10.5 
+85800: model cross entropy loss: 10.9 
+86000: model cross entropy loss: 10.9 
+86200: model cross entropy loss: 10.3 
+86400: model cross entropy loss: 10.9 
+86600: model cross entropy loss: 9.78 
+86800: model cross entropy loss: 10.4 
+87000: model cross entropy loss: 10.5 
+87200: model cross entropy loss: 10.3 
+87400: model cross entropy loss: 10.6 
+87600: model cross entropy loss: 10.6 
+87800: model cross entropy loss: 9.91 
+88000: model cross entropy loss: 9.49 
+88200: model cross entropy loss: 10.8 
+88400: model cross entropy loss: 9.89 
+88600: model cross entropy loss: 10.5 
+88800: model cross entropy loss: 10.3 
+89000: model cross entropy loss: 10.4 
+89200: model cross entropy loss: 10.2 
+89400: model cross entropy loss: 10.2 
+89600: model cross entropy loss: 10.5 
+89800: model cross entropy loss: 10.5 
+90000: model cross entropy loss: 10.0 
+10.012683868408203 tensor(9.6103)
+90000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_body_hands_gprvc/checkpoints
+validation start
+val/ce_loss tensor(24.9453)
+render start
+90200: model cross entropy loss: 10.1 
+90400: model cross entropy loss: 9.48 
+90600: model cross entropy loss: 9.86 
+90800: model cross entropy loss: 9.92 
+91000: model cross entropy loss: 10.9 
+91200: model cross entropy loss: 9.6 
+91400: model cross entropy loss: 10.0 
+91600: model cross entropy loss: 10.2 
+91800: model cross entropy loss: 10.8 
+92000: model cross entropy loss: 10.0 
+92200: model cross entropy loss: 10.3 
+92400: model cross entropy loss: 10.7 
+92600: model cross entropy loss: 9.88 
+92800: model cross entropy loss: 10.5 
+93000: model cross entropy loss: 10.8 
+93200: model cross entropy loss: 10.5 
+93400: model cross entropy loss: 10.9 
+93600: model cross entropy loss: 10.4 
+93800: model cross entropy loss: 10.7 
+94000: model cross entropy loss: 9.99 
+94200: model cross entropy loss: 10.0 
+94400: model cross entropy loss: 10.0 
+94600: model cross entropy loss: 10.2 
+94800: model cross entropy loss: 9.48 
+95000: model cross entropy loss: 9.41 
+95200: model cross entropy loss: 9.51 
+95400: model cross entropy loss: 9.5 
+95600: model cross entropy loss: 10.4 
+95800: model cross entropy loss: 10.6 
+96000: model cross entropy loss: 10.1 
+96200: model cross entropy loss: 10.6 
+96400: model cross entropy loss: 10.3 
+96600: model cross entropy loss: 10.6 
+96800: model cross entropy loss: 9.85 
+97000: model cross entropy loss: 10.2 
+97200: model cross entropy loss: 10.5 
+97400: model cross entropy loss: 10.3 
+97600: model cross entropy loss: 10.7 
+97800: model cross entropy loss: 10.1 
+98000: model cross entropy loss: 9.62 
+98200: model cross entropy loss: 9.4 
+98400: model cross entropy loss: 9.43 
+98600: model cross entropy loss: 10.8 
+98800: model cross entropy loss: 9.16 
+99000: model cross entropy loss: 9.63 
+99200: model cross entropy loss: 10.1 
+99400: model cross entropy loss: 9.42 
+99600: model cross entropy loss: 10.1 
+99800: model cross entropy loss: 9.4 
+100000: model cross entropy loss: 9.87 
+9.870733261108398 tensor(9.6103)
+100000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_body_hands_gprvc/checkpoints
+validation start
+val/ce_loss tensor(25.3476)
 render start

@@ -9,5 +9,5 @@
 
 cd /srv/hays-lab/scratch/sanisetty3/
 tar -cf /srv/hays-lab/flash5/sanisetty/new_joint_vecs.tar /srv/hays-lab/scratch/sanisetty3/motionx/motion_data/new_joint_vecs/
-tar -cf /srv/hays-lab/flash5/sanisetty/texts.tar /srv/hays-lab/scratch/sanisetty3/motionx/texts/
-tar -cf /srv/hays-lab/flash5/sanisetty/wav.tar /srv/hays-lab/scratch/sanisetty3/motionx/audio/wav/
+# tar -cf /srv/hays-lab/flash5/sanisetty/texts.tar /srv/hays-lab/scratch/sanisetty3/motionx/texts/
+# tar -cf /srv/hays-lab/flash5/sanisetty/wav.tar /srv/hays-lab/scratch/sanisetty3/motionx/audio/wav/

@@ -1621,11 +1621,14 @@ def generate_animation(
     overlap=5,
     timesteps=24,
     use_token_critic=True,
+    cond_scale=8,
+    temperature=0.8,
 ):
 
     _, conditions = condition_provider(
         raw_audio=aud_file, raw_text=text, audio_max_length_s=-1
     )
+
     neg_conditions = None
     if neg_text is not None:
         _, neg_conditions = condition_provider(
@@ -1641,7 +1644,6 @@ def generate_animation(
     if isinstance(text, list):
         num_iters = len(text)
     else:
-
         num_iters = math.ceil((duration_s * 7.5 - 30) / (30 - overlap) + 1)
 
     all_ids = []
@@ -1660,6 +1662,7 @@ def generate_animation(
 
         else:
             new_conditions["audio"] = conditions["audio"]
+
         if isinstance(text, list):
             new_conditions["text"] = (
                 conditions["text"][0][i : i + 1],
@@ -1673,9 +1676,9 @@ def generate_animation(
             neg_conditions=neg_conditions,
             prime_frames=prime_frames,
             duration_s=4,
-            temperature=1.0,
+            temperature=temperature,
             timesteps=timesteps,
-            cond_scale=8,
+            cond_scale=cond_scale,
             force_not_use_token_critic=~use_token_critic,
         )
         prime_frames = gen_ids[..., -overlap:]
@@ -1686,4 +1689,7 @@ def generate_animation(
             all_ids.append(gen_ids[..., overlap:])
 
     all_ids = torch.cat(all_ids, -1)
-    return all_ids[..., : int(duration_s * 7.5)]
+
+    if isinstance(text, list):
+        return all_ids
+    return all_ids[..., : math.ceil(duration_s * 7.5)]

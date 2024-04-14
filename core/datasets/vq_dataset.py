@@ -204,6 +204,7 @@ def simple_collate(
     )
 
     inputs["names"] = np.array(names)
+    inputs["lens"] = np.array(lens)
     inputs["motion"] = (torch.Tensor(motion).to(device), torch.Tensor(mask).to(device))
 
     return inputs

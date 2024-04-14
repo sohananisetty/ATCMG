@@ -43,7 +43,7 @@ SMPL_JOINT_NAMES = [
     "head",  "lshoulder", "rshoulder",      
     "lelbow", "relbow",      
     "lwrist", "rwrist",     
-    "lhand", "rhand",
+    # "lhand", "rhand",
 ]
 
 

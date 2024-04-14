@@ -33,9 +33,9 @@ import numpy as np
 from . import utils as feat_utils
 
 
-def extract_kinetic_features(positions):
+def extract_kinetic_features(positions, frame_time = 1./20):
     assert len(positions.shape) == 3  # (seq_len, n_joints, 3) 
-    features = KineticFeatures(positions)
+    features = KineticFeatures(positions , frame_time)
     kinetic_feature_vector = []
     for i in range(positions.shape[1]):
         feature_vector = np.hstack(

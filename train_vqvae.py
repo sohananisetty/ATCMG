@@ -56,7 +56,7 @@ def main(cfg):
 
 
 if __name__ == "__main__":
-    nme = "vqvae_full_gpvc"
+    nme = "vqvae_right_hand_1024"
     path = f"/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/{nme}/{nme}.yaml"
     cfg = get_cfg_defaults()
     print("loading config from:", path)
