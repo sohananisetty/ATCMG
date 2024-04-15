@@ -23,6 +23,8 @@ from tqdm import tqdm
 from transformers import AdamW, get_scheduler
 from yacs.config import CfgNode
 
+torch.autograd.detect_anomaly(True)
+
 
 def exists(val):
     return val is not None
@@ -149,7 +151,7 @@ class VQVAEMotionTrainer(nn.Module):
             dataset_names=list(dataset_names.keys()),
             dataset_args=self.dataset_args,
             split="train",
-            weight_scale=list(dataset_names.values()),
+            # weight_scale=list(dataset_names.values()),
         )
         test_ds, _, _ = load_dataset(
             dataset_names=list(dataset_names.keys()),

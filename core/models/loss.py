@@ -131,31 +131,31 @@ class ReConsLoss(nn.Module):
                 mg = mg * msk[..., None]
 
             if rep == "g":
-                loss += 2 * self.Loss(mp, mg)
+                loss += 1.5 * self.Loss(mp, mg)
 
-            elif rep == "p":
-                loss += self.Loss(mp, mg)
-                if self.skel is not None:
-                    loss += self.joint_offset_loss(mp)
+            # elif rep == "p":
+            #     loss += self.Loss(mp, mg)
+            #     if self.skel is not None:
+            #         loss += self.joint_offset_loss(mp)
 
-            elif rep == "r" and self.use_geodesic_loss:
+            # elif rep == "r" and self.use_geodesic_loss:
 
-                if (
-                    self.motion_rep == MotionRep.BODY
-                    or self.motion_rep == MotionRep.FULL
-                ):
-                    nb_joints = self.nb_joints - 1
-                else:
-                    nb_joints = self.nb_joints
+            #     if (
+            #         self.motion_rep == MotionRep.BODY
+            #         or self.motion_rep == MotionRep.FULL
+            #     ):
+            #         nb_joints = self.nb_joints - 1
+            #     else:
+            #         nb_joints = self.nb_joints
 
-                mp = geometry.rotation_6d_to_matrix(
-                    mp.view(-1, nb_joints, 6).contiguous()
-                ).view(-1, 3, 3)
-                mg = geometry.rotation_6d_to_matrix(
-                    mg.view(-1, nb_joints, 6).contiguous()
-                ).view(-1, 3, 3)
+            #     mp = geometry.rotation_6d_to_matrix(
+            #         mp.view(-1, nb_joints, 6).contiguous()
+            #     ).view(-1, 3, 3)
+            #     mg = geometry.rotation_6d_to_matrix(
+            #         mg.view(-1, nb_joints, 6).contiguous()
+            #     ).view(-1, 3, 3)
 
-                loss += self.geodesic_loss(mp, mg)
+            #     loss += self.geodesic_loss(mp, mg)
 
             # elif rep == "v":
 

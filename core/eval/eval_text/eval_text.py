@@ -9,6 +9,7 @@ from core.eval.eval_text.helpers import (
 from core.models.generation.muse2 import generate_animation
 from core.datasets.base_dataset import BaseMotionDataset
 from core import MotionRep
+from tqdm import tqdm
 
 
 def get_latents(inputs, conditions, tmr):
@@ -44,25 +45,30 @@ def evaluation_vqvae(
     matching_score_pred = 0
 
     nb_sample = 0
-    for inputs, conditions in val_loader:
+    motion_list = []
+    motion_pred_list = []
+    R_precision_real = 0
+    R_precision = 0
+    matching_score_real = 0
+    matching_score_pred = 0
+    for inputs, conditions in tqdm(val_loader):
 
-        motion_list = []
-        motion_pred_list = []
-        R_precision_real = 0
-        R_precision = 0
-        matching_score_real = 0
-        matching_score_pred = 0
         with torch.no_grad():
             bs = inputs["motion"][0].shape[0]
+
             t_latents, m_latents = get_latents(inputs["motion"], conditions, tmr)
 
-            pred_pose_eval = torch.zeros_like(inputs["motion"][0])
-            for k in range(bs):
-                lenn = int(inputs["lens"][k])
-                vqvae_output = motion_vqvae(
-                    motion=inputs["motion"][0][k : k + 1, :lenn],
-                )
-                pred_pose_eval[k : k + 1, :lenn] = vqvae_output.decoded_motion
+            # pred_pose_eval = torch.zeros_like(inputs["motion"][0])
+            # for k in range(bs):
+            #     lenn = int(inputs["lens"][k])
+            #     vqvae_output = motion_vqvae(
+            #         motion=inputs["motion"][0][k : k + 1, :lenn],
+            #     )
+            #     pred_pose_eval[k : k + 1, :lenn] = vqvae_output.decoded_motion
+            pred_pose_eval = (
+                motion_vqvae(inputs["motion"][0]).decoded_motion
+                * inputs["motion"][1][..., None]
+            )
             t_latents_pred, m_latents_pred = get_latents(
                 (pred_pose_eval, inputs["motion"][1]), conditions, tmr
             )
@@ -85,8 +91,8 @@ def evaluation_vqvae(
             matching_score_pred += temp_match
             nb_sample += bs
 
-    motion_annotation_np = torch.cat(motion_annotation_list, dim=0).cpu().numpy()
-    motion_pred_np = torch.cat(motion_pred_list, dim=0).cpu().numpy()
+    motion_annotation_np = torch.cat(motion_list).cpu().numpy()
+    motion_pred_np = torch.cat(motion_pred_list).cpu().numpy()
     gt_mu, gt_cov = calculate_activation_statistics(motion_annotation_np)
     mu, cov = calculate_activation_statistics(motion_pred_np)
 
@@ -139,6 +145,7 @@ def evaluation_transformer(
         matching_score_pred = 0
         with torch.no_grad():
             bs = inputs["motion"][0].shape[0]
+
             t_latents, m_latents = get_latents(inputs["motion"], conditions, tmr)
 
             pred_pose_eval = torch.zeros_like(inputs["motion"][0])

@@ -23,12 +23,7 @@ import math
 def evaluate_music_motion_vqvae(
     val_loader,  ##bs 1
     net,
-    audio_feature_dir="/srv/scratch/sanisetty3/music_motion/AIST/audio_features",
-    best_fid_k=1000,
-    best_fid_g=1000,
-    best_div_k=-100,
-    best_div_g=-100,
-    best_beat_align=-100,
+    audio_feature_dir="/srv/hays-lab/scratch/sanisetty3/motionx/audio/librosa",
 ):
 
     result_features = {"kinetic": [], "manual": []}
@@ -37,11 +32,16 @@ def evaluate_music_motion_vqvae(
     beat_scores_real = []
     beat_scores_pred = []
 
-    for i, aist_batch in enumerate(tqdm(val_loader)):
+    for aist_batch in tqdm(val_loader):
 
         mot_len = aist_batch["lens"][0]
         motion_name = aist_batch["names"][0]
         gt_motion = aist_batch["motion"][0]
+        audio_path = os.path.join(
+            audio_feature_dir,
+            f"{motion_name}.npy",
+        )
+        print(audio_path)
 
         vqvae_output = net(
             motion=gt_motion,
@@ -63,7 +63,7 @@ def evaluate_music_motion_vqvae(
         # get real data music beats
         audio_name = motion_name.split("_")[-2]
 
-        audio_feature = np.load(os.path.join(audio_feature_dir, f"{audio_name}.npy"))
+        audio_feature = np.load(audio_path)
         audio_beats = audio_feature[:mot_len, -1]  # last dim is the music beats
         # get beat alignment scores
         beat_score = alignment_score(audio_beats, motion_beats, sigma=1)
@@ -116,11 +116,7 @@ def evaluation_transformer(
     condition_provider,
     bkn_to_motion,
     motion_generator,
-    best_fid_k=1000,
-    best_fid_g=1000,
-    best_div_k=-100,
-    best_div_g=-100,
-    best_beat_align=-100,
+    audio_feature_dir="/srv/hays-lab/scratch/sanisetty3/motionx/audio/librosa",
 ):
 
     result_features = {"kinetic": [], "manual": []}
@@ -136,7 +132,7 @@ def evaluation_transformer(
         motion_name = inputs["names"][0]
         text_ = inputs["texts"][0]
         audio_path = os.path.join(
-            "/srv/hays-lab/scratch/sanisetty3/motionx/audio/librosa",
+            audio_feature_dir,
             f"{motion_name}.npy",
         )
         audio_feature = np.load(audio_path)
@@ -195,10 +191,10 @@ def evaluation_transformer(
     print("Beat score on real data: %.3f\n" % (np.mean(beat_scores_real)))
     print("Beat score on generated data: %.3f\n" % (np.mean(beat_scores_pred)))
 
-    best_fid_k = FID_k if FID_k < best_fid_k else best_fid_k
-    best_fid_g = FID_g if FID_g < best_fid_g else best_fid_g
-    best_div_k = Dist_k if Dist_k > best_div_k else best_div_k
-    best_div_g = Dist_g if Dist_g > best_div_g else best_div_g
+    best_fid_k = FID_k
+    best_fid_g = FID_g
+    best_div_k = Dist_k
+    best_div_g = Dist_g
 
     best_beat_align = (
         np.mean(beat_scores_real)

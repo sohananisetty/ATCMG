@@ -9,7 +9,7 @@ dataset:
   remove_translation: False
 train:
   resume: True
-  num_train_iters : 140001 #'Number of training steps
+  num_train_iters : 150001 #'Number of training steps
   save_steps : 10000
   logging_steps : 100
   wandb_every : 200
@@ -31,8 +31,8 @@ vqvae:
   recons_loss : "l1_smooth"
   use_geodesic_loss: False
   down_sampling_ratio: 4
-  motion_dim: 263
+  motion_dim: 137
   nb_joints: 22
-  use_simple_loss: True
+  use_simple_loss: False
   sample_codebook_temp: 0.1
 

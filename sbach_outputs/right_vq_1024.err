@@ -7,3 +7,14 @@ wandb: Run `wandb offline` to turn off syncing.
 wandb: Syncing run clear-wood-3
 wandb:  View project at https://wandb.ai/ai-choreo/vqvae_right_hand_1024
 wandb:  View run at https://wandb.ai/ai-choreo/vqvae_right_hand_1024/runs/bjwimjsn
+wandb: WARNING No program path found, not creating job artifact. See https://docs.wandb.ai/guides/launch/create-job
+wandb: - 0.014 MB of 0.014 MB uploadedwandb: \ 0.025 MB of 0.025 MB uploadedwandb: 
+wandb: Run summary:
+wandb: train_loss/commit_loss 0.16439
+wandb:        train_loss/loss 0.14339
+wandb: train_loss/loss_motion 0.05115
+wandb:  train_loss/perplexity 799.31561
+wandb: 
+wandb:  View run clear-wood-3 at: https://wandb.ai/ai-choreo/vqvae_right_hand_1024/runs/bjwimjsn
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20240414_173545-bjwimjsn/logs
