@@ -1,14 +1,2 @@
-wandb: Currently logged in as: sohananisetty (ai-choreo). Use `wandb login --relogin` to force relogin
-wandb: wandb version 0.16.6 is available!  To upgrade, please run:
-wandb:  $ pip install wandb --upgrade
-wandb: Tracking run with wandb version 0.16.2
-wandb: Run data is saved locally in /coc/scratch/sanisetty3/music_motion/ATCMG/wandb/run-20240412_195849-f0lzd51b
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run ethereal-fire-2
-wandb:  View project at https://wandb.ai/ai-choreo/vqvae_left_hand_1024
-wandb:  View run at https://wandb.ai/ai-choreo/vqvae_left_hand_1024/runs/f0lzd51b
-  0%|          | 0/13 [00:00<?, ?it/s]  8%|7         | 1/13 [00:05<01:02,  5.23s/it] 15%|#5        | 2/13 [00:05<00:26,  2.38s/it] 23%|##3       | 3/13 [00:06<00:15,  1.52s/it] 31%|###       | 4/13 [00:06<00:09,  1.10s/it] 38%|###8      | 5/13 [00:06<00:06,  1.18it/s] 46%|####6     | 6/13 [00:07<00:04,  1.44it/s] 54%|#####3    | 7/13 [00:07<00:03,  1.61it/s] 62%|######1   | 8/13 [00:08<00:02,  1.83it/s] 69%|######9   | 9/13 [00:08<00:01,  2.02it/s] 77%|#######6  | 10/13 [00:09<00:01,  1.88it/s] 85%|########4 | 11/13 [00:09<00:00,  2.03it/s] 92%|#########2| 12/13 [00:10<00:00,  2.17it/s]100%|##########| 13/13 [00:10<00:00,  1.29it/s]
-0it [00:00, ?it/s]1it [00:15, 15.47s/it]2it [00:29, 14.62s/it]3it [00:43, 14.13s/it]4it [00:56, 13.76s/it]5it [01:09, 13.69s/it]6it [01:21, 12.97s/it]7it [01:32, 12.47s/it]8it [01:44, 12.30s/it]9it [01:58, 12.68s/it]10it [02:12, 13.05s/it]11it [02:25, 13.28s/it]12it [02:40, 13.55s/it]13it [02:54, 13.67s/it]14it [03:09, 14.10s/it]15it [03:22, 14.01s/it]16it [03:37, 14.21s/it]17it [03:50, 13.75s/it]18it [04:03, 13.64s/it]19it [04:16, 13.32s/it]20it [04:29, 13.34s/it]21it [04:42, 13.08s/it]22it [04:55, 13.24s/it]23it [05:07, 12.80s/it]24it [05:20, 12.91s/it]25it [05:36, 13.79s/it]25it [05:36, 13.46s/it]
-srun: Job step aborted: Waiting up to 302 seconds for job step to finish.
-slurmstepd: error: *** STEP 854187.0 ON voltron CANCELLED AT 2024-04-12T21:51:32 ***
-slurmstepd: error: *** JOB 854187 ON voltron CANCELLED AT 2024-04-12T21:51:32 ***
+/coc/scratch/sanisetty3/music_motion/ATCMG/ctl/trainer_vq_simple.py:26: UserWarning: Anomaly Detection has been enabled. This mode will increase the runtime and should only be enabled for debugging.
+  torch.autograd.detect_anomaly(True)

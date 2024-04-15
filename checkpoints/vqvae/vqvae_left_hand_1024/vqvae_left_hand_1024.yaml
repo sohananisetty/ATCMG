@@ -8,7 +8,7 @@ dataset:
   window_size: 120
   remove_translation: False
 train:
-  resume: False
+  resume: True
   num_train_iters : 110001 #'Number of training steps
   save_steps : 10000
   logging_steps : 50
@@ -17,7 +17,7 @@ train:
   eval_bs : 400
   train_bs : 400
   gradient_accumulation_steps : 1
-  learning_rate : 1e-4
+  learning_rate : 3e-4
   # weight_decay : 1e-3
   warmup_steps : 4000
   gamma : 0.05

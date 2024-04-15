@@ -171,6 +171,8 @@ class VQSMPLXMotionDataset(BaseMotionDataset):
         motion = motion[idx : idx + mot_len]
         "Z Normalization"
 
+        motion = motion[: (motion.shape[0] // 4) * 4]
+
         processed_motion = self.get_processed_motion(
             motion, motion_rep=self.motion_rep, hml_rep=self.hml_rep
         )

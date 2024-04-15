@@ -147,11 +147,11 @@ class VQVAEMotionTrainer(nn.Module):
             # "HAA500": 1.0,
         }
 
-        train_ds, sampler_train, weights_train = load_dataset(
+        train_ds, sampler_train, _ = load_dataset(
             dataset_names=list(dataset_names.keys()),
             dataset_args=self.dataset_args,
             split="train",
-            # weight_scale=list(dataset_names.values()),
+            weight_scale=list(dataset_names.values()),
         )
         test_ds, _, _ = load_dataset(
             dataset_names=list(dataset_names.keys()),
@@ -337,9 +337,9 @@ class VQVAEMotionTrainer(nn.Module):
             )
 
         if steps % self.evaluate_every == 0:
-            pass
-            # self.validation_step()
-            # self.sample_render_hmlvec(os.path.join(self.output_dir, "samples"))
+
+            self.validation_step()
+            self.sample_render_hmlvec(os.path.join(self.output_dir, "samples"))
 
         self.steps += 1
         return logs

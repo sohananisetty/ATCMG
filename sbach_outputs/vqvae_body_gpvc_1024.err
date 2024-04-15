@@ -1,0 +1,2 @@
+/coc/scratch/sanisetty3/music_motion/ATCMG/ctl/trainer_vq_simple.py:26: UserWarning: Anomaly Detection has been enabled. This mode will increase the runtime and should only be enabled for debugging.
+  torch.autograd.detect_anomaly(True)
