@@ -1,5 +1,5 @@
-model_name: "motion_muse_body_hands_gprvc"
-output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_body_hands_gprvc"
+model_name: "motion_muse_body_hands_1024"
+output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_body_hands_1024"
 dataset:
   dataset_name: "mix"
   dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
@@ -18,8 +18,8 @@ train:
   logging_steps : 20
   wandb_every : 200
   evaluate_every : 10000
-  eval_bs : 300
-  train_bs : 300
+  eval_bs : 400
+  train_bs : 400
   gradient_accumulation_steps : 1
   learning_rate : 3e-4
   # weight_decay : 1e-3
@@ -28,9 +28,9 @@ train:
   lr_scheduler_type : "cosine"
  
 vqvae:
-  body_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gprvc/vqvae_body_gprvc.yaml"
-  left_hand_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_left_hand/vqvae_left_hand.yaml"
-  right_hand_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_right_hand/vqvae_right_hand.yaml"
+  body_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gpvc_1024/vqvae_body_gpvc_1024.yaml"
+  left_hand_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_left_hand_1024/vqvae_left_hand_1024.yaml"
+  right_hand_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_right_hand_1024/vqvae_right_hand_1024.yaml"
 
 codebooks_pattern:
   modeling: "parallel"
@@ -48,7 +48,7 @@ motion_generator:
   audio_input_dim: 128
   text_input_dim: 1024
   emb_dropout: 0.1
-  num_tokens: 512
+  num_tokens: 1024
   flash: True
   var_len: False
   quality_emb: False

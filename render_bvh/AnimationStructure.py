@@ -1,6 +1,6 @@
 import numpy as np
 # import scipy.sparse as sparse
-import visualization.Animation as Animation
+import render_bvh.Animation as Animation
 
 
 """ Family Functions """

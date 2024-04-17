@@ -1,24 +1,41 @@
-import visualization.Animation as Animation
-
-from visualization.InverseKinematics import (
+import render_bvh.Animation as Animation
+import numpy as np
+import os
+from render_bvh.InverseKinematics import (
     BasicInverseKinematics,
     BasicJacobianIK,
     InverseKinematics,
 )
-from visualization.Quaternions import Quaternions
-import visualization.BVH_mod as BVH
-from visualization.remove_fs import *
+from render_bvh.Quaternions import Quaternions
+import render_bvh.BVH_mod as BVH
+from render_bvh.remove_fs import *
 
 # from utils.plot_script import plot_3d_motion
-from utils import paramUtil
-from core.datasets.kinematics import Skeleton
-
-# common.skeleton import Skeleton
+# from render_bvh.utils import paramUtil
+# from render_bvh.common.skeleton import Skeleton
 import torch
-import numpy as np
+
 from torch import nn
-from visualization.utils.quat import ik_rot, between, fk, ik
+from render_bvh.utils.quat import ik_rot, between, fk, ik
 from tqdm import tqdm
+
+smplx_full_kinematic_chain = [
+    [0, 1, 4, 7, 10],
+    [0, 2, 5, 8, 11],
+    [0, 3, 6, 9, 12, 15],
+    [9, 13, 16, 18, 20],
+    [9, 14, 17, 19, 21],
+    [20, 22, 23, 24],
+    [20, 25, 26, 27],
+    [20, 28, 29, 30],
+    [20, 31, 32, 33],
+    [20, 34, 35, 36],
+    [21, 37, 38, 39],
+    [21, 40, 41, 42],
+    [21, 43, 44, 45],
+    [21, 46, 47, 48],
+    [21, 49, 50, 51],
+]
 
 
 def get_grot(glb, parent, offset):
@@ -34,13 +51,19 @@ def get_grot(glb, parent, offset):
 
 class Joint2BVHConvertor:
     def __init__(self):
-        self.template = BVH.load("./visualization/data/template.bvh", need_quater=True)
+        self.template = BVH.load(
+            "./render_bvh/data/smplx_eulerxyz2.bvh", need_quater=True
+        )
+
+        # self.re_order = [0]
+        # for i in smplx_full_kinematic_chain:
+        #     self.re_order.extend(i[1:])
         self.re_order = [
             0,
             1,
             4,
             7,
-            10,
+            19,
             2,
             5,
             8,
@@ -54,39 +77,56 @@ class Joint2BVHConvertor:
             16,
             18,
             20,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
             14,
             17,
             19,
             21,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
         ]
 
-        self.re_order_inv = [
-            0,
-            1,
-            5,
-            9,
-            2,
-            6,
-            10,
-            3,
-            7,
-            11,
+        self.re_order_inv = list(
+            dict(sorted(dict(zip(self.re_order, np.arange(0, 52))).items())).values()
+        )
+
+        self.end_points = [
             4,
             8,
-            12,
-            14,
-            18,
             13,
-            15,
-            19,
-            16,
-            20,
             17,
             21,
-        ]
-        self.end_points = [4, 8, 13, 17, 21]
+        ]  # left_foot right_foot head left_wrist right_wrist
 
         self.template_offset = self.template.offsets.copy()
+
         self.parents = [
             -1,
             0,
@@ -106,10 +146,40 @@ class Joint2BVHConvertor:
             14,
             15,
             16,
-            11,
+            17,
             18,
             19,
-            20,
+            17,
+            21,
+            22,
+            17,
+            24,
+            25,
+            17,
+            27,
+            28,
+            17,
+            30,
+            31,
+            11,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            36,
+            40,
+            41,
+            36,
+            43,
+            44,
+            36,
+            46,
+            47,
+            36,
+            49,
+            50,
         ]
 
     def convert(self, positions, filename, iterations=10, foot_ik=True):
@@ -219,25 +289,29 @@ class Joint2BVHConvertor:
         return anim, glb
 
 
-# if __name__ == "__main__":
-#     # file = 'batch0_sample13_repeat0_len196.npy'
-#     # file = 'batch2_sample10_repeat0_len156.npy'
-#     # file = 'batch2_sample13_repeat0_len196.npy' #line #57 new_anim.positions = lpos #new_anim.positions[0:1].repeat(positions.shape[0], axis=-0) #TODO, figure out why it's important
-#     # file = 'batch1_sample12_repeat0_len196.npy' #hard case karate
-#     # file = 'batch1_sample14_repeat0_len180.npy'
-#     # file = 'batch0_sample3_repeat0_len192.npy'
-#     # file = 'batch1_sample4_repeat0_len136.npy'
+if __name__ == "__main__":
+    # file = 'batch0_sample13_repeat0_len196.npy'
+    # file = 'batch2_sample10_repeat0_len156.npy'
+    # file = 'batch2_sample13_repeat0_len196.npy' #line #57 new_anim.positions = lpos #new_anim.positions[0:1].repeat(positions.shape[0], axis=-0) #TODO, figure out why it's important
+    # file = 'batch1_sample12_repeat0_len196.npy' #hard case karate
+    # file = 'batch1_sample14_repeat0_len180.npy'
+    # file = 'batch0_sample3_repeat0_len192.npy'
+    # file = 'batch1_sample4_repeat0_len136.npy'
 
-#     # file = 'batch0_sample0_repeat0_len152.npy'
-#     # path = f'/Users/yuxuanmu/project/MaskMIT/demo/cond4_topkr0.9_ts18_tau1.0_s1009/joints/{file}'
-#     # joints = np.load(path)
-#     # converter = Joint2BVHConvertor()
-#     # new_anim = converter.convert(joints, './gen_L196.mp4', foot_ik=True)
+    # file = 'batch0_sample0_repeat0_len152.npy'
+    # path = f'/Users/yuxuanmu/project/MaskMIT/demo/cond4_topkr0.9_ts18_tau1.0_s1009/joints/{file}'
+    # joints = np.load(path)
+    # converter = Joint2BVHConvertor()
+    # new_anim = converter.convert(joints, './gen_L196.mp4', foot_ik=True)
 
-#     folder = '/Users/yuxuanmu/project/MaskMIT/demo/cond4_topkr0.9_ts18_tau1.0_s1009'
-#     files = os.listdir(os.path.join(folder, 'joints'))
-#     files = [f for f in files if 'repeat' in f]
-#     converter = Joint2BVHConvertor()
-#     for f in tqdm(files):
-#         joints = np.load(os.path.join(folder, 'joints', f))
-#         converter.convert(joints, os.path.join(folder, 'ik_animations', f'ik_{f}'.replace('npy', 'mp4')), foot_ik=True)
+    folder = "/Users/yuxuanmu/project/MaskMIT/demo/cond4_topkr0.9_ts18_tau1.0_s1009"
+    files = os.listdir(os.path.join(folder, "joints"))
+    files = [f for f in files if "repeat" in f]
+    converter = Joint2BVHConvertor()
+    for f in tqdm(files):
+        joints = np.load(os.path.join(folder, "joints", f))
+        converter.convert(
+            joints,
+            os.path.join(folder, "ik_animations", f"ik_{f}".replace("npy", "mp4")),
+            foot_ik=True,
+        )

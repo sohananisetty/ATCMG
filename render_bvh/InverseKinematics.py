@@ -1,10 +1,10 @@
 import numpy as np
 import scipy.linalg as linalg
 
-from visualization import Animation
-from visualization import AnimationStructure
+from render_bvh import Animation
+from render_bvh import AnimationStructure
 
-from visualization.Quaternions import Quaternions
+from render_bvh.Quaternions import Quaternions
 
 
 class BasicInverseKinematics:

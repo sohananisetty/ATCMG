@@ -1,9 +1,8 @@
 import operator
 
 import numpy as np
-import numpy.core.umath_tests as ut
 
-from visualization.Quaternions import Quaternions
+from render_bvh.Quaternions import Quaternions
 
 
 class Animation:
@@ -28,7 +27,9 @@ class Animation:
         parents   : (J) ndarray        | Joint Parents
     """
 
-    def __init__(self, rotations, positions, orients, offsets, parents, names, frametime):
+    def __init__(
+        self, rotations, positions, orients, offsets, parents, names, frametime
+    ):
 
         self.rotations = rotations
         self.positions = positions
@@ -44,7 +45,8 @@ class Animation:
             op(self.positions, other.positions),
             op(self.orients, other.orients),
             op(self.offsets, other.offsets),
-            op(self.parents, other.parents))
+            op(self.parents, other.parents),
+        )
 
     def __iop__(self, op, other):
         self.rotations = op(self.roations, other.rotations)
@@ -60,7 +62,8 @@ class Animation:
             op(self.positions),
             op(self.orients),
             op(self.offsets),
-            op(self.parents))
+            op(self.parents),
+        )
 
     def __add__(self, other):
         return self.__op__(operator.add, other)
@@ -104,7 +107,8 @@ class Animation:
                 self.offsets[k[1:]],
                 self.parents[k[1:]],
                 self.names[k[1:]],
-                self.frametime[k[1:]])
+                self.frametime[k[1:]],
+            )
         else:
             return Animation(
                 self.rotations[k],
@@ -113,7 +117,8 @@ class Animation:
                 self.offsets,
                 self.parents,
                 self.names,
-                self.frametime)
+                self.frametime,
+            )
 
     def __setitem__(self, k, v):
         if isinstance(k, tuple):
@@ -135,35 +140,50 @@ class Animation:
 
     def copy(self):
         return Animation(
-            self.rotations.copy(), self.positions.copy(),
-            self.orients.copy(), self.offsets.copy(),
-            self.parents.copy(), self.names,
-            self.frametime)
+            self.rotations.copy(),
+            self.positions.copy(),
+            self.orients.copy(),
+            self.offsets.copy(),
+            self.parents.copy(),
+            self.names,
+            self.frametime,
+        )
 
     def repeat(self, *args, **kw):
         return Animation(
             self.rotations.repeat(*args, **kw),
             self.positions.repeat(*args, **kw),
-            self.orients, self.offsets, self.parents, self.frametime, self.names)
+            self.orients,
+            self.offsets,
+            self.parents,
+            self.frametime,
+            self.names,
+        )
 
     def ravel(self):
-        return np.hstack([
-            self.rotations.log().ravel(),
-            self.positions.ravel(),
-            self.orients.log().ravel(),
-            self.offsets.ravel()])
+        return np.hstack(
+            [
+                self.rotations.log().ravel(),
+                self.positions.ravel(),
+                self.orients.log().ravel(),
+                self.offsets.ravel(),
+            ]
+        )
 
     @classmethod
     def unravel(cls, anim, shape, parents):
         nf, nj = shape
-        rotations = anim[nf * nj * 0:nf * nj * 3]
-        positions = anim[nf * nj * 3:nf * nj * 6]
-        orients = anim[nf * nj * 6 + nj * 0:nf * nj * 6 + nj * 3]
-        offsets = anim[nf * nj * 6 + nj * 3:nf * nj * 6 + nj * 6]
+        rotations = anim[nf * nj * 0 : nf * nj * 3]
+        positions = anim[nf * nj * 3 : nf * nj * 6]
+        orients = anim[nf * nj * 6 + nj * 0 : nf * nj * 6 + nj * 3]
+        offsets = anim[nf * nj * 6 + nj * 3 : nf * nj * 6 + nj * 6]
         return cls(
-            Quaternions.exp(rotations), positions,
-            Quaternions.exp(orients), offsets,
-            parents.copy())
+            Quaternions.exp(rotations),
+            positions,
+            Quaternions.exp(orients),
+            offsets,
+            parents.copy(),
+        )
 
 
 # local transformation matrices
@@ -192,8 +212,12 @@ def transforms_local(anim):
     """
 
     transforms = anim.rotations.transforms()
-    transforms = np.concatenate([transforms, np.zeros(transforms.shape[:2] + (3, 1))], axis=-1)
-    transforms = np.concatenate([transforms, np.zeros(transforms.shape[:2] + (1, 4))], axis=-2)
+    transforms = np.concatenate(
+        [transforms, np.zeros(transforms.shape[:2] + (3, 1))], axis=-1
+    )
+    transforms = np.concatenate(
+        [transforms, np.zeros(transforms.shape[:2] + (1, 4))], axis=-2
+    )
     # the last column is filled with the joint positions!
     transforms[:, :, 0:3, 3] = anim.positions
     transforms[:, :, 3:4, 3] = 1.0
@@ -223,7 +247,13 @@ def transforms_multiply(t0s, t1s):
         together
     """
 
-    return ut.matrix_multiply(t0s, t1s)
+    return np.matmul(t0s, t1s)
+
+
+# np.einsum("f j 4 4, f j 4 4 -> f j 4 4", t0s, t1s)
+
+
+# ut.matrix_multiply(t0s, t1s)
 
 
 def transforms_inv(ts):
@@ -251,10 +281,10 @@ def transforms_blank(anim):
     """
 
     ts = np.zeros(anim.shape + (4, 4))
-    ts[:, :, 0, 0] = 1.0;
-    ts[:, :, 1, 1] = 1.0;
-    ts[:, :, 2, 2] = 1.0;
-    ts[:, :, 3, 3] = 1.0;
+    ts[:, :, 0, 0] = 1.0
+    ts[:, :, 1, 1] = 1.0
+    ts[:, :, 2, 2] = 1.0
+    ts[:, :, 3, 3] = 1.0
     return ts
 
 
@@ -366,6 +396,7 @@ def rotations_parents_global(anim):
     rotations[:, 0] = Quaternions.id(len(anim))
     return rotations
 
+
 """ Offsets & Orients """
 
 
@@ -385,8 +416,12 @@ def orients_global(anim):
 
 def offsets_transforms_local(anim):
     transforms = anim.orients[np.newaxis].transforms()
-    transforms = np.concatenate([transforms, np.zeros(transforms.shape[:2] + (3, 1))], axis=-1)
-    transforms = np.concatenate([transforms, np.zeros(transforms.shape[:2] + (1, 4))], axis=-2)
+    transforms = np.concatenate(
+        [transforms, np.zeros(transforms.shape[:2] + (3, 1))], axis=-1
+    )
+    transforms = np.concatenate(
+        [transforms, np.zeros(transforms.shape[:2] + (1, 4))], axis=-2
+    )
     transforms[:, :, 0:3, 3] = anim.offsets[np.newaxis]
     transforms[:, :, 3:4, 3] = 1.0
     return transforms
@@ -427,8 +462,8 @@ def position_lengths(anim):
 
 def skin(anim, rest, weights, mesh, maxjoints=4):
     full_transforms = transforms_multiply(
-        transforms_global(anim),
-        transforms_inv(transforms_global(rest[0:1])))
+        transforms_global(anim), transforms_inv(transforms_global(rest[0:1]))
+    )
 
     weightids = np.argsort(-weights, axis=1)[:, :maxjoints]
     weightvls = np.array(list(map(lambda w, i: w[i], weights, weightids)))

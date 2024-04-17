@@ -411,9 +411,9 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         self.text_dir = os.path.join(data_root, "texts/semantic_labels")
 
         if self.motion_rep in ["full", "hand"]:
-            self.motion_ind_dir = os.path.join(data_root, f"indices/body")
+            self.motion_ind_dir = os.path.join(data_root, f"indices/1024/body")
         else:
-            self.motion_ind_dir = os.path.join(data_root, f"indices/{motion_rep}")
+            self.motion_ind_dir = os.path.join(data_root, f"indices/1024/{motion_rep}")
 
         self.motion_dir = os.path.join(data_root, "motion_data/new_joint_vecs")
         self.audio_dir = os.path.join(data_root, "audio")

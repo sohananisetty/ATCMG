@@ -89,31 +89,48 @@ smplx_raw_hand_offsets = np.array(
 smplx_full_raw_offsets = np.concatenate(
     (smplx_raw_body_offsets, smplx_raw_hand_offsets), axis=0
 )
-
+# pelvis ---> left_hip ---> left_knee ---> left_ankle ---> left_foot 0, 1, 4, 7, 10
+# pelvis --> right_hip ---> right_knee ---> right_ankle ---> right_foot 0, 2, 5, 8, 11
+# pelvis ---> spine1 ---> spine2 ---> spine3 ---> neck ---> head 0, 3, 6, 9, 12, 15
+# spine3 ---> left_collar ---> left_shoulder --->  left_elbow ---> left_wrist 9, 13, 16, 18, 20
+# spine3 ---> right_collar ---> right_shoulder --->  right_elbow ---> right_wrist  9, 14, 17, 19, 21
 
 smplx_kinematic_chain = [
-    [0, 2, 5, 8, 11],
     [0, 1, 4, 7, 10],
+    [0, 2, 5, 8, 11],
     [0, 3, 6, 9, 12, 15],
-    [9, 14, 17, 19, 21],
     [9, 13, 16, 18, 20],
+    [9, 14, 17, 19, 21],
 ]
+
+# left_wrist ---> left_index1 ---> left_index2 --->left_index3
+# left_wrist ---> left_middle1 ---> left_middle2 --->left_middle3
+# left_wrist ---> left_pinky1 ---> left_pinky2 --->left_pinky3
+# left_wrist ---> left_ring1 ---> left_ring2 --->left_ring3
+# left_wrist ---> left_thumb1 ---> left_thumb2 --->left_thumb3
 
 
 smplx_left_hand_chain = [
     [20, 22, 23, 24],
-    [20, 34, 35, 36],
     [20, 25, 26, 27],
-    [20, 31, 32, 33],
     [20, 28, 29, 30],
+    [20, 31, 32, 33],
+    [20, 34, 35, 36],
 ]
+
+# right_wrist ---> right_index1 ---> right_index2 --->right_index3
+# right_wrist ---> right_middle1 ---> right_middle2 --->right_middle3
+# right_wrist ---> right_pinky1 ---> right_pinky2 --->right_pinky3
+# right_wrist ---> right_ring1 ---> right_ring2 --->right_ring3
+# right_wrist ---> right_thumb1 ---> right_thumb2 --->right_thumb3
 smplx_right_hand_chain = [
+    [21, 37, 38, 39],
+    [21, 40, 41, 42],
     [21, 43, 44, 45],
     [21, 46, 47, 48],
-    [21, 40, 41, 42],
-    [21, 37, 38, 39],
     [21, 49, 50, 51],
 ]
+
 
 smplx_only_one_hand_chain = [
     [0, 1, 2],

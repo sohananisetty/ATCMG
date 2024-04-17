@@ -23,8 +23,6 @@ from tqdm import tqdm
 from transformers import AdamW, get_scheduler
 from yacs.config import CfgNode
 
-torch.autograd.detect_anomaly(True)
-
 
 def exists(val):
     return val is not None

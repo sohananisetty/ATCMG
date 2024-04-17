@@ -1,2 +1,5 @@
-tar: /srv/hays-lab/flash5/sanisetty/new_joint_vecs.tar: Cannot open: No such file or directory
+tar (child): /srv/hays-lab/flash5/sanisetty/new_joint_vecs.tar.gz: Cannot open: No such file or directory
+tar (child): Error is not recoverable: exiting now
+tar: /srv/hays-lab/flash5/sanisetty/new_joint_vecs.tar.gz: Wrote only 4096 of 10240 bytes
+tar: Child returned status 2
 tar: Error is not recoverable: exiting now

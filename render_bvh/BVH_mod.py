@@ -1,25 +1,21 @@
 import re
 import numpy as np
 
-from visualization.Animation import Animation
-from visualization.Quaternions import Quaternions
+from render_bvh.Animation import Animation
+from render_bvh.Quaternions import Quaternions
 
-channelmap = {
-    'Xrotation': 'x',
-    'Yrotation': 'y',
-    'Zrotation': 'z'
-}
+channelmap = {"Xrotation": "x", "Yrotation": "y", "Zrotation": "z"}
 
 channelmap_inv = {
-    'x': 'Xrotation',
-    'y': 'Yrotation',
-    'z': 'Zrotation',
+    "x": "Xrotation",
+    "y": "Yrotation",
+    "z": "Zrotation",
 }
 
 ordermap = {
-    'x': 0,
-    'y': 1,
-    'z': 2,
+    "x": 0,
+    "y": 1,
+    "z": 2,
 }
 
 
@@ -67,8 +63,10 @@ def load(filename, start=None, end=None, order=None, world=False, need_quater=Tr
 
     for line in f:
 
-        if "HIERARCHY" in line: continue
-        if "MOTION" in line: continue
+        if "HIERARCHY" in line:
+            continue
+        if "MOTION" in line:
+            continue
 
         """ Modified line read to handle mixamo data """
         #        rmatch = re.match(r"ROOT (\w+)", line)
@@ -78,10 +76,11 @@ def load(filename, start=None, end=None, order=None, world=False, need_quater=Tr
             offsets = np.append(offsets, np.array([[0, 0, 0]]), axis=0)
             orients.qs = np.append(orients.qs, np.array([[1, 0, 0, 0]]), axis=0)
             parents = np.append(parents, active)
-            active = (len(parents) - 1)
+            active = len(parents) - 1
             continue
 
-        if "{" in line: continue
+        if "{" in line:
+            continue
 
         if "}" in line:
             if end_site:
@@ -90,7 +89,9 @@ def load(filename, start=None, end=None, order=None, world=False, need_quater=Tr
                 active = parents[active]
             continue
 
-        offmatch = re.match(r"\s*OFFSET\s+([\-\d\.e]+)\s+([\-\d\.e]+)\s+([\-\d\.e]+)", line)
+        offmatch = re.match(
+            r"\s*OFFSET\s+([\-\d\.e]+)\s+([\-\d\.e]+)\s+([\-\d\.e]+)", line
+        )
         if offmatch:
             if not end_site:
                 offsets[active] = np.array([list(map(float, offmatch.groups()))])
@@ -102,7 +103,7 @@ def load(filename, start=None, end=None, order=None, world=False, need_quater=Tr
             if order is None:
                 channelis = 0 if channels == 3 else 3
                 channelie = 3 if channels == 3 else 6
-                parts = line.split()[2 + channelis:2 + channelie]
+                parts = line.split()[2 + channelis : 2 + channelie]
                 if any([p not in channelmap for p in parts]):
                     continue
                 order = "".join([channelmap[p] for p in parts])
@@ -116,7 +117,7 @@ def load(filename, start=None, end=None, order=None, world=False, need_quater=Tr
             offsets = np.append(offsets, np.array([[0, 0, 0]]), axis=0)
             orients.qs = np.append(orients.qs, np.array([[1, 0, 0, 0]]), axis=0)
             parents = np.append(parents, active)
-            active = (len(parents) - 1)
+            active = len(parents) - 1
             continue
 
         if "End Site" in line:
@@ -169,15 +170,28 @@ def load(filename, start=None, end=None, order=None, world=False, need_quater=Tr
     f.close()
 
     if need_quater:
-        rotations = Quaternions.from_euler(np.radians(rotations), order=order, world=world)
-    elif order != 'xyz':
-        rotations = Quaternions.from_euler(np.radians(rotations), order=order, world=world)
+        rotations = Quaternions.from_euler(
+            np.radians(rotations), order=order, world=world
+        )
+    elif order != "xyz":
+        rotations = Quaternions.from_euler(
+            np.radians(rotations), order=order, world=world
+        )
         rotations = np.degrees(rotations.euler())
 
     return Animation(rotations, positions, orients, offsets, parents, names, frametime)
 
 
-def save(filename, anim, names=None, frametime=1.0 / 24.0, order='zyx', positions=False, mask=None, quater=False):
+def save(
+    filename,
+    anim,
+    names=None,
+    frametime=1.0 / 24.0,
+    order="zyx",
+    positions=False,
+    mask=None,
+    quater=False,
+):
     """
     Saves an Animation to file as BVH
 
@@ -212,17 +226,27 @@ def save(filename, anim, names=None, frametime=1.0 / 24.0, order='zyx', position
     if names is None:
         names = ["joint_" + str(i) for i in range(len(anim.parents))]
 
-    with open(filename, 'w') as f:
+    with open(filename, "w") as f:
 
         t = ""
         f.write("%sHIERARCHY\n" % t)
         f.write("%sROOT %s\n" % (t, names[0]))
         f.write("%s{\n" % t)
-        t += '\t'
+        t += "\t"
 
-        f.write("%sOFFSET %f %f %f\n" % (t, anim.offsets[0, 0], anim.offsets[0, 1], anim.offsets[0, 2]))
-        f.write("%sCHANNELS 6 Xposition Yposition Zposition %s %s %s \n" %
-                (t, channelmap_inv[order[0]], channelmap_inv[order[1]], channelmap_inv[order[2]]))
+        f.write(
+            "%sOFFSET %f %f %f\n"
+            % (t, anim.offsets[0, 0], anim.offsets[0, 1], anim.offsets[0, 2])
+        )
+        f.write(
+            "%sCHANNELS 6 Xposition Yposition Zposition %s %s %s \n"
+            % (
+                t,
+                channelmap_inv[order[0]],
+                channelmap_inv[order[1]],
+                channelmap_inv[order[2]],
+            )
+        )
 
         for i in range(anim.shape[1]):
             if anim.parents[i] == 0:
@@ -232,8 +256,8 @@ def save(filename, anim, names=None, frametime=1.0 / 24.0, order='zyx', position
         f.write("%s}\n" % t)
 
         f.write("MOTION\n")
-        f.write("Frames: %i\n" % anim.shape[0]);
-        f.write("Frame Time: %f\n" % frametime);
+        f.write("Frames: %i\n" % anim.shape[0])
+        f.write("Frame Time: %f\n" % frametime)
 
         # if orients:
         #    rots = np.degrees((-anim.orients[np.newaxis] * anim.rotations).euler(order=order[::-1]))
@@ -251,37 +275,64 @@ def save(filename, anim, names=None, frametime=1.0 / 24.0, order='zyx', position
 
                 if positions or j == 0:
 
-                    f.write("%f %f %f %f %f %f " % (
-                        poss[i, j, 0], poss[i, j, 1], poss[i, j, 2],
-                        rots[i, j, ordermap[order[0]]], rots[i, j, ordermap[order[1]]], rots[i, j, ordermap[order[2]]]))
+                    f.write(
+                        "%f %f %f %f %f %f "
+                        % (
+                            poss[i, j, 0],
+                            poss[i, j, 1],
+                            poss[i, j, 2],
+                            rots[i, j, ordermap[order[0]]],
+                            rots[i, j, ordermap[order[1]]],
+                            rots[i, j, ordermap[order[2]]],
+                        )
+                    )
 
                 else:
                     if mask == None or mask[j] == 1:
-                        f.write("%f %f %f " % (
-                            rots[i, j, ordermap[order[0]]], rots[i, j, ordermap[order[1]]],
-                            rots[i, j, ordermap[order[2]]]))
+                        f.write(
+                            "%f %f %f "
+                            % (
+                                rots[i, j, ordermap[order[0]]],
+                                rots[i, j, ordermap[order[1]]],
+                                rots[i, j, ordermap[order[2]]],
+                            )
+                        )
                     else:
                         f.write("%f %f %f " % (0, 0, 0))
 
             f.write("\n")
 
 
-def save_joint(f, anim, names, t, i, order='zyx', positions=False):
+def save_joint(f, anim, names, t, i, order="zyx", positions=False):
     f.write("%sJOINT %s\n" % (t, names[i]))
     f.write("%s{\n" % t)
-    t += '\t'
+    t += "\t"
 
-    f.write("%sOFFSET %f %f %f\n" % (t, anim.offsets[i, 0], anim.offsets[i, 1], anim.offsets[i, 2]))
+    f.write(
+        "%sOFFSET %f %f %f\n"
+        % (t, anim.offsets[i, 0], anim.offsets[i, 1], anim.offsets[i, 2])
+    )
 
     if positions:
-        f.write("%sCHANNELS 6 Xposition Yposition Zposition %s %s %s \n" % (t,
-                                                                            channelmap_inv[order[0]],
-                                                                            channelmap_inv[order[1]],
-                                                                            channelmap_inv[order[2]]))
+        f.write(
+            "%sCHANNELS 6 Xposition Yposition Zposition %s %s %s \n"
+            % (
+                t,
+                channelmap_inv[order[0]],
+                channelmap_inv[order[1]],
+                channelmap_inv[order[2]],
+            )
+        )
     else:
-        f.write("%sCHANNELS 3 %s %s %s\n" % (t,
-                                             channelmap_inv[order[0]], channelmap_inv[order[1]],
-                                             channelmap_inv[order[2]]))
+        f.write(
+            "%sCHANNELS 3 %s %s %s\n"
+            % (
+                t,
+                channelmap_inv[order[0]],
+                channelmap_inv[order[1]],
+                channelmap_inv[order[2]],
+            )
+        )
 
     end_site = True
 
@@ -293,7 +344,7 @@ def save_joint(f, anim, names, t, i, order='zyx', positions=False):
     if end_site:
         f.write("%sEnd Site\n" % t)
         f.write("%s{\n" % t)
-        t += '\t'
+        t += "\t"
         f.write("%sOFFSET %f %f %f\n" % (t, 0.0, 0.0, 0.0))
         t = t[:-1]
         f.write("%s}\n" % t)
