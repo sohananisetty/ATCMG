@@ -1,3 +1,32 @@
 /coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/utils/weight_norm.py:28: UserWarning: torch.nn.utils.weight_norm is deprecated in favor of torch.nn.utils.parametrizations.weight_norm.
   warnings.warn("torch.nn.utils.weight_norm is deprecated in favor of torch.nn.utils.parametrizations.weight_norm.")
 Could not find image processor class in the image processor config or the model config. Loading based on pattern matching with the model's feature extractor configuration. Please open a PR/issue to update `preprocessor_config.json` to use `image_processor_type` instead of `feature_extractor_type`. This warning will be removed in v4.40.
+wandb: Currently logged in as: sohananisetty (ai-choreo). Use `wandb login --relogin` to force relogin
+wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: wandb version 0.16.6 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.16.2
+wandb: Run data is saved locally in /coc/scratch/sanisetty3/music_motion/ATCMG/wandb/run-20240417_120217-r890u4zl
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run wobbly-brook-1
+wandb:  View project at https://wandb.ai/ai-choreo/motion_muse_body_hands_1024
+wandb:  View run at https://wandb.ai/ai-choreo/motion_muse_body_hands_1024/runs/r890u4zl
+Traceback (most recent call last):
+  File "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/train_generator.py", line 22, in <module>
+    trainer.train(cfg.train.resume)
+  File "/coc/scratch/sanisetty3/music_motion/ATCMG/ctl/trainer_muse.py", line 656, in train
+    self.load(save_path)
+  File "/coc/scratch/sanisetty3/music_motion/ATCMG/ctl/trainer_muse.py", line 314, in load
+    pkg = torch.load(str(path), map_location="cuda")
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/serialization.py", line 998, in load
+    with _open_file_like(f, 'rb') as opened_file:
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/serialization.py", line 445, in _open_file_like
+    return _open_file(name_or_buffer, mode)
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/serialization.py", line 426, in __init__
+    super().__init__(open(name, mode))
+FileNotFoundError: [Errno 2] No such file or directory: '/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_body_hands_1024/motion_muse.pt'
+wandb: WARNING No program path found, not creating job artifact. See https://docs.wandb.ai/guides/launch/create-job
+wandb: - 0.014 MB of 0.014 MB uploadedwandb: \ 0.020 MB of 0.020 MB uploadedwandb:  View run wobbly-brook-1 at: https://wandb.ai/ai-choreo/motion_muse_body_hands_1024/runs/r890u4zl
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20240417_120217-r890u4zl/logs
+srun: error: heistotron: task 0: Exited with exit code 1
+srun: Terminating StepId=856370.0

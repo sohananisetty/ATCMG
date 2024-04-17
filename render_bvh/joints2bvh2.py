@@ -50,20 +50,16 @@ def get_grot(glb, parent, offset):
 
 
 class Joint2BVHConvertor:
-    def __init__(self):
-        self.template = BVH.load(
-            "./render_bvh/data/smplx_eulerxyz2.bvh", need_quater=True
-        )
+    def __init__(self, path=None):
+        path = "./render_bvh/data/smplx_full_template.bvh" if path is None else path
+        self.template = BVH.load(path, need_quater=True)
 
-        # self.re_order = [0]
-        # for i in smplx_full_kinematic_chain:
-        #     self.re_order.extend(i[1:])
         self.re_order = [
             0,
             1,
             4,
             7,
-            19,
+            10,
             2,
             5,
             8,
@@ -113,9 +109,60 @@ class Joint2BVHConvertor:
             51,
         ]
 
-        self.re_order_inv = list(
-            dict(sorted(dict(zip(self.re_order, np.arange(0, 52))).items())).values()
-        )
+        self.re_order_inv = [
+            0,
+            1,
+            5,
+            9,
+            2,
+            6,
+            10,
+            3,
+            7,
+            11,
+            4,
+            8,
+            12,
+            14,
+            33,
+            13,
+            15,
+            34,
+            16,
+            35,
+            17,
+            36,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+        ]
 
         self.end_points = [
             4,
@@ -185,7 +232,7 @@ class Joint2BVHConvertor:
     def convert(self, positions, filename, iterations=10, foot_ik=True):
         """
         Convert the SMPL joint positions to Mocap BVH
-        :param positions: (N, 22, 3)
+        :param positions: (N, 52, 3)
         :param filename: Save path for resulting BVH
         :param iterations: iterations for optimizing rotations, 10 is usually enough
         :param foot_ik: whether to enfore foot inverse kinematics, removing foot slide issue.
@@ -218,7 +265,7 @@ class Joint2BVHConvertor:
                 filename,
                 new_anim,
                 names=new_anim.names,
-                frametime=1 / 20,
+                frametime=1 / 30,
                 order="zyx",
                 quater=True,
             )
