@@ -28,7 +28,7 @@ from transformers import AdamW, get_scheduler
 from utils.motion_processing.hml_process import recover_from_ric, recover_root_rot_pos
 from yacs.config import CfgNode
 from core.models.TMR.tmr import TMR
-from core.datasets.text_encoders import MPNETConditioner
+from core.datasets.text_encoders import SentenceConditioner
 
 
 def cycle(dl):
@@ -109,7 +109,7 @@ class TMRTrainer(nn.Module):
             **self.model_args,
         ).to(self.device)
 
-        self.sent_embedder = MPNETConditioner()
+        self.sent_embedder = SentenceConditioner()
 
         total = sum(p.numel() for p in self.tmr.parameters() if p.requires_grad)
         print("Total training params: %.2fM" % (total / 1e6))

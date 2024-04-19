@@ -12,14 +12,14 @@ dataset:
   motion_max_length_s: 4
   window_size_s: 4
 train:
-  resume: True
+  resume: False
   num_train_iters : 210001 #'Number of training steps
   save_steps : 10000
   logging_steps : 20
   wandb_every : 200
   evaluate_every : 10000
-  eval_bs : 400
-  train_bs : 400
+  eval_bs : 200
+  train_bs : 200
   gradient_accumulation_steps : 1
   learning_rate : 3e-4
   # weight_decay : 1e-3
@@ -42,7 +42,7 @@ motion_generator:
   target: "core.models.generation.muse2.MotionMuse"
   n_q : 3
   dim : 512
-  depth: 8
+  depth: 10
   cond_dropout: 0.4
   no_mask_token_prob: 0.3
   audio_input_dim: 128

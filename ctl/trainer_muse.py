@@ -136,22 +136,42 @@ class MotionMuseTrainer(nn.Module):
             fps=self.dataset_args.fps / self.dataset_args.down_sampling_ratio,
         )
 
+        # dataset_names = {
+        #     "animation": 0.5,
+        #     "humanml": 3.5,
+        #     "perform": 0.6,
+        #     "GRAB": 1.0,
+        #     "idea400": 2.0,
+        #     "humman": 0.5,
+        #     "beat": 2.5,
+        #     "game_motion": 0.8,
+        #     "music": 0.5,
+        #     "aist": 2.0,
+        #     "fitness": 1.0,
+        #     "moyo": 1.5,
+        #     "choreomaster": 2.5,
+        #     "dance": 1.0,
+        #     "kungfu": 1.0,
+        #     "EgoBody": 0.5,
+        #     # "HAA500": 1.0,
+        # }
+
         dataset_names = {
-            "animation": 0.5,
-            "humanml": 3.5,
-            "perform": 0.6,
+            "animation": 0.4,
+            "humanml": 1.5,
+            "perform": 0.5,
             "GRAB": 1.0,
-            "idea400": 2.0,
+            "idea400": 1.0,
             "humman": 0.5,
-            "beat": 2.5,
+            "beat": 1.2,
             "game_motion": 0.8,
-            "music": 0.5,
-            "aist": 2.5,
-            "fitness": 1.0,
-            "moyo": 1.5,
+            "music": 0.8,
+            "aist": 1.5,
+            "fitness": 0.7,
+            "moyo": 1.0,
             "choreomaster": 2.5,
-            "dance": 1.0,
-            "kungfu": 1.0,
+            "dance": 0.5,
+            "kungfu": 0.5,
             "EgoBody": 0.5,
             # "HAA500": 1.0,
         }
@@ -264,30 +284,6 @@ class MotionMuseTrainer(nn.Module):
             )
         else:
             self.right_hand_model = None
-
-    def getBodyMuse(self, nme="motion_muse_film"):
-        gen_cfg = muse_get_cfg_defaults()
-        gen_cfg.merge_from_file(
-            f"/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/{nme}/{nme}.yaml"
-        )
-        gen_cfg.freeze()
-
-        tranformer_config = gen_cfg.motion_generator
-        fuse_config = gen_cfg.fuser
-        pattern_config = gen_cfg.codebooks_pattern
-
-        target = tranformer_config.pop("target")
-        motion_gen = (
-            MotionMuse(tranformer_config, fuse_config, pattern_config)
-            .to(self.device)
-            .eval()
-        )
-        pkg = torch.load(
-            f"/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/{nme}/motion_muse.pt",
-            map_location="cuda",
-        )
-        motion_gen.load_state_dict(pkg["model"])
-        return motion_gen
 
     def print(self, msg):
         # self.accelerator.print(msg)

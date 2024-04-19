@@ -128,19 +128,19 @@ class VQVAEMotionTrainer(nn.Module):
         dataset_names = {
             "animation": 0.8,
             "humanml": 3.0,
-            "perform": 0.6,
+            "perform": 0.5,
             "GRAB": 1.0,
-            "idea400": 2.0,
-            "humman": 0.5,
-            "beat": 2.5,
+            "idea400": 1.5,
+            # "humman": 0.5,
+            "beat": 2.0,
             "game_motion": 0.8,
-            "music": 0.5,
+            "music": 0.8,
             "aist": 2.0,
-            "fitness": 1.0,
+            "fitness": 0.6,
             "moyo": 1.5,
-            "choreomaster": 2.5,
+            "choreomaster": 2.0,
             "dance": 1.0,
-            "kungfu": 1.0,
+            "kungfu": 0.8,
             "EgoBody": 0.5,
             # "HAA500": 1.0,
         }
@@ -322,7 +322,7 @@ class VQVAEMotionTrainer(nn.Module):
             model_path = os.path.join(
                 self.output_dir, "checkpoints", f"vqvae_motion.{steps}.pt"
             )
-            self.save(model_path)
+            self.save(model_path, loss=float(logs["loss"]))
             print(float(logs["loss"]), self.best_loss)
 
             if float(logs["loss"]) <= self.best_loss:

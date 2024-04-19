@@ -1,42 +1,40 @@
-model_name: "vqvae_full_gpvc"
-output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_full_gpvc"
+model_name: "vqvae_body_gpvc_512"
+output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gpvc_512"
 dataset:
   dataset_name: "mix"
   dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
-  motion_rep: "full"
+  motion_rep: "body"
   hml_rep: "gpvc"
   window_size: 120
+  remove_translation: False
 train:
   resume: False
   num_train_iters : 110001 #'Number of training steps
   save_steps : 10000
-  logging_steps : 100
+  logging_steps : 50
   wandb_every : 200
   evaluate_every : 10000
   eval_bs : 400
   train_bs : 400
   gradient_accumulation_steps : 1
   learning_rate : 2e-4
-  # weight_decay : 1e-3
+  weight_decay : 1e-3
   warmup_steps : 3000
   gamma : 0.05
   lr_scheduler_type : "cosine"
 vqvae:
-  target: "core.models.resnetVQ.vqvae.HumanVQVAE2" #"core.models.resnetVQ.rq_vqvae.HumanRVQVAE"
+  target: "core.models.resnetVQ.vqvae.HumanVQVAE2"
   dim : 768
-  depth: 6
-  codebook_size : 768
+  depth: 8
+  codebook_size : 512
   codebook_dim : 512
   commit : 0.25
   loss_motion: 2.0
   recons_loss : "l1_smooth"
-  use_simple_loss: False  
   use_geodesic_loss: False
   down_sampling_ratio: 4
-  motion_dim: 317
-  nb_joints: 52
-  # num_quantizers: 2
-  sample_codebook_temp: 0.1
-  quantize_dropout_prob: 0.0
+  motion_dim: 137
+  nb_joints: 22
+  
   
 

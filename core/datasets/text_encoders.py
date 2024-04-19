@@ -419,12 +419,17 @@ class BERTConditioner(BaseTextConditioner):
         return encoding, mask
 
 
-class MPNETConditioner(BaseTextConditioner):
+class SentenceConditioner(BaseTextConditioner):
     def __init__(
         self,
-        device: str = "cuda" if torch.cuda.is_available() else "cpu",
         name: str = "sentence-transformers/all-mpnet-base-v2",
+        device: str = "cuda" if torch.cuda.is_available() else "cpu",
     ):
+        """
+        available models:
+        "sentence-transformers/all-mpnet-base-v2"
+        "sentence-transformers/all-MiniLM-L6-v2"
+        """
         super().__init__()
         self.device = device
 

@@ -17,7 +17,21 @@ from core.datasets.conditioner import ConditionProvider
 from torch.utils import data
 from tqdm import tqdm
 import random
+import librosa
 
+genre_dict = {
+    "mBR": "Break",
+    "mPO": "Pop",
+    "mLO": "Lock",
+    "mMH": "Middle_Hip-hop",
+    "mLH": "LAstyle Hip-hop",
+    "mHO": "House",
+    "mWA": "Waack",
+    "mKR": "Krump",
+    "mJS": "Street_Jazz",
+    "mJB": "Ballet_Jazz",
+}
+inv_genre_dict = {v: k for k, v in genre_dict.items()}
 
 dataset_names_default = [
     "animation",
@@ -118,6 +132,7 @@ class TMRDataset(BaseMotionDataset):
 
         self.text_dir = os.path.join(data_root, "texts/semantic_labels")
         self.motion_dir = os.path.join(data_root, "motion_data/new_joint_vecs")
+        self.audio_dir = os.path.join(data_root, "audio")
 
         split_file = os.path.join(data_root, f"motion_data/{split}.txt")
 
@@ -233,6 +248,25 @@ class TMRDataset(BaseMotionDataset):
         motion = np.load(os.path.join(self.motion_dir, name + ".npy"))
 
         text = self.text_list[item]
+        audio_name = name
+
+        try:
+
+            if "aist" in audio_name:
+                for i in genre_dict.values():
+                    if i in audio_name:
+                        audio_name = (
+                            f"aist/{(inv_genre_dict[i])}{str(random.randint(0, 5))}"
+                        )
+
+            audio_file = os.path.join(self.audio_dir, "wav", audio_name + ".wav")
+            audio_data, _ = librosa.load(
+                audio_file,
+                sr=9600,
+            )
+
+        except:
+            audio_file = None
 
         if motion[int(f_) : math.ceil(to_)].shape[0] > default(
             self.window_size, self.min_motion_length
@@ -270,6 +304,7 @@ class TMRDataset(BaseMotionDataset):
             "name": name,
             "motion": processed_motion,
             "text": text,
+            "audio_file": audio_file,
         }
 
 
@@ -285,6 +320,7 @@ def simple_collate(
     lens = []
     motions = []
     texts = []
+    audio_files = []
 
     device = conditioner.device
 
@@ -293,6 +329,7 @@ def simple_collate(
         motions.append(sample["motion"]())
         lens.append(len(sample["motion"]))
         texts.append(sample["text"])
+        audio_files.append(sample["audio_file"])
 
     motion, mask = conditioner._get_motion_features(
         motion_list=motions,
@@ -309,5 +346,6 @@ def simple_collate(
         torch.Tensor(text).to(device),
         torch.Tensor(text_mask).to(device),
     )
+    conditions["audio_files"] = np.array(audio_files)
 
     return inputs, conditions

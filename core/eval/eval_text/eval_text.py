@@ -12,18 +12,21 @@ from core import MotionRep
 from tqdm import tqdm
 
 
-def get_latents(inputs, conditions, tmr):
+def get_latents(inputs, conditions, tmr, normalize=True):
     text_conds = conditions["text"]
     text_x_dict = {"x": text_conds[0], "mask": text_conds[1].to(torch.bool)}
     motion_x_dict = {"x": inputs[0], "mask": inputs[1].to(torch.bool)}
     motion_mask = motion_x_dict["mask"]
     text_mask = text_x_dict["mask"]
-    t_motions, t_latents, t_dists = tmr(text_x_dict, mask=motion_mask, return_all=True)
+    t_latents = tmr.encode(text_x_dict, sample_mean=False)
 
     # motion -> motion
-    m_motions, m_latents, m_dists = tmr(
-        motion_x_dict, mask=motion_mask, return_all=True
-    )
+    m_latents = tmr.encode(motion_x_dict, sample_mean=False)
+
+    if normalize:
+        t_latents = torch.nn.functional.normalize(t_latents, dim=-1)
+        m_latents = torch.nn.functional.normalize(m_latents, dim=-1)
+
     return t_latents, m_latents
 
 
@@ -32,17 +35,12 @@ def evaluation_vqvae(
     val_loader,
     motion_vqvae,
     tmr,
+    normalize=True,
 ):
     motion_vqvae.eval()
     tmr.eval()
     nb_sample = 0
-
-    motion_annotation_list = []
-    motion_pred_list = []
-    R_precision_real = 0
-    R_precision = 0
-    matching_score_real = 0
-    matching_score_pred = 0
+    base_dset = BaseMotionDataset(motion_rep=MotionRep.BODY, hml_rep="gpvc")
 
     nb_sample = 0
     motion_list = []
@@ -52,25 +50,48 @@ def evaluation_vqvae(
     matching_score_real = 0
     matching_score_pred = 0
     for inputs, conditions in tqdm(val_loader):
+        torch.cuda.empty_cache()
 
         with torch.no_grad():
             bs = inputs["motion"][0].shape[0]
 
-            t_latents, m_latents = get_latents(inputs["motion"], conditions, tmr)
+            t_latents, m_latents = get_latents(
+                inputs["motion"], conditions, tmr, normalize=normalize
+            )
 
-            # pred_pose_eval = torch.zeros_like(inputs["motion"][0])
+            pred_pose_eval = torch.zeros_like(inputs["motion"][0])
             # for k in range(bs):
             #     lenn = int(inputs["lens"][k])
             #     vqvae_output = motion_vqvae(
             #         motion=inputs["motion"][0][k : k + 1, :lenn],
             #     )
             #     pred_pose_eval[k : k + 1, :lenn] = vqvae_output.decoded_motion
-            pred_pose_eval = (
+            decoded_motion = (
                 motion_vqvae(inputs["motion"][0]).decoded_motion
                 * inputs["motion"][1][..., None]
             )
+
+            ### need to assert tmr hml_rep
+
+            if inputs["motion"][0].shape[-1] != decoded_motion.shape[-1]:
+
+                for i in range(bs):
+                    lenn = inputs["motion"][1].sum(-1)
+                    body_M = base_dset.toMotion(
+                        decoded_motion[i, :lenn],
+                        motion_rep=MotionRep("body"),
+                        hml_rep=val_loader.dataset.datasets[0].hml_rep,
+                    )
+                    pred_pose_eval[i, :lenn] = body_M()
+
+            else:
+                pred_pose_eval = decoded_motion
+
             t_latents_pred, m_latents_pred = get_latents(
-                (pred_pose_eval, inputs["motion"][1]), conditions, tmr
+                (pred_pose_eval, inputs["motion"][1]),
+                conditions,
+                tmr,
+                normalize=normalize,
             )
 
             motion_list.append(m_latents)
@@ -120,14 +141,14 @@ def evaluation_vqvae(
 
 @torch.no_grad()
 def evaluation_transformer(
-    val_loader, condition_provider, bkn_to_motion, motion_generator, tmr
+    val_loader, condition_provider, bkn_to_motion, motion_generator, tmr, normalize=True
 ):
     motion_generator.eval()
     tmr.eval()
     nb_sample = 0
     base_dset = BaseMotionDataset(motion_rep=MotionRep.BODY, hml_rep="gpvc")
 
-    motion_annotation_list = []
+    motion_list = []
     motion_pred_list = []
     R_precision_real = 0
     R_precision = 0
@@ -137,34 +158,31 @@ def evaluation_transformer(
     nb_sample = 0
     for inputs, conditions in val_loader:
 
-        motion_list = []
-        motion_pred_list = []
-        R_precision_real = 0
-        R_precision = 0
-        matching_score_real = 0
-        matching_score_pred = 0
         with torch.no_grad():
             bs = inputs["motion"][0].shape[0]
 
-            t_latents, m_latents = get_latents(inputs["motion"], conditions, tmr)
+            t_latents, m_latents = get_latents(
+                inputs["motion"], conditions, tmr, normalize
+            )
 
             pred_pose_eval = torch.zeros_like(inputs["motion"][0])
             for k in range(bs):
-                lenn = int(inputs["lens"][k])
+                lenn = int(inputs["motion"][1][k].sum())
                 text_ = inputs["texts"][k]
                 duration_s = math.ceil(lenn / 30)
-                all_ids_body = generate_animation(
+                all_ids = generate_animation(
                     motion_generator,
                     condition_provider,
-                    temperature=0.6,
+                    temperature=0.4,
                     overlap=10,
                     duration_s=duration_s,
                     text=text_,
+                    aud_file=(conditions["audio_files"][k]),
                     use_token_critic=True,
-                    timesteps=24,
+                    timesteps=8,
                 )
-                gen_motion = bkn_to_motion(all_ids_body[:, :1], base_dset)
-                pred_pose_eval[k : k + 1, :lenn] = gen_motion()[:lenn][None]
+                gen_motion = bkn_to_motion(all_ids[:, :1], base_dset)()[:lenn][None]
+                pred_pose_eval[k : k + 1, :lenn] = gen_motion
 
             t_latents_pred, m_latents_pred = get_latents(
                 (pred_pose_eval, inputs["motion"][1]), conditions, tmr
@@ -188,26 +206,24 @@ def evaluation_transformer(
             matching_score_pred += temp_match
             nb_sample += bs
 
-        break
-
     motion_annotation_np = torch.cat(motion_list, dim=0).cpu().numpy()
     motion_pred_np = torch.cat(motion_pred_list, dim=0).cpu().numpy()
+
     gt_mu, gt_cov = calculate_activation_statistics(motion_annotation_np)
     mu, cov = calculate_activation_statistics(motion_pred_np)
 
     diversity_real = calculate_diversity(
-        motion_annotation_np, 300 if nb_sample > 300 else 2
+        motion_annotation_np, 300 if nb_sample > 300 else 8
     )
-    diversity = calculate_diversity(motion_pred_np, 300 if nb_sample > 300 else 2)
+    diversity = calculate_diversity(motion_pred_np, 300 if nb_sample > 300 else 8)
 
     R_precision_real = R_precision_real / nb_sample
     R_precision = R_precision / nb_sample
 
     matching_score_real = matching_score_real / nb_sample
     matching_score_pred = matching_score_pred / nb_sample
-    print(gt_mu.shape, gt_cov.shape, mu.shape, cov.shape)
 
-    fid = calculate_frechet_distance(gt_mu, gt_cov, mu, cov)
+    fid = calculate_frechet_distance(gt_mu, gt_cov, mu, cov)  ## assert scipy 1.11.1
 
     msg = f"-->  FID. {fid:.4f}, Diversity Real. {diversity_real:.4f}, Diversity. {diversity:.4f}, R_precision_real. {R_precision_real}, R_precision. {R_precision}, matching_score_real. {matching_score_real}, matching_score_pred. {matching_score_pred}"
     print(msg)

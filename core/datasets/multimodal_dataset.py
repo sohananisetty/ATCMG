@@ -177,9 +177,9 @@ class MotionAudioTextDataset(BaseMotionDataset):
         audio_rep: str = "encodec",
         motion_rep: str = "full",
         hml_rep: str = "gprvc",
-        motion_min_length_s=2,
+        motion_min_length_s=3,
         motion_max_length_s=10,
-        window_size=None,
+        window_size_s=None,
         sampling_rate: int = 16000,
         fps: int = 30,
         split: str = "train",
@@ -191,7 +191,9 @@ class MotionAudioTextDataset(BaseMotionDataset):
         self.fps = fps
         self.audio_rep = audio_rep
 
-        self.window_size = window_size
+        self.window_size = (
+            int(window_size_s * self.fps) if window_size_s is not None else None
+        )
 
         self.min_motion_length = motion_min_length_s * fps
         self.max_motion_length = motion_max_length_s * fps
@@ -205,8 +207,10 @@ class MotionAudioTextDataset(BaseMotionDataset):
 
         if self.audio_rep in ["encodec", "librosa"]:
             self.sampling_rate = 30
+        elif self.audio_rep == "clap":
+            self.sampling_rate = 48000
         else:
-            self.sampling_rate = sampling_rate
+            self.sampling_rate = int(sampling_rate)
 
         split_file = os.path.join(data_root, f"motion_data/{split}.txt")
 
@@ -216,7 +220,9 @@ class MotionAudioTextDataset(BaseMotionDataset):
             for line in f.readlines():
                 if dataset_name + "/" in line:
                     try:
-                        motion = np.load(os.path.join(self.motion_dir, line.strip()))
+                        motion = np.load(
+                            os.path.join(self.motion_dir, line.strip())
+                        ).squeeze()
                         if motion.shape[0] < default(
                             self.window_size, self.min_motion_length
                         ):
@@ -315,52 +321,110 @@ class MotionAudioTextDataset(BaseMotionDataset):
 
         return name_list, txt_list
 
-    def mask_augment(self, motion, perc_n=0.0, perc_d=0.0):
-        n, d = motion.shape
-        num_masked_n = int(n * perc_n)
-        num_masked_d = int(d * perc_d)
+    def _select_common_start_idx(self, motion, audio, max_length_s):
+        motion_s = motion.shape[0] // self.fps
+        audio_s = audio.shape[0] // self.sampling_rate
 
-        n_ind = list(np.random.choice(np.arange(n), num_masked_n))
-        d_ind = list(np.random.choice(np.arange(d), num_masked_d))
+        common_len_seconds = min(motion_s, audio_s)
+        motion = motion[: int(common_len_seconds * self.fps)]
+        audio = motion[: int(common_len_seconds * self.sampling_rate)]
 
-        motion[n_ind, :] = 0
-        motion[:, d_ind] = 0
+        if common_len_seconds > max_length_s:
+            subset_idx_motion = np.random.randint(
+                0, motion.shape[0] - int(max_length_s * self.fps) + 1
+            )
 
-        return motion
+            mot_start_s = subset_idx_motion // self.fps
+            subset_idx_audio = int(mot_start_s * self.sampling_rate)
+
+        else:
+            return 0, 0
+
+        return subset_idx_audio, subset_idx_motion
+
+    def get_windowed_data(self, audio_data, motion):
+        if self.window_size == -1:
+            mot_len_s = int(motion.shape[0] // self.fps)
+            audio_len_s = mot_len_s
+
+        else:
+            mot_len_s = int(self.window_size // self.fps)
+            audio_len_s = mot_len_s
+
+        if audio_data is None:
+
+            subset_idx_motion = random.randint(
+                0, max(0, motion.shape[0] - int(mot_len_s * self.fps))
+            )
+
+        else:
+            subset_idx_audio, subset_idx_motion = self._select_common_start_idx(
+                motion, audio_data, mot_len_s
+            )
+
+            audio_data = audio_data[
+                subset_idx_audio : subset_idx_audio
+                + int(audio_len_s * self.sampling_rate)
+            ]
+
+        motion = motion[
+            subset_idx_motion : subset_idx_motion + int(mot_len_s * self.fps)
+        ]
+
+        return audio_data, motion
 
     def __getitem__(self, item: int) -> Tuple[torch.Tensor, str]:
         # print(self.id_list[item])
 
         name, ind, f_, to_ = self.id_list[item].rsplit("_", 3)
         f_, to_ = int(f_), int(to_)
-        motion = np.load(os.path.join(self.motion_dir, name + ".npy"))
+        motion = np.load(os.path.join(self.motion_dir, name + ".npy")).squeeze()
+        if "GRAB" in name:
+            f_ = int(7.5)
+            to_ = math.ceil(motion.shape[0] - 7.5)
 
         text = self.text_list[item]
+        audio_name = name
         try:
+
+            if "aist" in audio_name:
+                for i in genre_dict.values():
+                    if i in audio_name:
+                        audio_name = (
+                            f"aist/{(inv_genre_dict[i])}{str(random.randint(0, 5))}"
+                        )
 
             if self.audio_rep in ["wav", "clap"]:
 
-                wav, sr = torchaudio.load(
-                    os.path.join(self.audio_dir, self.audio_rep, name + ".wav")
-                )
-                audio_data = np.array(convert_audio(wav, sr, self.sampling_rate, 1))
+                audio_data, _ = librosa.load(
+                    os.path.join(self.audio_dir, "wav", audio_name + ".wav"),
+                    sr=self.sampling_rate,
+                )  # sample rate should be 48000
+                audio_data = audio_data.reshape(-1, 1)  ## T 1
             elif self.audio_rep in ["encodec", "librosa"]:
                 audio_data = np.load(
-                    os.path.join(self.audio_dir, self.audio_rep, name + ".npy")
+                    os.path.join(self.audio_dir, self.audio_rep, audio_name + ".npy")
                 )
 
-            motion_s = motion.shape[0] // self.fps
+            motion_s = (motion.shape[0]) // self.fps
             audio_s = audio_data.shape[0] // self.sampling_rate
 
             common_len_seconds = min(motion_s, audio_s)
-            motion = motion[: int(common_len_seconds * self.fps)]
+            motion = motion[: int((common_len_seconds * self.fps))]
+
             audio_data = audio_data[: int(common_len_seconds * self.sampling_rate)]
 
         except:
             audio_data = None
 
-        if to_ - f_ > self.min_motion_length:
-            motion = motion[f_:to_]
+        if motion[int(f_) : math.ceil(to_)].shape[0] > default(
+            self.window_size, self.min_motion_length
+        ):
+            motion = motion[int(f_) : math.ceil(to_)]
+
+        if self.window_size is not None:
+
+            audio_data, motion = self.get_windowed_data(audio_data, motion)
 
         processed_motion = self.get_processed_motion(
             motion, motion_rep=self.motion_rep, hml_rep=self.hml_rep
@@ -368,7 +432,7 @@ class MotionAudioTextDataset(BaseMotionDataset):
 
         return {
             "name": name,
-            "motion": processed_motion,
+            "motion": processed_motion(),
             "text": text,
             "audio": audio_data,
         }
@@ -628,6 +692,10 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
             .squeeze()
             .reshape(-1, 1)
         )
+
+        if "GRAB" in name:
+            f_ = int(7.5)
+            to_ = math.ceil(motion.shape[0] - 7.5)
         # if "g" in self.hml_rep:
         #     vel_xz_ = np.load(os.path.join(self.motion_dir, name + ".npy"))[
         #         : int(motion.shape[0] * self.downsample_ratio), [1, 2]

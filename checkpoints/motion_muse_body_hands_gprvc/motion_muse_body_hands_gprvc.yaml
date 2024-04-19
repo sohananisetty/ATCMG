@@ -41,7 +41,7 @@ fuser:
 motion_generator:
   target: "core.models.generation.muse2.MotionMuse"
   n_q : 3
-  dim : 512
+  dim : 768
   depth: 8
   cond_dropout: 0.4
   no_mask_token_prob: 0.3
