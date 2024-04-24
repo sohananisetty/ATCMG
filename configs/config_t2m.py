@@ -79,6 +79,9 @@ cfg.fuser.fuse_method = [{"cross": ["audio"], "prepend": ["text"]}]
 cfg.fuser.cross_attention_pos_emb = False
 cfg.fuser.cross_attention_pos_emb_scale = 1.0
 
+cfg.tmr = CN()
+cfg.tmr.config = None
+
 
 cfg.vqvae = CN()
 cfg.vqvae.body_config = "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_rv/vqvae_rv.yaml"
@@ -116,6 +119,8 @@ cfg.motion_generator.film_skip = 1
 cfg.motion_generator.no_mask_token_prob = 0.1
 cfg.motion_generator.cond_dropout = 0.4
 cfg.motion_generator.critic_loss_weight = 0.0
+cfg.motion_generator.align_loss_weight = 0.0
+
 ##dropouts
 cfg.motion_generator.attn_dropout = 0.0
 cfg.motion_generator.emb_dropout = 0.1

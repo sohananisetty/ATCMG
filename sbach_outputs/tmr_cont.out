@@ -65,3 +65,139 @@ resuming from  /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/t
 0.16222995519638062 tensor(0.1665, device='cuda:0')
 60000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/tmr/checkpoints
 validation start
+val_m2t/MedR 27.0
+val_m2t/R01 13.63
+val_m2t/R02 17.9
+val_m2t/R03 22.44
+val_m2t/R05 27.42
+val_m2t/R10 35.86
+val_m2t/len 10667.0
+val_t2m/MedR 18.0
+val_t2m/R01 13.12
+val_t2m/R02 20.41
+val_t2m/R03 25.65
+val_t2m/R05 31.27
+val_t2m/R10 40.69
+val_t2m/len 10667.0
+model total loss: 0.0709, recons: 0.0327, kl: 18.5 contrastive: 0.38 latent: 0.236
+60200: model total loss: 0.141, recons: 0.132, kl: 50.5 contrastive: 0.085 latent: 0.724
+60400: model total loss: 0.156, recons: 0.144, kl: 51.8 contrastive: 0.115 latent: 0.738
+60600: model total loss: 0.134, recons: 0.127, kl: 47.3 contrastive: 0.07 latent: 0.689
+60800: model total loss: 0.154, recons: 0.144, kl: 49.5 contrastive: 0.0879 latent: 0.707
+61000: model total loss: 0.125, recons: 0.117, kl: 46.4 contrastive: 0.0806 latent: 0.672
+61200: model total loss: 0.145, recons: 0.138, kl: 47.3 contrastive: 0.0641 latent: 0.677
+61400: model total loss: 0.153, recons: 0.142, kl: 48.9 contrastive: 0.113 latent: 0.702
+61600: model total loss: 0.146, recons: 0.138, kl: 47.7 contrastive: 0.0715 latent: 0.684
+61800: model total loss: 0.151, recons: 0.142, kl: 49.2 contrastive: 0.0807 latent: 0.695
+62000: model total loss: 0.147, recons: 0.14, kl: 49.6 contrastive: 0.0699 latent: 0.708
+62200: model total loss: 0.132, recons: 0.124, kl: 49.1 contrastive: 0.0687 latent: 0.707
+62400: model total loss: 0.112, recons: 0.104, kl: 46.6 contrastive: 0.076 latent: 0.674
+62600: model total loss: 0.141, recons: 0.132, kl: 50.1 contrastive: 0.0885 latent: 0.702
+62800: model total loss: 0.142, recons: 0.131, kl: 50.1 contrastive: 0.108 latent: 0.716
+63000: model total loss: 0.12, recons: 0.11, kl: 49.4 contrastive: 0.0988 latent: 0.705
+63200: model total loss: 0.136, recons: 0.126, kl: 48.9 contrastive: 0.0938 latent: 0.701
+63400: model total loss: 0.14, recons: 0.131, kl: 48.0 contrastive: 0.0772 latent: 0.687
+63600: model total loss: 0.135, recons: 0.127, kl: 50.2 contrastive: 0.073 latent: 0.72
+63800: model total loss: 0.144, recons: 0.135, kl: 52.4 contrastive: 0.0859 latent: 0.731
+64000: model total loss: 0.15, recons: 0.138, kl: 52.4 contrastive: 0.112 latent: 0.753
+64200: model total loss: 0.157, recons: 0.147, kl: 52.1 contrastive: 0.0996 latent: 0.731
+64400: model total loss: 0.136, recons: 0.125, kl: 51.8 contrastive: 0.098 latent: 0.736
+64600: model total loss: 0.133, recons: 0.123, kl: 48.8 contrastive: 0.0855 latent: 0.702
+64800: model total loss: 0.132, recons: 0.122, kl: 55.7 contrastive: 0.089 latent: 0.765
+65000: model total loss: 0.142, recons: 0.132, kl: 51.8 contrastive: 0.0908 latent: 0.746
+65200: model total loss: 0.153, recons: 0.143, kl: 51.2 contrastive: 0.0915 latent: 0.725
+65400: model total loss: 0.133, recons: 0.125, kl: 50.5 contrastive: 0.0822 latent: 0.719
+65600: model total loss: 0.139, recons: 0.13, kl: 52.1 contrastive: 0.0913 latent: 0.743
+65800: model total loss: 0.133, recons: 0.122, kl: 52.4 contrastive: 0.103 latent: 0.749
+66000: model total loss: 0.129, recons: 0.118, kl: 51.4 contrastive: 0.1 latent: 0.737
+66200: model total loss: 0.153, recons: 0.142, kl: 54.8 contrastive: 0.102 latent: 0.778
+66400: model total loss: 0.153, recons: 0.141, kl: 53.4 contrastive: 0.111 latent: 0.771
+66600: model total loss: 0.143, recons: 0.132, kl: 54.1 contrastive: 0.106 latent: 0.76
+66800: model total loss: 0.136, recons: 0.124, kl: 54.8 contrastive: 0.12 latent: 0.785
+67000: model total loss: 0.132, recons: 0.12, kl: 50.7 contrastive: 0.115 latent: 0.73
+67200: model total loss: 0.15, recons: 0.137, kl: 53.8 contrastive: 0.13 latent: 0.769
+67400: model total loss: 0.148, recons: 0.137, kl: 55.1 contrastive: 0.112 latent: 0.782
+67600: model total loss: 0.145, recons: 0.137, kl: 52.5 contrastive: 0.077 latent: 0.743
+67800: model total loss: 0.133, recons: 0.121, kl: 51.9 contrastive: 0.109 latent: 0.741
+68000: model total loss: 0.143, recons: 0.137, kl: 52.5 contrastive: 0.0611 latent: 0.718
+68200: model total loss: 0.152, recons: 0.142, kl: 55.9 contrastive: 0.101 latent: 0.777
+68400: model total loss: 0.128, recons: 0.118, kl: 50.4 contrastive: 0.096 latent: 0.722
+68600: model total loss: 0.129, recons: 0.12, kl: 53.7 contrastive: 0.087 latent: 0.752
+68800: model total loss: 0.15, recons: 0.138, kl: 54.8 contrastive: 0.109 latent: 0.768
+69000: model total loss: 0.147, recons: 0.133, kl: 55.1 contrastive: 0.127 latent: 0.774
+69200: model total loss: 0.144, recons: 0.134, kl: 59.5 contrastive: 0.0936 latent: 0.862
+69400: model total loss: 0.144, recons: 0.132, kl: 56.3 contrastive: 0.114 latent: 0.793
+69600: model total loss: 0.141, recons: 0.13, kl: 52.7 contrastive: 0.106 latent: 0.751
+69800: model total loss: 0.142, recons: 0.13, kl: 55.3 contrastive: 0.114 latent: 0.78
+70000: model total loss: 0.121, recons: 0.109, kl: 53.4 contrastive: 0.115 latent: 0.745
+0.12104252725839615 tensor(0.1622)
+70000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/tmr/checkpoints
+validation start
+val_m2t/MedR 26.0
+val_m2t/R01 14.04
+val_m2t/R02 17.92
+val_m2t/R03 22.72
+val_m2t/R05 28.3
+val_m2t/R10 36.62
+val_m2t/len 10667.0
+val_t2m/MedR 19.0
+val_t2m/R01 13.12
+val_t2m/R02 20.25
+val_t2m/R03 25.73
+val_t2m/R05 31.37
+val_t2m/R10 41.54
+val_t2m/len 10667.0
+model total loss: 0.0711, recons: 0.0332, kl: 19.2 contrastive: 0.377 latent: 0.237
+70200: model total loss: 0.139, recons: 0.131, kl: 51.8 contrastive: 0.0678 latent: 0.725
+70400: model total loss: 0.134, recons: 0.12, kl: 55.5 contrastive: 0.136 latent: 0.776
+70600: model total loss: 0.129, recons: 0.118, kl: 55.4 contrastive: 0.11 latent: 0.781
+70800: model total loss: 0.144, recons: 0.131, kl: 55.8 contrastive: 0.124 latent: 0.783
+71000: model total loss: 0.157, recons: 0.145, kl: 51.5 contrastive: 0.11 latent: 0.715
+71200: model total loss: 0.132, recons: 0.122, kl: 56.0 contrastive: 0.101 latent: 0.772
+71400: model total loss: 0.131, recons: 0.12, kl: 54.3 contrastive: 0.102 latent: 0.761
+71600: model total loss: 0.129, recons: 0.115, kl: 56.1 contrastive: 0.13 latent: 0.782
+71800: model total loss: 0.139, recons: 0.129, kl: 53.6 contrastive: 0.103 latent: 0.75
+72000: model total loss: 0.152, recons: 0.14, kl: 54.2 contrastive: 0.118 latent: 0.738
+72200: model total loss: 0.146, recons: 0.133, kl: 54.8 contrastive: 0.122 latent: 0.745
+72400: model total loss: 0.136, recons: 0.129, kl: 51.2 contrastive: 0.0666 latent: 0.71
+72600: model total loss: 0.153, recons: 0.141, kl: 55.7 contrastive: 0.117 latent: 0.774
+72800: model total loss: 0.148, recons: 0.131, kl: 56.4 contrastive: 0.167 latent: 0.785
+73000: model total loss: 0.144, recons: 0.127, kl: 57.4 contrastive: 0.158 latent: 0.775
+73200: model total loss: 0.136, recons: 0.129, kl: 52.5 contrastive: 0.0604 latent: 0.73
+73400: model total loss: 0.147, recons: 0.135, kl: 55.3 contrastive: 0.11 latent: 0.763
+73600: model total loss: 0.131, recons: 0.123, kl: 54.7 contrastive: 0.0826 latent: 0.765
+73800: model total loss: 0.145, recons: 0.135, kl: 56.5 contrastive: 0.0985 latent: 0.781
+74000: model total loss: 0.136, recons: 0.126, kl: 54.1 contrastive: 0.0987 latent: 0.742
+74200: model total loss: 0.141, recons: 0.134, kl: 54.1 contrastive: 0.0653 latent: 0.738
+74400: model total loss: 0.139, recons: 0.129, kl: 53.0 contrastive: 0.0958 latent: 0.746
+74600: model total loss: 0.143, recons: 0.133, kl: 55.2 contrastive: 0.0903 latent: 0.769
+74800: model total loss: 0.153, recons: 0.141, kl: 54.4 contrastive: 0.121 latent: 0.754
+75000: model total loss: 0.168, recons: 0.155, kl: 58.5 contrastive: 0.13 latent: 0.789
+75200: model total loss: 0.141, recons: 0.132, kl: 53.0 contrastive: 0.0837 latent: 0.724
+75400: model total loss: 0.149, recons: 0.132, kl: 60.0 contrastive: 0.165 latent: 0.806
+75600: model total loss: 0.147, recons: 0.137, kl: 56.8 contrastive: 0.102 latent: 0.766
+75800: model total loss: 0.129, recons: 0.118, kl: 55.0 contrastive: 0.101 latent: 0.744
+76000: model total loss: 0.126, recons: 0.114, kl: 56.7 contrastive: 0.117 latent: 0.781
+76200: model total loss: 0.13, recons: 0.122, kl: 53.3 contrastive: 0.0715 latent: 0.722
+76400: model total loss: 0.148, recons: 0.136, kl: 55.4 contrastive: 0.112 latent: 0.751
+76600: model total loss: 0.154, recons: 0.14, kl: 57.6 contrastive: 0.135 latent: 0.792
+76800: model total loss: 0.128, recons: 0.119, kl: 55.0 contrastive: 0.0834 latent: 0.755
+77000: model total loss: 0.129, recons: 0.117, kl: 53.2 contrastive: 0.113 latent: 0.731
+77200: model total loss: 0.122, recons: 0.113, kl: 52.0 contrastive: 0.0857 latent: 0.722
+77400: model total loss: 0.136, recons: 0.128, kl: 53.5 contrastive: 0.0801 latent: 0.723
+77600: model total loss: 0.135, recons: 0.127, kl: 52.8 contrastive: 0.0767 latent: 0.73
+77800: model total loss: 0.132, recons: 0.119, kl: 58.0 contrastive: 0.128 latent: 0.791
+78000: model total loss: 0.153, recons: 0.144, kl: 56.6 contrastive: 0.0902 latent: 0.76
+78200: model total loss: 0.136, recons: 0.126, kl: 56.2 contrastive: 0.0994 latent: 0.755
+78400: model total loss: 0.156, recons: 0.141, kl: 57.3 contrastive: 0.144 latent: 0.769
+78600: model total loss: 0.132, recons: 0.12, kl: 56.4 contrastive: 0.112 latent: 0.765
+78800: model total loss: 0.137, recons: 0.126, kl: 55.4 contrastive: 0.104 latent: 0.747
+79000: model total loss: 0.134, recons: 0.124, kl: 54.6 contrastive: 0.0968 latent: 0.743
+79200: model total loss: 0.121, recons: 0.107, kl: 55.3 contrastive: 0.134 latent: 0.748
+79400: model total loss: 0.139, recons: 0.126, kl: 57.6 contrastive: 0.124 latent: 0.781
+79600: model total loss: 0.139, recons: 0.131, kl: 55.3 contrastive: 0.0786 latent: 0.744
+79800: model total loss: 0.137, recons: 0.126, kl: 54.1 contrastive: 0.098 latent: 0.757
+80000: model total loss: 0.143, recons: 0.135, kl: 52.4 contrastive: 0.0715 latent: 0.719
+0.14264421164989471 tensor(0.1210)
+80000: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/tmr/checkpoints
+validation start

@@ -32,8 +32,6 @@ vqvae:
   left_hand_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_left_hand/vqvae_left_hand.yaml"
   right_hand_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_right_hand/vqvae_right_hand.yaml"
 
-codebooks_pattern:
-  modeling: "parallel"
 
 fuser:
   fuse_method: [{"cross": ["text"], "input_interpolate": ["audio"]}]

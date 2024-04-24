@@ -56,7 +56,7 @@ def main(cfg):
 
 
 if __name__ == "__main__":
-    nme = "tmr"
+    nme = "tmr_full"
     path = f"/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/{nme}/{nme}.yaml"
     cfg = get_cfg_defaults()
     print("loading config from:", path)

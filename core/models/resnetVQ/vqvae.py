@@ -374,7 +374,7 @@ class HumanVQVAE2(nn.Module):
         ]
         self.load_state_dict(pkg["model"])
 
-        print("loaded model with ", pkg["total_loss"].item(), pkg["steps"], "steps")
+        print("loaded model with ", float(pkg["total_loss"]), pkg["steps"], "steps")
 
     def freeze(self):
         # self.eval()

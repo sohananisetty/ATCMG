@@ -1,0 +1,64 @@
+/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/utils/weight_norm.py:28: UserWarning: torch.nn.utils.weight_norm is deprecated in favor of torch.nn.utils.parametrizations.weight_norm.
+  warnings.warn("torch.nn.utils.weight_norm is deprecated in favor of torch.nn.utils.parametrizations.weight_norm.")
+Could not find image processor class in the image processor config or the model config. Loading based on pattern matching with the model's feature extractor configuration. Please open a PR/issue to update `preprocessor_config.json` to use `image_processor_type` instead of `feature_extractor_type`. This warning will be removed in v4.40.
+wandb: Currently logged in as: sohananisetty (ai-choreo). Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.16.6 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.16.2
+wandb: Run data is saved locally in /coc/scratch/sanisetty3/music_motion/ATCMG/wandb/run-20240423_224335-zbaqnlpd
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run youthful-resonance-1
+wandb:  View project at https://wandb.ai/ai-choreo/motion_muse_full
+wandb:  View run at https://wandb.ai/ai-choreo/motion_muse_full/runs/zbaqnlpd
+Traceback (most recent call last):
+  File "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/train_generator.py", line 22, in <module>
+    trainer.train(cfg.train.resume)
+  File "/coc/scratch/sanisetty3/music_motion/ATCMG/ctl/trainer_muse.py", line 722, in train
+    logs = self.train_step()
+  File "/coc/scratch/sanisetty3/music_motion/ATCMG/ctl/trainer_muse.py", line 412, in train_step
+    out = self.motion_muse(
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/coc/scratch/sanisetty3/music_motion/ATCMG/core/models/generation/muse2.py", line 777, in forward
+    bce_loss, bce_per_codebook = self.token_critic(
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/coc/scratch/sanisetty3/music_motion/ATCMG/core/models/generation/muse2.py", line 264, in forward
+    out = self.net(inputs, conditions, return_embed=True, **kwargs)
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/coc/scratch/sanisetty3/music_motion/ATCMG/core/models/generation/mlm_model.py", line 864, in forward
+    embed = self.transformer_blocks(
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/coc/scratch/sanisetty3/music_motion/ATCMG/core/models/generation/mlm_model.py", line 433, in forward
+    x = self.norm_out(ff1(x) + x)
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/container.py", line 217, in forward
+    input = module(input)
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/modules/dropout.py", line 59, in forward
+    return F.dropout(input, self.p, self.training, self.inplace)
+  File "/coc/flash5/sanisetty3/miniconda3/envs/tgm3d/lib/python3.9/site-packages/torch/nn/functional.py", line 1268, in dropout
+    return _VF.dropout_(input, p, training) if inplace else _VF.dropout(input, p, training)
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 282.00 MiB. GPU 0 has a total capacity of 44.39 GiB of which 107.56 MiB is free. Including non-PyTorch memory, this process has 44.28 GiB memory in use. Of the allocated memory 42.28 GiB is allocated by PyTorch, and 595.86 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+wandb: WARNING No program path found, not creating job artifact. See https://docs.wandb.ai/guides/launch/create-job
+wandb: - 0.014 MB of 0.014 MB uploadedwandb: \ 0.015 MB of 0.023 MB uploadedwandb: | 0.023 MB of 0.023 MB uploadedwandb:  View run youthful-resonance-1 at: https://wandb.ai/ai-choreo/motion_muse_full/runs/zbaqnlpd
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20240423_224335-zbaqnlpd/logs
+srun: error: baymax: task 0: Exited with exit code 1
+srun: Terminating StepId=860172.0

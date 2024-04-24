@@ -18,10 +18,10 @@ def get_latents(inputs, conditions, tmr, normalize=True):
     motion_x_dict = {"x": inputs[0], "mask": inputs[1].to(torch.bool)}
     motion_mask = motion_x_dict["mask"]
     text_mask = text_x_dict["mask"]
-    t_latents = tmr.encode(text_x_dict, sample_mean=False)
+    t_latents = tmr.encode(text_x_dict, sample_mean=True)
 
     # motion -> motion
-    m_latents = tmr.encode(motion_x_dict, sample_mean=False)
+    m_latents = tmr.encode(motion_x_dict, sample_mean=True)
 
     if normalize:
         t_latents = torch.nn.functional.normalize(t_latents, dim=-1)
@@ -55,11 +55,33 @@ def evaluation_vqvae(
         with torch.no_grad():
             bs = inputs["motion"][0].shape[0]
 
-            t_latents, m_latents = get_latents(
-                inputs["motion"], conditions, tmr, normalize=normalize
-            )
+            if inputs["motion"][0].shape[-1] != tmr.motion_encoder.nfeats:
+                input_eval = torch.zeros(
+                    inputs["motion"][0].shape[:1] + (tmr.motion_encoder.nfeats,)
+                ).to(inputs["motion"][0].device)
 
-            pred_pose_eval = torch.zeros_like(inputs["motion"][0])
+                for i in range(bs):
+                    lenn = inputs["motion"][1].sum(-1)
+                    body_M = base_dset.toMotion(
+                        inputs["motion"][i, :lenn],
+                        motion_rep=MotionRep("body"),
+                        hml_rep=val_loader.dataset.datasets[0].hml_rep,
+                    )
+                    input_eval[i, :lenn] = body_M()
+                t_latents, m_latents = get_latents(
+                    input_eval, conditions, tmr, normalize=normalize
+                )
+
+            else:
+
+                t_latents, m_latents = get_latents(
+                    inputs["motion"], conditions, tmr, normalize=normalize
+                )
+
+            pred_pose_eval = torch.zeros(
+                inputs["motion"][0].shape[:1] + (tmr.motion_encoder.nfeats,)
+            ).to(inputs["motion"][0].device)
+
             # for k in range(bs):
             #     lenn = int(inputs["lens"][k])
             #     vqvae_output = motion_vqvae(
@@ -73,7 +95,7 @@ def evaluation_vqvae(
 
             ### need to assert tmr hml_rep
 
-            if inputs["motion"][0].shape[-1] != decoded_motion.shape[-1]:
+            if decoded_motion.shape[-1] != tmr.motion_encoder.nfeats:
 
                 for i in range(bs):
                     lenn = inputs["motion"][1].sum(-1)

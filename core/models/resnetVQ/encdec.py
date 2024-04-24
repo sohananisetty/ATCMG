@@ -7,7 +7,7 @@ class Encoder(nn.Module):
         self,
         input_emb_width=3,
         codebook_dim=512,
-        down_t=2,  ## 2 -> 4 downasample
+        down_t=2,  ## 2 ->  downasample factor 4
         stride_t=2,
         width=None,
         depth=3,

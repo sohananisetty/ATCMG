@@ -173,6 +173,10 @@ class VQSMPLXMotionDataset(BaseMotionDataset):
 
         motion = motion[: (motion.shape[0] // 4) * 4]
 
+        if np.isnan(motion).any():
+            print(self.id_list[item])
+            self.__getitem__(np.random.randint(0, len(self.id_list)))
+
         processed_motion = self.get_processed_motion(
             motion, motion_rep=self.motion_rep, hml_rep=self.hml_rep
         )
@@ -204,6 +208,9 @@ def simple_collate(
         motion_list=motions,
         # max_length=max(lens),
     )
+
+    if np.isnan(motion).any():
+        print(names)
 
     inputs["names"] = np.array(names)
     inputs["lens"] = np.array(lens)

@@ -109,8 +109,6 @@ class TMRTrainer(nn.Module):
             **self.model_args,
         ).to(self.device)
 
-        self.sent_embedder = SentenceConditioner()
-
         total = sum(p.numel() for p in self.tmr.parameters() if p.requires_grad)
         print("Total training params: %.2fM" % (total / 1e6))
         # self.load_vqvae(vqvae_config)
@@ -140,6 +138,9 @@ class TMRTrainer(nn.Module):
             motion_max_length_s=self.dataset_args.motion_max_length_s,
             fps=self.dataset_args.fps,
         )
+
+        self.sent_embedder = condition_provider.text_encoder
+        # SentenceConditioner()
 
         dataset_names = {
             "animation": 0.7,

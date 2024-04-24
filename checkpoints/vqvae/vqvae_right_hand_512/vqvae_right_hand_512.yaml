@@ -1,17 +1,16 @@
-model_name: "vqvae_body_gprvc"
-output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gprvc"
+model_name: "vqvae_right_hand_512"
+output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_right_hand_512"
 dataset:
   dataset_name: "mix"
   dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
-  motion_rep: "body"
-  hml_rep: "gprvc"
+  motion_rep: "right_hand"
+  hml_rep: "pv"
   window_size: 120
-  remove_translation: False
 train:
-  resume: True
-  num_train_iters : 140001 #'Number of training steps
+  resume: False
+  num_train_iters : 140000 #'Number of training steps
   save_steps : 10000
-  logging_steps : 100
+  logging_steps : 10
   wandb_every : 200
   evaluate_every : 10000
   eval_bs : 400
@@ -24,17 +23,16 @@ train:
   lr_scheduler_type : "cosine"
 vqvae:
   target: "core.models.resnetVQ.vqvae.HumanVQVAE2"
-  dim : 768
-  depth: 8
+  nb_joints : 15
+  motion_dim : 90
+  dim : 512
+  depth: 3
   codebook_size : 512
-  codebook_dim : 512
-  commit : 0.25
+  codebook_dim : 256
+  commit : 0.1
   loss_motion: 2.0
   recons_loss : "l1_smooth"
-  use_geodesic_loss: False
   down_sampling_ratio: 4
-  motion_dim: 263
-  nb_joints: 22
-  use_simple_loss: True
-  sample_codebook_temp: 0.0
+  
+  
 

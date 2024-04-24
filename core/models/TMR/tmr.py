@@ -93,6 +93,10 @@ class TMR(TEMOS):
         self.validation_step_m_latents = []
         self.validation_step_sent_emb = []
 
+    def freeze(self):
+        for param in self.parameters():
+            param.requires_grad = False
+
     def mean_pooling(self, token_embeddings, attention_mask):
 
         input_mask_expanded = (
@@ -101,6 +105,33 @@ class TMR(TEMOS):
         return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(
             input_mask_expanded.sum(1), min=1e-9
         )  ## b d
+
+    def split(self, hml_data):
+        joint_num: int = 52
+        body_joints: int = 22
+        hand_joints: int = 30
+
+        root_params, local_pos, local_vels, foot = torch.split(
+            hml_data, [4, (joint_num - 1) * 3, joint_num * 3, 4], -1
+        )
+        local_pos_body, local_pos_hand = torch.split(
+            local_pos, ([(body_joints - 1) * 3, hand_joints * 3]), -1
+        )
+        # local_rots_body, local_rots_hand = torch.split(
+        #     local_rots, ([(body_joints - 1) * 6, hand_joints * 6]), -1
+        # )[:-1]
+        local_vel_body, local_vel_hand = torch.split(
+            local_vels, ([(body_joints) * 3, hand_joints * 3]), -1
+        )
+
+        return (
+            root_params,
+            local_pos_body,
+            local_pos_hand,
+            local_vel_body,
+            local_vel_hand,
+            foot,
+        )
 
     def compute_loss(self, inputs: Tuple, conditions: Dict, return_all=False) -> Dict:
 
@@ -139,10 +170,27 @@ class TMR(TEMOS):
 
         # Reconstructions losses
         # fmt: off
-        losses["recons"] = (
-            + self.reconstruction_loss_fn(t_motions, ref_motions) # text -> motion
-            + self.reconstruction_loss_fn(m_motions, ref_motions) # motion -> motion
-        )
+        
+        if ref_motions.shape[-1]>263:
+            root_params_t, local_pos_body_t, local_pos_hand_t, local_vel_body_t, local_vel_hand_t, foot_t = self.split(t_motions)
+            root_params_m, local_pos_body_m, local_pos_hand_m, local_vel_body_m, local_vel_hand_m, foot_m = self.split(m_motions)
+            root_params, local_pos_body, local_pos_hand, local_vel_body, local_vel_hand, foot = self.split(ref_motions)
+            
+            
+            losses["recons"] = \
+            1.5*self.reconstruction_loss_fn(root_params_t , root_params) + self.reconstruction_loss_fn(root_params_m , root_params) +\
+            1.5*self.reconstruction_loss_fn(local_pos_body_t , local_pos_body) + self.reconstruction_loss_fn(local_pos_body_m , local_pos_body) +\
+            self.reconstruction_loss_fn(local_pos_hand_t , local_pos_hand) + self.reconstruction_loss_fn(local_pos_hand_m , local_pos_hand)+\
+            1.5*self.reconstruction_loss_fn(local_vel_body_t , local_vel_body) + self.reconstruction_loss_fn(local_vel_body_m , local_vel_body)+\
+            self.reconstruction_loss_fn(local_vel_hand_t , local_vel_hand) + self.reconstruction_loss_fn(local_vel_hand_m , local_vel_hand)+\
+            self.reconstruction_loss_fn(foot_t , foot) + self.reconstruction_loss_fn(foot_m , foot)
+            
+        else:
+        
+            losses["recons"] = (
+                + self.reconstruction_loss_fn(t_motions, ref_motions) # text -> motion
+                + self.reconstruction_loss_fn(m_motions, ref_motions) # motion -> motion
+            )
         # fmt: on
 
         # VAE losses

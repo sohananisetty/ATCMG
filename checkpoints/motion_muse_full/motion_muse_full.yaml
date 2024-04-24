@@ -1,5 +1,5 @@
-model_name: "motion_muse_body_hands_1024"
-output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_body_hands_1024"
+model_name: "motion_muse_full"
+output_dir: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_full"
 dataset:
   dataset_name: "mix"
   dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
@@ -13,27 +13,25 @@ dataset:
   window_size_s: 4
 train:
   resume: False
-  num_train_iters : 210001 #'Number of training steps
+  num_train_iters : 110001 #'Number of training steps
   save_steps : 10000
   logging_steps : 20
   wandb_every : 200
   evaluate_every : 10000
-  eval_bs : 100
-  train_bs : 100
+  eval_bs : 400
+  train_bs : 400
   gradient_accumulation_steps : 1
   learning_rate : 3e-4
   # weight_decay : 1e-3
-  warmup_steps : 10000
+  warmup_steps : 8000
   gamma : 0.05
   lr_scheduler_type : "cosine"
- 
-vqvae:
-  body_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gpvc_1024/vqvae_body_gpvc_1024.yaml"
-  left_hand_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_left_hand_1024/vqvae_left_hand_1024.yaml"
-  right_hand_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_right_hand_1024/vqvae_right_hand_1024.yaml"
 
-codebooks_pattern:
-  modeling: "parallel"
+vqvae:
+  body_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gpvc_5121/vqvae_body_gpvc_5121.yaml"
+  left_hand_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_left_hand/vqvae_left_hand.yaml"
+  right_hand_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_right_hand/vqvae_right_hand.yaml"
+
 
 fuser:
   fuse_method: [{"cross": ["text"], "input_interpolate": ["audio"]}]
@@ -42,20 +40,20 @@ motion_generator:
   target: "core.models.generation.muse2.MotionMuse"
   n_q : 3
   dim : 512
-  depth: 16
-  cond_dropout: 0.4
-  no_mask_token_prob: 0.3
+  depth: 8
+  cond_dropout: 0.2
+  no_mask_token_prob: 0.2
   audio_input_dim: 128
   text_input_dim: 1024
   emb_dropout: 0.1
-  num_tokens: 1024
+  num_tokens: 512
   flash: True
   var_len: False
   quality_emb: False
   custom: True
   attn_dropout: 0.1
   spatial: True
-  film_skip: 3
+  film_skip: 2
   critic_loss_weight: 1.0
 
 

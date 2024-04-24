@@ -29,6 +29,8 @@ from tqdm import tqdm
 from transformers import AdamW, get_scheduler
 from utils.motion_processing.hml_process import recover_from_ric, recover_root_rot_pos
 from yacs.config import CfgNode
+from core.models.TMR.tmr import TMR
+from configs.config_tmr import get_cfg_defaults as get_cfg_defaults_tmr
 
 
 def cycle(dl):
@@ -92,17 +94,26 @@ class MotionMuseTrainer(nn.Module):
 
         target = self.model_args.pop("target")
         fuse_config = self.args.fuser
-        pattern_config = self.args.codebooks_pattern
         vqvae_config = self.args.vqvae
+
+        self.use_align = self.model_args.align_loss_weight > 0
+
+        self.load_vqvae(vqvae_config)
 
         print(self.model_args)
 
-        self.motion_muse = MotionMuse2(self.model_args, fuse_config, pattern_config).to(
-            self.device
-        )
+        if self.use_align:
+            self.load_tmr(self.args.tmr)
+
+            self.motion_muse = MotionMuse2(
+                self.model_args, fuse_config, self.body_model, self.tmr
+            ).to(self.device)
+
+        else:
+
+            self.motion_muse = MotionMuse2(self.model_args, fuse_config).to(self.device)
         total = sum(p.numel() for p in self.motion_muse.parameters() if p.requires_grad)
         print("Total training params: %.2fM" % (total / 1e6))
-        self.load_vqvae(vqvae_config)
 
         # if self.motion_rep == "hand":
         #     self.body_muse = self.getBodyMuse(nme="motion_muse_film")
@@ -245,6 +256,46 @@ class MotionMuseTrainer(nn.Module):
         wandb.login()
         wandb.init(project=self.model_name)
 
+    def load_tmr(self, tmr_args):
+
+        if tmr_args.config is not None:
+            tmr_cfg = get_cfg_defaults_tmr()
+            tmr_cfg.merge_from_file(tmr_args.config)
+            tmr_cfg.freeze()
+            tmr_parms = tmr_cfg.tmr
+
+            _ = tmr_parms.pop("target")
+            motion_encoder = (
+                instantiate_from_config(tmr_cfg.motion_encoder).to(self.device).eval()
+            )
+            text_encoder = (
+                instantiate_from_config(tmr_cfg.text_encoder).to(self.device).eval()
+            )
+            motion_decoder = (
+                instantiate_from_config(tmr_cfg.motion_decoder).to(self.device).eval()
+            )
+            self.tmr = (
+                TMR(
+                    motion_encoder,
+                    text_encoder,
+                    motion_decoder,
+                    lr=tmr_cfg.train.learning_rate,
+                    **tmr_parms,
+                )
+                .to(self.device)
+                .eval()
+            )
+            pkg = torch.load(os.path.join(tmr_cfg.output_dir, "tmr.pt"))
+            self.tmr.load_state_dict(pkg["model"])
+            self.tmr.freeze()
+
+            self.tmr_cfg = tmr_cfg
+        else:
+            self.tmr = None
+            self.tmr_cfg = None
+
+        # return tmr, tmr_cfg
+
     def load_vqvae(self, vqvae_args):
 
         if vqvae_args.body_config is not None:
@@ -257,6 +308,7 @@ class MotionMuseTrainer(nn.Module):
             self.body_model.load(
                 os.path.join(self.body_cfg.output_dir, "vqvae_motion.pt")
             )
+            self.body_model.freeze()
 
         else:
             self.body_model = None
@@ -270,6 +322,7 @@ class MotionMuseTrainer(nn.Module):
             self.left_hand_model.load(
                 os.path.join(self.left_cfg.output_dir, "vqvae_motion.pt")
             )
+            self.left_hand_model.freeze()
         else:
             self.left_hand_model = None
 
@@ -282,6 +335,7 @@ class MotionMuseTrainer(nn.Module):
             self.right_hand_model.load(
                 os.path.join(self.right_cfg.output_dir, "vqvae_motion.pt")
             )
+            self.right_hand_model.freeze()
         else:
             self.right_hand_model = None
 
@@ -364,7 +418,7 @@ class MotionMuseTrainer(nn.Module):
             if out.ce_per_codebook is not None and len(out.ce_per_codebook) == 3:
                 loss = (
                     loss
-                    + 2 * out.ce_per_codebook[0]
+                    + 1.5 * out.ce_per_codebook[0]
                     + out.ce_per_codebook[1]
                     + out.ce_per_codebook[2]
                 )
@@ -373,10 +427,20 @@ class MotionMuseTrainer(nn.Module):
 
             loss.backward()
 
-            accum_log(
-                logs,
-                dict(loss=loss.detach().cpu()),
-            )
+            if self.use_align:
+                accum_log(
+                    logs,
+                    dict(
+                        loss=loss.detach().cpu(),
+                        align_loss=out.align_loss.detach().cpu(),
+                    ),
+                )
+            else:
+
+                accum_log(
+                    logs,
+                    dict(loss=loss.detach().cpu()),
+                )
 
         self.optim.step()
         self.lr_scheduler.step()
@@ -385,6 +449,9 @@ class MotionMuseTrainer(nn.Module):
         # build pretty printed losses
 
         losses_str = f"{steps}: model cross entropy loss: {logs['loss'].float():.3} "
+
+        if self.use_align:
+            losses_str += f"align loss {logs['align_loss'].float():.3}"
 
         # log
         if steps % self.wandb_every == 0:
@@ -399,7 +466,7 @@ class MotionMuseTrainer(nn.Module):
             model_path = os.path.join(
                 self.output_dir, "checkpoints", f"motion_muse.{steps}.pt"
             )
-            self.save(model_path)
+            self.save(model_path, logs["loss"])
             print(float(logs["loss"]), self.best_loss)
 
             if float(logs["loss"]) <= self.best_loss:
@@ -451,6 +518,9 @@ class MotionMuseTrainer(nn.Module):
 
                 loss_dict["loss"] = loss.detach().cpu()
 
+                if self.use_align:
+                    loss_dict["align_loss"] = out.align_loss.detach().cpu()
+
                 for key, value in loss_dict.items():
                     if key in val_loss_ae:
                         val_loss_ae[key] += value
@@ -465,10 +535,7 @@ class MotionMuseTrainer(nn.Module):
         for key, value in val_loss_ae.items():
             wandb.log({f"val_ce_loss/{key}": value})
 
-        print(
-            "val/ce_loss",
-            val_loss_ae["loss"],
-        )
+            print(f"val/{key}", value)
 
         self.motion_muse.train()
 

@@ -125,25 +125,50 @@ class VQVAEMotionTrainer(nn.Module):
 
         self.max_grad_norm = self.training_args.max_grad_norm
 
-        dataset_names = {
-            "animation": 0.8,
-            "humanml": 3.0,
-            "perform": 0.5,
-            "GRAB": 1.0,
-            "idea400": 1.5,
-            # "humman": 0.5,
-            "beat": 2.0,
-            "game_motion": 0.8,
-            "music": 0.8,
-            "aist": 2.0,
-            "fitness": 0.6,
-            "moyo": 1.5,
-            "choreomaster": 2.0,
-            "dance": 1.0,
-            "kungfu": 0.8,
-            "EgoBody": 0.5,
-            # "HAA500": 1.0,
-        }
+        if self.motion_rep in [MotionRep.BODY, MotionRep.FULL]:
+
+            dataset_names = {
+                "animation": 0.8,
+                "humanml": 3.0,
+                "perform": 0.5,
+                "GRAB": 1.0,
+                "idea400": 2.0,
+                # "humman": 0.5,
+                "beat": 2.0,
+                "game_motion": 0.8,
+                "music": 0.8,
+                "aist": 2.0,
+                "fitness": 0.6,
+                "moyo": 1.5,
+                "choreomaster": 2.0,
+                "dance": 1.0,
+                "kungfu": 0.8,
+                # "EgoBody": 0.5,
+                # "HAA500": 1.0,
+            }
+        else:
+
+            ##hands
+
+            dataset_names = {
+                "animation": 0.5,
+                "humanml": 2.0,
+                "perform": 0.5,
+                "GRAB": 2.0,
+                "idea400": 2.0,
+                # "humman": 0.5,
+                "beat": 2.0,
+                "game_motion": 0.5,
+                "music": 0.5,
+                "aist": 2.0,
+                "fitness": 1.0,
+                "moyo": 1.5,
+                "choreomaster": 2.0,
+                "dance": 1.0,
+                "kungfu": 0.8,
+                "EgoBody": 1.5,
+                # "HAA500": 1.0,
+            }
 
         train_ds, sampler_train, _ = load_dataset(
             dataset_names=list(dataset_names.keys()),
@@ -301,6 +326,8 @@ class VQVAEMotionTrainer(nn.Module):
                 ),
             )
 
+        # torch.nn.utils.clip_grad_norm_(self.vqvae_model.parameters(), 5)
+
         self.optim.step()
         self.lr_scheduler.step()
         self.optim.zero_grad()
@@ -337,7 +364,7 @@ class VQVAEMotionTrainer(nn.Module):
         if steps % self.evaluate_every == 0:
 
             self.validation_step()
-            self.sample_render_hmlvec(os.path.join(self.output_dir, "samples"))
+            # self.sample_render_hmlvec(os.path.join(self.output_dir, "samples"))
 
         self.steps += 1
         return logs

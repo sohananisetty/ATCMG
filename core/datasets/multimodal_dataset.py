@@ -475,9 +475,9 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
         self.text_dir = os.path.join(data_root, "texts/semantic_labels")
 
         if self.motion_rep in ["full", "hand"]:
-            self.motion_ind_dir = os.path.join(data_root, f"indices/1024/body")
+            self.motion_ind_dir = os.path.join(data_root, f"indices/512/body")
         else:
-            self.motion_ind_dir = os.path.join(data_root, f"indices/1024/{motion_rep}")
+            self.motion_ind_dir = os.path.join(data_root, f"indices/512/{motion_rep}")
 
         self.motion_dir = os.path.join(data_root, "motion_data/new_joint_vecs")
         self.audio_dir = os.path.join(data_root, "audio")
@@ -584,14 +584,14 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
 
     def load_beat(self, name):
         name = name[:-4]
-        id, person_name, recording_type, start, end = name.split("_")
-        if id in (list(np.arange(6, 11)) + list(np.arange(21, 31))):
-            gender = "woman"
-        else:
-            gender = "man"
+        # id, person_name, recording_type, start, end = name.split("_")
+        # if id in (list(np.arange(6, 11)) + list(np.arange(21, 31))):
+        #     gender = "woman"
+        # else:
+        #     gender = "man"
 
-        new_name = f"{name}_0_0"
-        name_list = []
+        # new_name = f"{name}_0_0"
+        # name_list = []
         txt_list = []
         with open(
             os.path.join(
@@ -602,23 +602,23 @@ class MotionIndicesAudioTextDataset(BaseMotionDataset):
             frame_texts = json.load(outfile)
 
         emotion = frame_texts.pop("emotion")
-        if emotion == "neutral":
-            emotion = "a neutral tone"
+        # if emotion == "neutral":
+        #     emotion = "a neutral tone"
 
-        prefix = (
-            f"a {gender} is giving a speech with {emotion} on "
-            if recording_type == 0
-            else f"a {gender} is having a conversation with {emotion} on "
-        )
+        # prefix = (
+        #     f"a {gender} is giving a speech with {emotion} on "
+        #     if recording_type == 0
+        #     else f"a {gender} is having a conversation with {emotion} on "
+        # )
 
         items = list(frame_texts.values())
 
-        items.insert(0, prefix)
+        # items.insert(0, prefix)
         # sentence = (" ".join(list(dict.fromkeys(items)))).strip()
-        name_list.append(new_name)
+        # name_list.append(new_name)
         txt_list.append(" ".join(items))
 
-        return name_list, txt_list
+        return txt_list
 
     def _select_common_start_idx(self, motion, audio, max_length_s):
         motion_s = motion.shape[0] // self.fps

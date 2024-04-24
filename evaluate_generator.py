@@ -58,12 +58,9 @@ def load_generator(cfg_file):
     gen_cfg.freeze()
     tranformer_config = gen_cfg.motion_generator
     fuse_config = gen_cfg.fuser
-    pattern_config = gen_cfg.codebooks_pattern
 
     target = tranformer_config.pop("target")
-    motion_gen = (
-        MotionMuse(tranformer_config, fuse_config, pattern_config).to(device).eval()
-    )
+    motion_gen = MotionMuse(tranformer_config, fuse_config).to(device).eval()
 
     pkg = torch.load(
         os.path.join(gen_cfg.output_dir, "motion_muse.pt"),

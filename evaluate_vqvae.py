@@ -22,6 +22,8 @@ from core.eval.eval_text.eval_text import evaluation_vqvae
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+torch.autograd.set_detect_anomaly(True)
+
 
 def load_tmr(cfg_file):
     tmr_cfg = get_cfg_defaults_tmr()
@@ -56,6 +58,9 @@ def load_vqvae(cfg_file):
     vqvae_config.merge_from_file(cfg_file)
     vqvae_model = instantiate_from_config(vqvae_config.vqvae).to(device).eval()
     vqvae_model.load(os.path.join(vqvae_config.output_dir, "vqvae_motion.pt"))
+    # vqvae_model.load(
+    #     "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gpvc_512/checkpoints/vqvae_motion.70000_old copy.pt"
+    # )
 
     return vqvae_model, vqvae_config
 
@@ -65,7 +70,7 @@ if __name__ == "__main__":
         "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/tmr/tmr.yaml"
     )
     vqvae_model, vqvae_config = load_vqvae(
-        "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gpvc_1024/vqvae_body_gpvc_1024.yaml"
+        "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gprvc/vqvae_body_gprvc.yaml"
     )
 
     dataset_args = tmr_cfg.dataset

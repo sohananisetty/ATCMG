@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=tmr
-#SBATCH --output=/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/sbach_outputs/tmr_cont.out
-#SBATCH --error=/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/sbach_outputs/tmr_cont.err
+#SBATCH --job-name=tmr_full
+#SBATCH --output=/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/sbach_outputs/tmr_full.out
+#SBATCH --error=/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/sbach_outputs/tmr_full.err
 #SBATCH --ntasks=1
 #SBATCH -G a40:1
 #SBATCH -p overcap
