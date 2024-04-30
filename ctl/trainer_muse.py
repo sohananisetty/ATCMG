@@ -168,19 +168,19 @@ class MotionMuseTrainer(nn.Module):
         # }
 
         dataset_names = {
-            "animation": 0.4,
-            "humanml": 2.0,
+            "animation": 0.5,
+            "humanml": 2.5,
             "perform": 0.5,
             "GRAB": 1.5,
             "idea400": 1.5,
             "humman": 0.5,
-            "beat": 1.6,
+            "beat": 1.8,
             "game_motion": 0.8,
             "music": 0.8,
             "aist": 1.5,
             "fitness": 0.7,
             "moyo": 1.0,
-            "choreomaster": 1.6,
+            "choreomaster": 1.8,
             "dance": 0.5,
             "kungfu": 0.5,
             "EgoBody": 0.5,
@@ -471,7 +471,7 @@ class MotionMuseTrainer(nn.Module):
             )
 
         if steps % self.evaluate_every == 0:
-            self.validation_step()
+            # self.validation_step()
             self.sample_render_hmlvec(os.path.join(self.output_dir, "samples"))
 
         self.steps += 1
@@ -547,7 +547,7 @@ class MotionMuseTrainer(nn.Module):
                 body_inds = codes[:, 0]
                 body_motion = self.body_model.decode(body_inds[0:1]).detach().cpu()
 
-                if self.dataset_args.remove_translation:
+                if self.body_cfg.dataset.remove_translation:
                     z = torch.zeros(
                         body_motion.shape[:-1] + (2,),
                         dtype=body_motion.dtype,
@@ -689,8 +689,8 @@ class MotionMuseTrainer(nn.Module):
                     os.path.join(
                         save_file, os.path.basename(name).split(".")[0] + "_gt.gif"
                     ),
-                    # zero_trans=True,
-                    # zero_orient=True,
+                    zero_trans=self.body_cfg.dataset.remove_translation,
+                    zero_orient=self.body_cfg.dataset.remove_translation,
                 )
 
                 dset.render_hml(
@@ -698,8 +698,8 @@ class MotionMuseTrainer(nn.Module):
                     os.path.join(
                         save_file, os.path.basename(name).split(".")[0] + "_gen.gif"
                     ),
-                    # zero_trans=True,
-                    # zero_orient=True,
+                    zero_trans=self.body_cfg.dataset.remove_translation,
+                    zero_orient=self.body_cfg.dataset.remove_translation,
                 )
 
         self.motion_muse.train()

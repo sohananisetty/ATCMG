@@ -80,10 +80,7 @@ Total number of motions kungfu: 2 and texts 2
 Total number of motions EgoBody: 2 and texts 2
 training with training 84141 and test dataset of 10667 and render 27 samples
 /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_full_tmr
-0: model cross entropy loss: 44.3 align loss 5.03
-44.30728530883789 inf
+0: model cross entropy loss: 44.3 align loss 5.04
+44.29383850097656 inf
 0: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_full_tmr/checkpoints
-validation start
-val/loss tensor(22.1366)
-val/align_loss tensor(2.4956)
 render start

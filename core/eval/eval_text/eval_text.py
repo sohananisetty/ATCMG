@@ -11,6 +11,8 @@ from core.datasets.base_dataset import BaseMotionDataset
 from core import MotionRep
 from tqdm import tqdm
 
+base_dset = BaseMotionDataset(motion_rep=MotionRep.BODY, hml_rep="gpvc")
+
 
 def get_latents(inputs, conditions, tmr, normalize=True):
     text_conds = conditions["text"]
@@ -36,11 +38,12 @@ def evaluation_vqvae(
     motion_vqvae,
     tmr,
     normalize=True,
+    eval_bs=256,
 ):
     motion_vqvae.eval()
     tmr.eval()
     nb_sample = 0
-    base_dset = BaseMotionDataset(motion_rep=MotionRep.BODY, hml_rep="gpvc")
+    # base_dset = BaseMotionDataset(motion_rep=MotionRep.BODY, hml_rep="gpvc")
 
     nb_sample = 0
     motion_list = []
@@ -168,7 +171,6 @@ def evaluation_transformer(
     motion_generator.eval()
     tmr.eval()
     nb_sample = 0
-    base_dset = BaseMotionDataset(motion_rep=MotionRep.BODY, hml_rep="gpvc")
 
     motion_list = []
     motion_pred_list = []
@@ -181,13 +183,40 @@ def evaluation_transformer(
     for inputs, conditions in val_loader:
 
         with torch.no_grad():
+            print(inputs["motion"][0].shape, tmr.motion_encoder.nfeats)
             bs = inputs["motion"][0].shape[0]
 
-            t_latents, m_latents = get_latents(
-                inputs["motion"], conditions, tmr, normalize
-            )
+            if inputs["motion"][0].shape[-1] != tmr.motion_encoder.nfeats:
+                input_eval = torch.zeros(
+                    inputs["motion"][0].shape[:1] + (tmr.motion_encoder.nfeats,)
+                ).to(inputs["motion"][0].device)
 
-            pred_pose_eval = torch.zeros_like(inputs["motion"][0])
+                for i in range(bs):
+                    lenn = inputs["motion"][1].sum(-1)
+                    body_M = base_dset.toMotion(
+                        inputs["motion"][i, :lenn],
+                        motion_rep=MotionRep("body"),
+                        hml_rep=val_loader.dataset.datasets[0].hml_rep,
+                    )
+                    input_eval[i, :lenn] = body_M()
+                t_latents, m_latents = get_latents(
+                    input_eval, conditions, tmr, normalize=normalize
+                )
+
+            else:
+
+                t_latents, m_latents = get_latents(
+                    inputs["motion"], conditions, tmr, normalize=normalize
+                )
+
+            print(t_latents.shape, m_latents.shape)
+
+            pred_pose_eval = torch.zeros(
+                inputs["motion"][0].shape[:-1] + (tmr.motion_encoder.nfeats,)
+            ).to(inputs["motion"][0].device)
+
+            print(pred_pose_eval.shape)
+
             for k in range(bs):
                 lenn = int(inputs["motion"][1][k].sum())
                 text_ = inputs["texts"][k]
@@ -203,11 +232,14 @@ def evaluation_transformer(
                     use_token_critic=True,
                     timesteps=8,
                 )
-                gen_motion = bkn_to_motion(all_ids[:, :1], base_dset)()[:lenn][None]
+                gen_motion = bkn_to_motion(all_ids[:, :1])()[:lenn][None]
+
+                print(gen_motion.shape)
+
                 pred_pose_eval[k : k + 1, :lenn] = gen_motion
 
             t_latents_pred, m_latents_pred = get_latents(
-                (pred_pose_eval, inputs["motion"][1]), conditions, tmr
+                (pred_pose_eval, inputs["motion"][1]), conditions, tmr, normalize
             )
 
             motion_list.append(m_latents)
