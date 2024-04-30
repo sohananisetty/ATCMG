@@ -48,25 +48,35 @@ class ReConsLoss(nn.Module):
         self.use_simple_loss = use_simple_loss
 
         split_seq = []
+        self.loss_weights = []
 
         if "g" in hml_rep:
             split_seq.append(4 if not remove_translation else 2)
+            self.loss_weights.append(2)
         if "p" in hml_rep:
+            self.loss_weights.append(1)
             if motion_rep == MotionRep.BODY or motion_rep == MotionRep.FULL:
                 split_seq.append((self.nb_joints - 1) * 3)
+
             else:
                 split_seq.append((self.nb_joints) * 3)
+
         if "r" in hml_rep:
+            self.loss_weights.append(1)
             if motion_rep == MotionRep.BODY or motion_rep == MotionRep.FULL:
                 split_seq.append((self.nb_joints - 1) * 6)
             else:
                 split_seq.append((self.nb_joints) * 6)
         if "v" in hml_rep:
+            self.loss_weights.append(1)
             split_seq.append(self.nb_joints * 3)
         if "c" in hml_rep:
+            self.loss_weights.append(1)
             split_seq.append(4)
 
         self.split_seq = split_seq
+        if self.use_simple_loss:
+            self.loss_weights = [1] * len(self.loss_weights)
 
     def get_c_from_v(self, vel_param):
         fid_r, fid_l = [8, 11], [7, 10]
@@ -106,10 +116,132 @@ class ReConsLoss(nn.Module):
         gt_offset = self.offset_ref[None].repeat(all_pos.shape[0], 1, 1)
         return self.Loss(pred_offset, gt_offset)
 
+    def split(self, hml_data):
+        joint_num: int = 52
+        body_joints: int = 22
+        hand_joints: int = 30
+
+        if self.hml_rep == "gpvc":
+
+            root_params, local_pos, local_vels, foot = torch.split(
+                hml_data, [4, (joint_num - 1) * 3, joint_num * 3, 4], -1
+            )
+            local_pos_body, local_pos_hand = torch.split(
+                local_pos, ([(body_joints - 1) * 3, hand_joints * 3]), -1
+            )
+
+            local_vel_body, local_vel_hand = torch.split(
+                local_vels, ([(body_joints) * 3, hand_joints * 3]), -1
+            )
+            return (
+                root_params,
+                local_pos_body,
+                local_pos_hand,
+                local_vel_body,
+                local_vel_hand,
+                foot,
+            )
+
+        elif self.hml_rep == "gprvc":
+
+            root_params, local_pos, local_rots, local_vels, foot = torch.split(
+                hml_data,
+                [4, (joint_num - 1) * 3, (joint_num - 1) * 6, joint_num * 3, 4],
+                -1,
+            )
+            local_pos_body, local_pos_hand = torch.split(
+                local_pos, ([(body_joints - 1) * 3, hand_joints * 3]), -1
+            )
+
+            local_rots_body, local_rots_hand = torch.split(
+                local_rots, ([(body_joints - 1) * 6, hand_joints * 6]), -1
+            )
+            local_vel_body, local_vel_hand = torch.split(
+                local_vels, ([(body_joints) * 3, hand_joints * 3]), -1
+            )
+
+            return (
+                root_params,
+                local_pos_body,
+                local_pos_hand,
+                local_rots_body,
+                local_rots_hand,
+                local_vel_body,
+                local_vel_hand,
+                foot,
+            )
+
+    def full_body_loss(self, pred_motion, gt_motion):
+
+        if self.hml_rep == "gpvc":
+
+            (
+                root_params_m,
+                local_pos_body_m,
+                local_pos_hand_m,
+                local_vel_body_m,
+                local_vel_hand_m,
+                foot_m,
+            ) = self.split(pred_motion)
+            (
+                root_params,
+                local_pos_body,
+                local_pos_hand,
+                local_vel_body,
+                local_vel_hand,
+                foot,
+            ) = self.split(gt_motion)
+
+            return (
+                +self.loss_weights[0] * self.Loss(root_params_m, root_params)
+                + self.loss_weights[1] * self.Loss(local_pos_body_m, local_pos_body)
+                + self.loss_weights[1] * self.Loss(local_pos_hand_m, local_pos_hand)
+                + self.loss_weights[2] * self.Loss(local_vel_body_m, local_vel_body)
+                + self.loss_weights[2] * self.Loss(local_vel_hand_m, local_vel_hand)
+                + self.loss_weights[3] * self.Loss(foot_m, foot)
+            )
+        elif self.hml_rep == "gprvc":
+
+            (
+                root_params_m,
+                local_pos_body_m,
+                local_pos_hand_m,
+                local_rots_body_m,
+                local_rots_hand_m,
+                local_vel_body_m,
+                local_vel_hand_m,
+                foot_m,
+            ) = self.split(pred_motion)
+            (
+                root_params,
+                local_pos_body,
+                local_pos_hand,
+                local_rots_body,
+                local_rots_hand,
+                local_vel_body,
+                local_vel_hand,
+                foot,
+            ) = self.split(gt_motion)
+
+            return (
+                +self.loss_weights[0] * self.Loss(root_params_m, root_params)
+                + self.loss_weights[1] * self.Loss(local_pos_body_m, local_pos_body)
+                + self.loss_weights[1] * self.Loss(local_pos_hand_m, local_pos_hand)
+                + self.loss_weights[2] * self.Loss(local_rots_body_m, local_rots_body)
+                + self.loss_weights[2] * self.Loss(local_rots_hand_m, local_rots_hand)
+                + self.loss_weights[3] * self.Loss(local_vel_body_m, local_vel_body)
+                + self.loss_weights[4] * self.Loss(local_vel_hand_m, local_vel_hand)
+                + self.loss_weights[4] * self.Loss(foot_m, foot)
+            )
+
     def forward(self, motion_pred, motion_gt, mask=None):
 
-        if self.use_simple_loss:
-            return self.Loss(motion_pred, motion_gt)
+        if motion_gt.shape[-1] > 263:
+            return self.full_body_loss(motion_pred, motion_gt)
+        else:
+            if self.use_simple_loss:
+
+                return self.Loss(motion_pred, motion_gt)
 
         hml_rep = self.hml_rep
 
@@ -130,57 +262,72 @@ class ReConsLoss(nn.Module):
                 mp = mp * msk[..., None]
                 mg = mg * msk[..., None]
 
-            if rep == "g":
-                loss += 1.5 * self.Loss(mp, mg)
+            elif rep == "r" and self.use_geodesic_loss:
 
-            # elif rep == "p":
-            #     loss += self.Loss(mp, mg)
-            #     if self.skel is not None:
-            #         loss += self.joint_offset_loss(mp)
+                if (
+                    self.motion_rep == MotionRep.BODY
+                    or self.motion_rep == MotionRep.FULL
+                ):
+                    nb_joints = self.nb_joints - 1
+                else:
+                    nb_joints = self.nb_joints
 
-            # elif rep == "r" and self.use_geodesic_loss:
+                mp = geometry.rotation_6d_to_matrix(
+                    mp.view(-1, nb_joints, 6).contiguous()
+                ).view(-1, 3, 3)
+                mg = geometry.rotation_6d_to_matrix(
+                    mg.view(-1, nb_joints, 6).contiguous()
+                ).view(-1, 3, 3)
 
-            #     if (
-            #         self.motion_rep == MotionRep.BODY
-            #         or self.motion_rep == MotionRep.FULL
-            #     ):
-            #         nb_joints = self.nb_joints - 1
-            #     else:
-            #         nb_joints = self.nb_joints
+                loss += self.geodesic_loss(mp, mg)
+                continue
 
-            #     mp = geometry.rotation_6d_to_matrix(
-            #         mp.view(-1, nb_joints, 6).contiguous()
-            #     ).view(-1, 3, 3)
-            #     mg = geometry.rotation_6d_to_matrix(
-            #         mg.view(-1, nb_joints, 6).contiguous()
-            #     ).view(-1, 3, 3)
-
-            #     loss += self.geodesic_loss(mp, mg)
-
-            # elif rep == "v":
-
-            #     if "c" in hml_rep:
-            #         pred_c = self.get_c_from_v(mp).clamp(-1, 1)
-            #         gt_c = 2 * params_gt[-1] - 1
-            #         prm_pred_c = (2 * params_pred[-1] - 1).clamp(-1, 1)
-            #         # loss += 0.7 * nn.functional.binary_cross_entropy_with_logits(
-            #         #     pred_c, params_gt[-1]
-            #         # )
-            #         loss += 0.8 * (1 - ((pred_c).reshape(-1) * gt_c.reshape(-1)).mean())
-            #         loss += 0.8 * (
-            #             1 - ((pred_c).reshape(-1) * prm_pred_c.reshape(-1)).mean()
-            #         )
-            #     loss += self.Loss(mp, mg)
-
-            # if rep == "c":
-            #     loss += 1.5 * nn.functional.binary_cross_entropy_with_logits(mp, mg)
-            # self.Loss(mp, mg)
-
-            else:
-
-                loss += self.Loss(mp, mg)
+            loss += self.loss_weights[indx] * self.Loss(mp, mg)
 
         return loss
+
+        # elif rep == "p":
+        #     loss += self.Loss(mp, mg)
+        #     if self.skel is not None:
+        #         loss += self.joint_offset_loss(mp)
+
+        # elif rep == "r" and self.use_geodesic_loss:
+
+        #     if (
+        #         self.motion_rep == MotionRep.BODY
+        #         or self.motion_rep == MotionRep.FULL
+        #     ):
+        #         nb_joints = self.nb_joints - 1
+        #     else:
+        #         nb_joints = self.nb_joints
+
+        #     mp = geometry.rotation_6d_to_matrix(
+        #         mp.view(-1, nb_joints, 6).contiguous()
+        #     ).view(-1, 3, 3)
+        #     mg = geometry.rotation_6d_to_matrix(
+        #         mg.view(-1, nb_joints, 6).contiguous()
+        #     ).view(-1, 3, 3)
+
+        #     loss += self.geodesic_loss(mp, mg)
+
+        # elif rep == "v":
+
+        #     if "c" in hml_rep:
+        #         pred_c = self.get_c_from_v(mp).clamp(-1, 1)
+        #         gt_c = 2 * params_gt[-1] - 1
+        #         prm_pred_c = (2 * params_pred[-1] - 1).clamp(-1, 1)
+        #         # loss += 0.7 * nn.functional.binary_cross_entropy_with_logits(
+        #         #     pred_c, params_gt[-1]
+        #         # )
+        #         loss += 0.8 * (1 - ((pred_c).reshape(-1) * gt_c.reshape(-1)).mean())
+        #         loss += 0.8 * (
+        #             1 - ((pred_c).reshape(-1) * prm_pred_c.reshape(-1)).mean()
+        #         )
+        #     loss += self.Loss(mp, mg)
+
+        # if rep == "c":
+        #     loss += 1.5 * nn.functional.binary_cross_entropy_with_logits(mp, mg)
+        # self.Loss(mp, mg)
 
 
 class GeodesicLoss(nn.Module):

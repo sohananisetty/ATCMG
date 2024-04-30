@@ -37,7 +37,7 @@ fuser:
   fuse_method: [{"cross": ["text"], "input_interpolate": ["audio"]}]
 
 motion_generator:
-  target: "core.models.generation.muse.MotionMuse"
+  target: "core.models.generation.muse2.MotionMuse"
   n_q : 1
   dim : 512
   depth: 8

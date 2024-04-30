@@ -4,10 +4,10 @@ dataset:
   dataset_name: "mix"
   dataset_root: "/srv/hays-lab/scratch/sanisetty3/motionx"
   motion_rep: "body"
-  hml_rep: "gc"
-  window_size_s: 4
-  motion_min_length_s: 4
-  motion_max_length_s: 4
+  hml_rep: "gpvc"
+  window_size: 120
+  # motion_min_length_s: 4
+  # motion_max_length_s: 4
 train:
   resume: True
   num_train_iters : 800001 #'Number of training steps
@@ -15,10 +15,10 @@ train:
   logging_steps : 10
   wandb_every : 200
   evaluate_every : 10000
-  eval_bs : 400
-  train_bs : 400
+  eval_bs : 200
+  train_bs : 200
   gradient_accumulation_steps : 1
-  learning_rate : 2e-4
+  learning_rate : 3e-4
   weight_decay : 1e-3
   warmup_steps : 0
   gamma : 0.05

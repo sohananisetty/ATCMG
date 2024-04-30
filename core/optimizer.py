@@ -12,16 +12,16 @@ def separate_weight_decayable_params(params):
 def get_optimizer(
     params,
     lr=1e-4,
-    wd=1e-2,
+    wd=1e-5,
     betas=(0.9, 0.99),
     eps=1e-8,
-    filter_by_requires_grad=False,
+    filter_by_requires_grad=True,
     group_wd_params=True,
 ):
     has_wd = wd > 0
 
-    if filter_by_requires_grad:
-        params = list(filter(lambda t: t.requires_grad, params))
+    # if filter_by_requires_grad:
+    params = list(filter(lambda t: t.requires_grad, params))
 
     if group_wd_params and has_wd:
         wd_params, no_wd_params = separate_weight_decayable_params(params)

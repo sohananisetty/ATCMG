@@ -96,7 +96,7 @@ class MotionMuseTrainer(nn.Module):
         fuse_config = self.args.fuser
         vqvae_config = self.args.vqvae
 
-        self.use_align = self.model_args.align_loss_weight > 0
+        self.use_align = True if self.model_args.align_loss_weight > 0 else False
 
         self.load_vqvae(vqvae_config)
 
@@ -169,18 +169,18 @@ class MotionMuseTrainer(nn.Module):
 
         dataset_names = {
             "animation": 0.4,
-            "humanml": 1.5,
+            "humanml": 2.0,
             "perform": 0.5,
-            "GRAB": 1.0,
-            "idea400": 1.0,
+            "GRAB": 1.5,
+            "idea400": 1.5,
             "humman": 0.5,
-            "beat": 1.2,
+            "beat": 1.6,
             "game_motion": 0.8,
             "music": 0.8,
             "aist": 1.5,
             "fitness": 0.7,
             "moyo": 1.0,
-            "choreomaster": 2.5,
+            "choreomaster": 1.6,
             "dance": 0.5,
             "kungfu": 0.5,
             "EgoBody": 0.5,
@@ -400,25 +400,17 @@ class MotionMuseTrainer(nn.Module):
                 [dataset_qualities[nm.split("/")[0]] for nm in inputs["names"]]
             ).to(motions.device)
 
-            # out_body = self.body_muse(
-            #     (inputs["motion"][0][:, :1, :], motion_mask),
-            #     conditions,
-            #     train_critic=False,
-            # )
-            # conditions["body"] = (out_body.embed, motion_mask)
-            # _ = conditions.pop("audio")
-            # _ = conditions.pop("text")
-
             out = self.motion_muse(
                 (motions, motion_mask),
                 conditions,
                 quality_list=quality_list,
+                remove_translation=self.body_cfg.dataset.remove_translation,
             )
             loss = out.loss
             if out.ce_per_codebook is not None and len(out.ce_per_codebook) == 3:
                 loss = (
                     loss
-                    + 1.5 * out.ce_per_codebook[0]
+                    + 2.5 * out.ce_per_codebook[0]
                     + out.ce_per_codebook[1]
                     + out.ce_per_codebook[2]
                 )
@@ -506,12 +498,16 @@ class MotionMuseTrainer(nn.Module):
                 motions = inputs["motion"][0].to(torch.long)
                 motion_mask = inputs["motion"][1]
 
-                out = self.motion_muse((motions, motion_mask), conditions)
+                out = self.motion_muse(
+                    (motions, motion_mask),
+                    conditions,
+                    remove_translation=self.body_cfg.dataset.remove_translation,
+                )
                 loss = out.loss
                 if out.ce_per_codebook is not None and len(out.ce_per_codebook) == 3:
                     loss = (
                         loss
-                        + 2 * out.ce_per_codebook[0]
+                        + 2.5 * out.ce_per_codebook[0]
                         + out.ce_per_codebook[1]
                         + out.ce_per_codebook[2]
                     )

@@ -13,13 +13,13 @@ dataset:
   window_size_s: 4
 train:
   resume: False
-  num_train_iters : 110001 #'Number of training steps
+  num_train_iters : 210001 #'Number of training steps
   save_steps : 10000
   logging_steps : 20
   wandb_every : 200
   evaluate_every : 10000
-  eval_bs : 400
-  train_bs : 400
+  eval_bs : 150
+  train_bs : 150
   gradient_accumulation_steps : 1
   learning_rate : 3e-4
   # weight_decay : 1e-3
@@ -39,7 +39,7 @@ fuser:
 motion_generator:
   target: "core.models.generation.muse2.MotionMuse"
   n_q : 3
-  dim : 512
+  dim : 768
   depth: 8
   cond_dropout: 0.2
   no_mask_token_prob: 0.2
@@ -53,7 +53,7 @@ motion_generator:
   custom: True
   attn_dropout: 0.1
   spatial: True
-  film_skip: 2
+  film_skip: 3
   critic_loss_weight: 1.0
 
 

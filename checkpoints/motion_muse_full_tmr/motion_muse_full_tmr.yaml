@@ -13,13 +13,13 @@ dataset:
   window_size_s: 4
 train:
   resume: False
-  num_train_iters : 110001 #'Number of training steps
+  num_train_iters : 210001 #'Number of training steps
   save_steps : 10000
   logging_steps : 20
   wandb_every : 200
-  evaluate_every : 10000
-  eval_bs : 4
-  train_bs : 4
+  evaluate_every : 20000
+  eval_bs : 150
+  train_bs : 150
   gradient_accumulation_steps : 1
   learning_rate : 3e-4
   # weight_decay : 1e-3
@@ -43,7 +43,7 @@ motion_generator:
   n_q : 3
   dim : 512
   depth: 8
-  cond_dropout: 0.4
+  cond_dropout: 0.2
   no_mask_token_prob: 0.3
   audio_input_dim: 128
   text_input_dim: 1024
@@ -57,7 +57,7 @@ motion_generator:
   spatial: True
   film_skip: 3
   critic_loss_weight: 1.0
-  align_loss_weight: 0.4
+  align_loss_weight: 1.0
 
 
 

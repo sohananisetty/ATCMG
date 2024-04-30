@@ -70,7 +70,7 @@ if __name__ == "__main__":
         "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/tmr/tmr.yaml"
     )
     vqvae_model, vqvae_config = load_vqvae(
-        "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gprvc/vqvae_body_gprvc.yaml"
+        "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gpvc_512/vqvae_body_gpvc_512.yaml"
     )
 
     dataset_args = tmr_cfg.dataset

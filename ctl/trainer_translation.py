@@ -21,11 +21,15 @@ from transformers import AdamW, get_scheduler
 from utils.motion_processing.hml_process import recover_from_ric, recover_root_rot_pos
 from yacs.config import CfgNode
 from core import AudioRep, MotionRep, MotionTokenizerParams, TextRep
-from core.datasets.translation_dataset import (
-    TranslationDataset,
-    load_dataset,
-    simple_collate,
-)
+
+# from core.datasets.translation_dataset import (
+#     TranslationDataset,
+#     load_dataset,
+#     simple_collate,
+# )
+from core.models.translation_model import Predictor2
+from core.datasets.vq_dataset import load_dataset, simple_collate
+
 from core.models.utils import instantiate_from_config
 import utils.rotation_conversions as geometry
 
@@ -65,7 +69,9 @@ class TranslationTransformerTrainer(nn.Module):
         self.output_dir = Path(self.args.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        self.tcn_model = instantiate_from_config(self.model_args).to(self.device)
+        self.tcn_model = Predictor2().to(self.device)
+
+        # instantiate_from_config(self.model_args).to(self.device)
 
         self.register_buffer("steps", torch.Tensor([0]))
 
@@ -85,22 +91,22 @@ class TranslationTransformerTrainer(nn.Module):
         # )
 
         dataset_names = {
-            # "animation": 0.8,
-            "humanml": 2.0,
+            "animation": 0.8,
+            "humanml": 2.5,
             "perform": 0.6,
             "GRAB": 1.0,
-            "idea400": 1.0,
+            "idea400": 1.5,
             # "humman": 0.5,
-            "beat": 1.0,
+            "beat": 1.5,
             "game_motion": 0.8,
-            # "music": 0.5,
-            "aist": 1.0,
-            "fitness": 1.0,
-            "moyo": 2.0,
-            "choreomaster": 1.0,
+            "music": 0.5,
+            "aist": 1.5,
+            "fitness": 0.8,
+            "moyo": 1.5,
+            "choreomaster": 1.5,
             "dance": 1.0,
             # "kungfu": 1.0,
-            # "EgoBody": 0.5,
+            "EgoBody": 0.5,
             # "HAA500": 1.0,
         }
 
@@ -139,9 +145,10 @@ class TranslationTransformerTrainer(nn.Module):
         #     fps=self.dataset_args.fps,
         # )
         condition_provider = ConditionProvider(
-            motion_padding=self.dataset_args.motion_padding,
+            # motion_padding=self.dataset_args.motion_padding,
             # motion_max_length_s=dataset_args.motion_max_length_s,
             fps=self.dataset_args.fps,
+            motion_rep=MotionRep(self.dataset_args.motion_rep),
             only_motion=True,
         )
 
@@ -234,19 +241,20 @@ class TranslationTransformerTrainer(nn.Module):
         return perplexity
 
     def loss_func(self, pred, gt):
+        return nn.functional.smooth_l1_loss(pred, gt)
 
-        rel_pos_pred = pred[..., :2]
-        r_rot_pred = pred[..., 2:]
+        # rel_pos_pred = pred[..., :2]
+        # r_rot_pred = pred[..., 2:]
 
-        r_rot = gt[..., :4]
-        rel_pos = gt[..., 4:]
-        if rel_pos.shape[-1] == 3:
-            rel_pos = rel_pos[..., [0, 2]]
-        r_rot = geometry.quaternion_to_matrix(r_rot)[..., [0, 0], [0, 2]]
+        # r_rot = gt[..., :4]
+        # rel_pos = gt[..., 4:]
+        # if rel_pos.shape[-1] == 3:
+        #     rel_pos = rel_pos[..., [0, 2]]
+        # r_rot = geometry.quaternion_to_matrix(r_rot)[..., [0, 0], [0, 2]]
 
-        return nn.functional.smooth_l1_loss(
-            rel_pos_pred, rel_pos
-        ) + nn.functional.smooth_l1_loss(r_rot_pred, r_rot)
+        # return nn.functional.smooth_l1_loss(
+        #     rel_pos_pred, rel_pos
+        # ) + nn.functional.smooth_l1_loss(r_rot_pred, r_rot)
 
     def train_step(self):
         steps = int(self.steps.item())
@@ -262,29 +270,35 @@ class TranslationTransformerTrainer(nn.Module):
             inputs = next(self.dl_iter)
 
             gt_motion = inputs["motion"][0].to(self.device)
+            params = torch.split(gt_motion, [4, 63, 66, 4], -1)
+            b, n, d = gt_motion.shape
+            x = torch.cat([params[1], params[2][..., 3:]], -1).reshape(b, n, 21, 6)
+            y = torch.cat([params[0], params[-1]], -1)
+
+            # print(x.shape , y.shape)
             # conditions = self.to_device(conditions)
 
-            out = self.tcn_model(gt_motion)
+            out = self.tcn_model(x)
 
-            loss_motion = self.loss_func(out.decoded_motion, gt_motion)
+            loss = 10 * self.loss_func(out, y)
 
-            loss = (
-                self.model_args.loss_motion * loss_motion
-                + self.model_args.commit * out.commit_loss
-            ) / self.grad_accum_every
+            # loss = (
+            #     self.model_args.loss_motion * loss_motion
+            #     + self.model_args.commit * out.commit_loss
+            # ) / self.grad_accum_every
 
-            # loss = loss / self.grad_accum_every
+            loss = loss / self.grad_accum_every
 
             loss.backward()
-            perplexity = self.compute_perplexity(out.indices.flatten())
+            # perplexity = self.compute_perplexity(out.indices.flatten())
 
             accum_log(
                 logs,
                 dict(
                     loss=loss.detach().cpu(),
-                    loss_motion=loss_motion.detach().cpu() / self.grad_accum_every,
-                    commit_loss=out.commit_loss.detach().cpu() / self.grad_accum_every,
-                    perplexity=perplexity.detach().cpu() / self.grad_accum_every,
+                    # loss_motion=loss_motion.detach().cpu() / self.grad_accum_every,
+                    # commit_loss=out.commit_loss.detach().cpu() / self.grad_accum_every,
+                    # perplexity=perplexity.detach().cpu() / self.grad_accum_every,
                 ),
             )
 
@@ -294,8 +308,8 @@ class TranslationTransformerTrainer(nn.Module):
 
         # build pretty printed losses
 
-        # losses_str = f"{steps}: model total loss: {logs['loss'].float():.3}"
-        losses_str = f"{steps}: vqvae model total loss: {logs['loss'].float():.3} reconstruction loss: {logs['loss_motion'].float():.3} commit_loss: {logs['commit_loss'].float():.3} codebook usage: {logs['perplexity']}"
+        losses_str = f"{steps}: model total loss: {logs['loss'].float():.3}"
+        # losses_str = f"{steps}: vqvae model total loss: {logs['loss'].float():.3} reconstruction loss: {logs['loss_motion'].float():.3} commit_loss: {logs['commit_loss'].float():.3} codebook usage: {logs['perplexity']}"
 
         # log
         if steps % self.wandb_every == 0:
@@ -352,26 +366,27 @@ class TranslationTransformerTrainer(nn.Module):
 
                 # loss_dict["loss"] = loss.detach().cpu()
                 gt_motion = inputs["motion"][0].to(self.device)
+                params = torch.split(gt_motion, [4, 63, 66, 4], -1)
+                b, n, d = gt_motion.shape
+                x = torch.cat([params[1], params[2][..., 3:]], -1).reshape(b, n, 21, 6)
+                y = torch.cat([params[0], params[-1]], -1)
 
-                out = self.tcn_model(
-                    motion=gt_motion,
-                    # mask=mask,
-                )
+                out = self.tcn_model(x)
 
-                loss_motion = self.loss_func(out.decoded_motion, gt_motion)
+                loss = 10 * self.loss_func(out, y)
 
-                loss = (
-                    self.model_args.loss_motion * loss_motion
-                    + self.model_args.commit * out.commit_loss
-                ) / self.grad_accum_every
+                # loss = (
+                #     self.model_args.loss_motion * loss_motion
+                #     + self.model_args.commit * out.commit_loss
+                # ) / self.grad_accum_every
 
-                perplexity = self.compute_perplexity(out.indices.flatten())
+                # perplexity = self.compute_perplexity(out.indices.flatten())
 
                 loss_dict = {
                     "total_loss": loss.detach().cpu(),
-                    "loss_motion": loss_motion.detach().cpu(),
-                    "commit_loss": out.commit_loss.detach().cpu(),
-                    "perplexity": perplexity,
+                    # "loss_motion": loss_motion.detach().cpu(),
+                    # "commit_loss": out.commit_loss.detach().cpu(),
+                    # "perplexity": perplexity,
                 }
 
                 for key, value in loss_dict.items():

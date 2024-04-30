@@ -135,7 +135,7 @@ class TMRAlignLoss(nn.Module):
             input_mask_expanded.sum(1), min=1e-9
         )
 
-    def forward(self, inputs, conditions):
+    def forward(self, inputs, conditions, remove_translation=False):
 
         ### inputs: codes, mask
 
@@ -147,6 +147,15 @@ class TMRAlignLoss(nn.Module):
         body_ids = inputs[0][:, 0]
 
         body_motion = self.vqvae.decode(body_ids)
+        if remove_translation:
+            z = torch.zeros(
+                body_motion.shape[:-1] + (2,),
+                dtype=body_motion.dtype,
+                device=body_motion.device,
+            )
+            body_motion = torch.cat(
+                [body_motion[..., 0:1], z, body_motion[..., 1:]], -1
+            )
         mask = inputs[1]
         upsampled_motion_mask = (
             nn.functional.interpolate(mask[:, None, :].to(torch.float), scale_factor=4)
@@ -154,15 +163,16 @@ class TMRAlignLoss(nn.Module):
             .squeeze(1)
         )
 
-        print(body_motion.shape, upsampled_motion_mask.shape)
-
         motion_x_dict = {"x": body_motion, "mask": upsampled_motion_mask}
         m_latents = self.tmr.encode(motion_x_dict, sample_mean=True)
         # m_latents = torch.nn.functional.normalize(m_latents, dim=-1)
 
-        sent_emb = self.mean_pooling(text_conds[0], text_conds[1].to(torch.bool))
+        # sent_emb = self.mean_pooling(text_conds[0], text_conds[1].to(torch.bool))
 
-        loss = self.contrastive_loss(t_latents, m_latents, sent_emb)
+        loss = self.contrastive_loss(t_latents, m_latents)
+
+        # print(body_motion.shape, loss, text_conds[0].shape)
+        # print(t_latents.shape, m_latents.shape, sent_emb.shape)
 
         return loss
 
@@ -733,6 +743,7 @@ class MotionMuse(nn.Module):
         quality_list=None,
         sample_temperature=None,
         train_critic=True,
+        remove_translation=False,
     ) -> MuseOutput:
 
         if self.flatten:
@@ -762,9 +773,11 @@ class MotionMuse(nn.Module):
         )
 
         if self.tmr_loss_fn is not None:
-            align_loss = self.tmr_loss_fn((sampled_ids, input_mask), conditions)
+            align_loss = self.tmr_loss_fn(
+                (sampled_ids, input_mask), conditions, remove_translation
+            )
             out.align_loss = align_loss
-            out.loss + self.align_loss_weight * align_loss
+            out.loss += self.align_loss_weight * align_loss
 
         if not exists(self.token_critic) or train_critic == False:
             return out

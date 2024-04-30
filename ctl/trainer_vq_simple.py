@@ -129,7 +129,7 @@ class VQVAEMotionTrainer(nn.Module):
 
             dataset_names = {
                 "animation": 0.8,
-                "humanml": 3.0,
+                "humanml": 2.5,
                 "perform": 0.5,
                 "GRAB": 1.0,
                 "idea400": 2.0,
