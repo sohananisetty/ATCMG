@@ -146,7 +146,7 @@ def bkn_to_motion_add_translation(
     body_model,
     body_cfg,
     body_refiner_model,
-    trans_model,
+    trans_model=None,
     remove_translation=True,
 ):
     gen_motion = bkn_to_motion(
@@ -157,7 +157,9 @@ def bkn_to_motion_add_translation(
         remove_translation,
     )
 
-    print(gen_motion().shape)
+    if trans_model is None:
+        return gen_motion
+
     params = torch.split(gen_motion(), [4, 63, 66, 4], -1)
     x = torch.cat([params[1], params[2][..., 3:]], -1).reshape(1, -1, 21, 6)
     out = trans_model(x.to(device))
@@ -209,16 +211,18 @@ if __name__ == "__main__":
     )
 
     motion_gen, gen_cfg = load_generator(
-        "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_body_hands/motion_muse_body_hands.yaml"
+        "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_body_hands_gprvc/motion_muse_body_hands_gprvc.yaml"
     )
 
-    trans_model, trans_cfg = load_translation_model(
-        "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/simple_motion_translation/simple_motion_translation.yaml"
-    )
+    trans_model, trans_cfg = None, None
+    # load_translation_model(
+    #     "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/simple_motion_translation/simple_motion_translation.yaml"
+    # )
 
-    refiner, refiner_cfg = load_refine_model(
-        "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gpvc_5121/vqvae_body_gpvc_5121.yaml"
-    )
+    refiner, refiner_cfg = None, None
+    # load_refine_model(
+    #     "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_body_gpvc_5121/vqvae_body_gpvc_5121.yaml"
+    # )
 
     body_model, body_cfg = load_vqvae(gen_cfg)
 
@@ -238,11 +242,11 @@ if __name__ == "__main__":
     )
 
     ds, _, _ = load_dataset(
-        dataset_names=["moyo"], dataset_args=tmr_cfg.dataset, split="train"
+        dataset_names=["humanml"], dataset_args=tmr_cfg.dataset, split="test"
     )
     data_loader = torch.utils.data.DataLoader(
         ds,
-        4,
+        32,
         collate_fn=partial(simple_collate, conditioner=condition_provider_gen),
         drop_last=True,
     )
@@ -256,6 +260,7 @@ if __name__ == "__main__":
             body_cfg=body_cfg,
             body_refiner_model=refiner,
             trans_model=trans_model,
+            remove_translation=False,
         ),
         motion_generator=motion_gen,
         tmr=tmr,

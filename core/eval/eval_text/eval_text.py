@@ -183,7 +183,6 @@ def evaluation_transformer(
     for inputs, conditions in val_loader:
 
         with torch.no_grad():
-            print(inputs["motion"][0].shape, tmr.motion_encoder.nfeats)
             bs = inputs["motion"][0].shape[0]
 
             if inputs["motion"][0].shape[-1] != tmr.motion_encoder.nfeats:
@@ -209,13 +208,11 @@ def evaluation_transformer(
                     inputs["motion"], conditions, tmr, normalize=normalize
                 )
 
-            print(t_latents.shape, m_latents.shape)
-
             pred_pose_eval = torch.zeros(
                 inputs["motion"][0].shape[:-1] + (tmr.motion_encoder.nfeats,)
             ).to(inputs["motion"][0].device)
 
-            print(pred_pose_eval.shape)
+            # print(pred_pose_eval.shape)
 
             for k in range(bs):
                 lenn = int(inputs["motion"][1][k].sum())
@@ -232,9 +229,11 @@ def evaluation_transformer(
                     use_token_critic=True,
                     timesteps=8,
                 )
-                gen_motion = bkn_to_motion(all_ids[:, :1])()[:lenn][None]
-
-                print(gen_motion.shape)
+                gen_motion = bkn_to_motion(all_ids[:, :1])
+                # print(gen_motion().shape)
+                gen_motion.rotations = None
+                gen_motion.hml_rep = "gpvc"
+                gen_motion = gen_motion()[:lenn][None]
 
                 pred_pose_eval[k : k + 1, :lenn] = gen_motion
 

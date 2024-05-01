@@ -471,7 +471,7 @@ class MotionMuseTrainer(nn.Module):
             )
 
         if steps % self.evaluate_every == 0:
-            # self.validation_step()
+            self.validation_step()
             self.sample_render_hmlvec(os.path.join(self.output_dir, "samples"))
 
         self.steps += 1

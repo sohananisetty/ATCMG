@@ -32,8 +32,8 @@ vqvae:
   left_hand_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_left_hand/vqvae_left_hand.yaml"
   right_hand_config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/vqvae/vqvae_right_hand/vqvae_right_hand.yaml"
 
-tmr:
-  config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/tmr/tmr.yaml"
+# tmr:
+#   config: "/srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/tmr/tmr.yaml"
 
 fuser:
   fuse_method: [{"cross": ["text"], "input_interpolate": ["audio"]}]
@@ -41,8 +41,8 @@ fuser:
 motion_generator:
   target: "core.models.generation.muse2.MotionMuse"
   n_q : 3
-  dim : 512
-  depth: 8
+  dim : 768
+  depth: 10
   cond_dropout: 0.2
   no_mask_token_prob: 0.3
   audio_input_dim: 128
@@ -57,7 +57,7 @@ motion_generator:
   spatial: True
   film_skip: 3
   critic_loss_weight: 1.0
-  align_loss_weight: 1.0
+  # align_loss_weight: 1.0
 
 
 

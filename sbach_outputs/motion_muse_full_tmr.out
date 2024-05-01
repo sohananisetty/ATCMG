@@ -2,15 +2,15 @@ loading config from: /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpo
 output_dir:  /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_full_tmr
 Sync is turned on False
 loaded model with  0.03015906736254692 tensor([110000.], device='cuda:0') steps
-align_loss_weight: 1.0
+align_loss_weight: 0.0
 attn_dropout: 0.1
 audio_input_dim: 128
 causal: False
 cond_dropout: 0.2
 critic_loss_weight: 1.0
 custom: True
-depth: 8
-dim: 512
+depth: 10
+dim: 768
 emb_dropout: 0.1
 ff_mult: 4
 film: False
@@ -29,7 +29,7 @@ spatial: True
 text_input_dim: 1024
 var_len: False
 Non-A100 GPU detected, using math or mem efficient attention if input tensor is on cuda
-Total training params: 45.32M
+Total training params: 124.18M
 Total number of motions animation: 120 and texts 120
 Total number of motions humanml: 49974 and texts 49974
 Total number of motions perform: 346 and texts 346
@@ -80,7 +80,10 @@ Total number of motions kungfu: 2 and texts 2
 Total number of motions EgoBody: 2 and texts 2
 training with training 84141 and test dataset of 10667 and render 27 samples
 /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_full_tmr
-0: model cross entropy loss: 44.3 align loss 5.04
-44.29383850097656 inf
+0: model cross entropy loss: 39.2 
+39.17817306518555 inf
 0: saving model to /srv/hays-lab/scratch/sanisetty3/music_motion/ATCMG/checkpoints/motion_muse_full_tmr/checkpoints
+validation start
+val/loss tensor(39.0909)
 render start
+200: model cross entropy loss: 34.4 

@@ -1,0 +1,7 @@
+Non-A100 GPU detected, using math or mem efficient attention if input tensor is on cuda
+loading model with tensor([100000.], device='cuda:0') steps and 0.0023263946641236544 loss
+Sync is turned on False
+loaded model with  0.03844764456152916 tensor([140000.], device='cuda:0') steps
+Sync is turned on False
+loaded model with  0.03015906736254692 tensor([110000.], device='cuda:0') steps
+Total number of motions humanml: 8802 and texts 8802
